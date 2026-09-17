@@ -1,4 +1,4 @@
-import { CalendarEvent, Course, Task } from './types';
+import type { CalendarEvent, Course, Task } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 export class TaskManager {

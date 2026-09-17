@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { useAppStore } from '../../../store/useAppStore';
-import { EventType, LocationType, LessonType } from '../../../core/types';
+import type { EventType, LocationType, LessonType } from '../../../core/types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface EventFormModalProps {

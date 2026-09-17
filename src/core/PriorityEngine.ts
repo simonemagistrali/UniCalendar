@@ -1,4 +1,4 @@
-import { Task, Course, CalendarEvent, UserPreferences } from './types';
+import type { Task, Course, CalendarEvent, UserPreferences } from './types';
 import { differenceInDays, differenceInHours } from 'date-fns';
 
 export class PriorityEngine {

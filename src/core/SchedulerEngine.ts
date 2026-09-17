@@ -1,4 +1,4 @@
-import { Task, StudySession, UserPreferences, CalendarEvent } from './types';
+import type { Task, StudySession, UserPreferences, CalendarEvent } from './types';
 import { addMinutes, setHours, setMinutes, startOfDay, isBefore, isAfter, isSameDay } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 

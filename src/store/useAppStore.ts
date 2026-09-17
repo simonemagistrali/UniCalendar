@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Task, Course, CalendarEvent, UserPreferences } from '../core/types';
+import type { Task, Course, CalendarEvent, UserPreferences } from '../core/types';
 
 interface AppState {
   tasks: Task[];
