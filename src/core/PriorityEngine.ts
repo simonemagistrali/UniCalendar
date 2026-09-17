@@ -1,111 +1,156 @@
-import type { Task, Course, CalendarEvent, UserPreferences } from './types';
-import { differenceInDays, differenceInHours } from 'date-fns';
+import type { Task, Course, CalendarEvent, UserPreferences, PerformanceRecord } from './types';
 
+/**
+ * PriorityEngine — Calculates dynamic priority scores for tasks.
+ * Uses: difficulty, delay, exam proximity, past performance, look-ahead, postpone count.
+ */
 export class PriorityEngine {
-  /**
-   * Calculates the priority score for a given task.
-   * Higher score = more important/urgent.
-   */
+  
   static calculatePriority(
-    task: Task, 
-    course: Course | undefined, 
+    task: Task,
+    course: Course | undefined,
     upcomingExam: CalendarEvent | undefined,
     upcomingLesson: CalendarEvent | undefined,
-    prefs: UserPreferences
+    prefs: UserPreferences,
+    history: PerformanceRecord[]
   ): number {
     let score = 0;
-    const now = new Date();
+    const now = Date.now();
 
-    // 1. Difficulty Base Weight (1-10)
-    const difficultyWeight = course ? course.difficulty : 5;
-    score += difficultyWeight * 10; 
+    // 1. Difficulty base (1-10 scaled to 10-100)
+    const diff = course ? course.difficulty : 5;
+    score += diff * 10;
 
-    // 2. Delay Weight: how long the task has been pending since creation
-    const daysSinceCreation = differenceInDays(now, task.createdAt);
+    // 2. Delay weight — how long since creation
+    const daysSinceCreation = (now - new Date(task.createdAt).getTime()) / 86400000;
     if (daysSinceCreation > 0) {
-      score += daysSinceCreation * 5; // Increases by 5 points per day delayed
+      score += Math.min(daysSinceCreation * 5, 100); // Cap at 100
     }
 
-    // 3. Deadline / Exam Proximity Weight (The "Project Deadline" logic)
+    // 3. Postpone penalty
+    score += task.postponedCount * 15;
+
+    // 4. Exam proximity — progressive increase
     if (upcomingExam) {
-      const daysToExam = differenceInDays(upcomingExam.startTime, now);
+      const daysToExam = (new Date(upcomingExam.startTime).getTime() - now) / 86400000;
+      const threshold = prefs.daysBeforeExamToIncreasePriority;
       
-      // If we are within the user's defined critical window
-      if (daysToExam <= prefs.daysBeforeExamToIncreasePriority && daysToExam >= 0) {
-        // Exponential/Progressive increase as exam approaches
-        // Example: If threshold is 14 days, at 14 days multiplier is 1, at 0 days it's max.
-        const urgencyMultiplier = Math.pow((prefs.daysBeforeExamToIncreasePriority - daysToExam + 1), 1.5);
-        score += (100 * urgencyMultiplier); 
+      if (daysToExam >= 0 && daysToExam <= threshold) {
+        // Exponential urgency as exam approaches
+        const ratio = (threshold - daysToExam) / threshold; // 0 to 1
+        score += 150 * Math.pow(ratio, 1.5);
       }
     } else if (task.deadline) {
-      // General deadline (e.g. next lesson)
-      const hoursToDeadline = differenceInHours(task.deadline, now);
-      if (hoursToDeadline < 48 && hoursToDeadline >= 0) {
-        score += (48 - hoursToDeadline) * 2;
+      // General deadline
+      const hoursToDeadline = (new Date(task.deadline).getTime() - now) / 3600000;
+      if (hoursToDeadline >= 0 && hoursToDeadline < 72) {
+        score += (72 - hoursToDeadline) * 2;
       }
     }
 
-    // 4. Past Performance (if they historically take longer, we should prioritize starting earlier)
-    // This could be derived from global stats, but for now we increase slightly if it's a known heavy task
-    if (task.estimatedDuration > 120) {
-      score += 20; // Long tasks get a bump to be scheduled earlier
+    // 5. Past performance — if student historically takes longer for this course, bump priority
+    if (course) {
+      const courseHistory = history.filter(h => h.courseId === course.id);
+      if (courseHistory.length > 0) {
+        const avgOverrun = courseHistory.reduce((acc, h) => acc + (h.actualMinutes - h.estimatedMinutes), 0) / courseHistory.length;
+        if (avgOverrun > 0) {
+          score += Math.min(avgOverrun * 0.5, 40); // If they always run over, prioritize earlier
+        }
+      }
     }
 
-    // 5. Look-ahead Logic: if a lesson of the same course is coming up within 48h, prioritize preparation!
+    // 6. Long tasks get a bump to be started earlier
+    if (task.estimatedDuration > 120) {
+      score += 20;
+    }
+
+    // 7. Look-ahead: if a lesson of same course is within 48h, prepare!
     if (upcomingLesson && task.title.toLowerCase().includes('appunti')) {
-      const hoursToLesson = differenceInHours(upcomingLesson.startTime, now);
+      const hoursToLesson = (new Date(upcomingLesson.startTime).getTime() - now) / 3600000;
       if (hoursToLesson > 0 && hoursToLesson < 48) {
-        // Boost priority dramatically so you are ready for the next lesson
         score += 80;
       }
+    }
+
+    // 8. Project tasks get moderate consistent priority
+    if (task.isProjectTask) {
+      score += 30;
     }
 
     return Math.round(score);
   }
 
   /**
-   * Sorts tasks considering dependencies and priority scores.
-   * If Task B depends on Task A, Task A must come first regardless of score.
+   * Sorts tasks respecting dependencies (propedeuticità) and priority.
    */
-  static sortTasks(tasks: Task[], courses: Map<string, Course>, exams: CalendarEvent[], upcomingLessons: CalendarEvent[], prefs: UserPreferences): Task[] {
-    // 1. Update all scores
-    tasks.forEach(t => {
-      const course = t.courseId ? courses.get(t.courseId) : undefined;
-      const exam = exams.find(e => e.courseId === t.courseId && e.type === 'exam' && e.startTime > new Date());
-      const nextLesson = upcomingLessons.find(e => e.courseId === t.courseId && e.type === 'lesson' && e.startTime > new Date());
-      t.priorityScore = this.calculatePriority(t, course, exam, nextLesson, prefs);
-    });
+  static sortTasks(
+    tasks: Task[],
+    courses: Map<string, Course>,
+    events: CalendarEvent[],
+    prefs: UserPreferences,
+    history: PerformanceRecord[]
+  ): Task[] {
+    const now = Date.now();
 
-    // 2. Sort by score descending
-    let sorted = [...tasks].sort((a, b) => b.priorityScore - a.priorityScore);
+    // Precompute exams and upcoming lessons per course
+    const examsByCourse = new Map<string, CalendarEvent>();
+    const lessonsByCourse = new Map<string, CalendarEvent>();
 
-    // 3. Resolve Dependencies (Propedeuticità)
-    // Simple topological sort / dependency reordering
-    const resolved: Task[] = [];
-    const resolvedIds = new Set<string>();
+    for (const e of events) {
+      if (!e.courseId) continue;
+      const eTime = new Date(e.startTime).getTime();
+      if (eTime < now) continue;
 
-    let progress = true;
-    while (sorted.length > 0 && progress) {
-      progress = false;
-      for (let i = 0; i < sorted.length; i++) {
-        const task = sorted[i];
-        const canBeScheduled = task.dependencies.every(depId => resolvedIds.has(depId));
-        
-        if (canBeScheduled) {
-          resolved.push(task);
-          resolvedIds.add(task.id);
-          sorted.splice(i, 1);
-          progress = true;
-          break; // restart the loop with updated sorted list
+      if (e.type === 'exam') {
+        const existing = examsByCourse.get(e.courseId);
+        if (!existing || eTime < new Date(existing.startTime).getTime()) {
+          examsByCourse.set(e.courseId, e);
+        }
+      }
+      if (e.type === 'lesson') {
+        const existing = lessonsByCourse.get(e.courseId);
+        if (!existing || eTime < new Date(existing.startTime).getTime()) {
+          lessonsByCourse.set(e.courseId, e);
         }
       }
     }
 
-    // If there are circular dependencies or missing deps, just append the rest
-    if (sorted.length > 0) {
-      resolved.push(...sorted);
+    // Update scores
+    const scored = tasks.map(t => {
+      const course = t.courseId ? courses.get(t.courseId) : undefined;
+      const exam = t.courseId ? examsByCourse.get(t.courseId) : undefined;
+      const lesson = t.courseId ? lessonsByCourse.get(t.courseId) : undefined;
+      return {
+        ...t,
+        priorityScore: this.calculatePriority(t, course, exam, lesson, prefs, history)
+      };
+    });
+
+    // Sort by score descending
+    scored.sort((a, b) => b.priorityScore - a.priorityScore);
+
+    // Topological sort respecting dependencies
+    const resolved: Task[] = [];
+    const resolvedIds = new Set<string>();
+    const remaining = [...scored];
+
+    let progress = true;
+    while (remaining.length > 0 && progress) {
+      progress = false;
+      for (let i = 0; i < remaining.length; i++) {
+        const task = remaining[i];
+        if (task.dependencies.every(d => resolvedIds.has(d) || !remaining.some(r => r.id === d))) {
+          resolved.push(task);
+          resolvedIds.add(task.id);
+          remaining.splice(i, 1);
+          progress = true;
+          break;
+        }
+      }
     }
 
+    // Append any with circular deps
+    resolved.push(...remaining);
     return resolved;
   }
 }

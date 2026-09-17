@@ -1,122 +1,122 @@
-import type { Task, StudySession, UserPreferences, CalendarEvent } from './types';
-import { addMinutes, setHours, setMinutes, startOfDay, isBefore, isAfter, isSameDay } from 'date-fns';
+import type { Task, StudySession, UserPreferences, CalendarEvent, PerformanceRecord } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * SchedulerEngine — Generates study sessions dynamically filling empty calendar gaps.
+ * Features: per-day hours, adaptive buffer from history, collision avoidance, max 2h blocks.
+ */
 export class SchedulerEngine {
-  /**
-   * Generates study sessions dynamically filling empty gaps in the calendar.
-   */
+
   static generateSchedule(
-    tasks: Task[], 
-    existingEvents: CalendarEvent[], 
+    tasks: Task[],
+    existingEvents: CalendarEvent[],
     prefs: UserPreferences,
     startDate: Date,
-    daysToSchedule: number = 7
+    daysToSchedule: number = 7,
+    history: PerformanceRecord[] = []
   ): StudySession[] {
     const sessions: StudySession[] = [];
+    const todoTasks = tasks.filter(t => t.status !== 'done');
+    if (todoTasks.length === 0) return sessions;
+
     let currentTime = new Date(startDate);
-    
-    // Convert time limits to numbers
-    const startHour = parseInt(prefs.studyHours.start.split(':')[0]);
-    const startMinute = parseInt(prefs.studyHours.start.split(':')[1]);
-    const endHour = parseInt(prefs.studyHours.end.split(':')[0]);
-    const endMinute = parseInt(prefs.studyHours.end.split(':')[1]);
+    let taskIdx = 0;
+    let remainingTime = todoTasks[0]?.estimatedDuration || 0;
 
-    let currentTaskIndex = 0;
-    let remainingTaskTime = tasks.length > 0 ? tasks[0].estimatedDuration : 0;
+    const endScheduleDate = new Date(startDate);
+    endScheduleDate.setDate(endScheduleDate.getDate() + daysToSchedule);
 
-    // Buffer Logic: dynamically adjusted based on history.
-    // Base is 15 mins. If priority is high, increase to absorb delays.
-    const getDynamicBuffer = (task: Task) => {
-      let buffer = 15;
-      if (task.priorityScore > 50) buffer += 15; // Harder tasks get more buffer
-      
-      const relatedCourse = existingEvents.find(e => e.courseId === task.courseId && e.location?.type === 'in_person');
-      if (relatedCourse) {
-        // If it involves traveling to campus, add travel buffer
-        buffer += 30;
-      }
-      return buffer;
-    };
+    while (taskIdx < todoTasks.length && currentTime < endScheduleDate) {
+      const dayOfWeek = currentTime.getDay();
+      const dayConfig = prefs.dailyStudyHours ? prefs.dailyStudyHours[dayOfWeek] : undefined;
 
-    while (currentTaskIndex < tasks.length && differenceInDays(currentTime, startDate) < daysToSchedule) {
-      // 1. Check if current day is forbidden
-      if (prefs.forbiddenDays.includes(currentTime.getDay())) {
-        currentTime = startOfDay(addDays(currentTime, 1));
+      // Skip disabled days
+      if (!dayConfig || !dayConfig.enabled) {
+        currentTime = this.nextDay(currentTime);
         continue;
       }
 
-      // 2. Check time bounds
-      const dayStart = setMinutes(setHours(currentTime, startHour), startMinute);
-      const dayEnd = setMinutes(setHours(currentTime, endHour), endMinute);
+      // Parse day bounds
+      const [startH, startM] = dayConfig.start.split(':').map(Number);
+      const [endH, endM] = dayConfig.end.split(':').map(Number);
 
-      if (isBefore(currentTime, dayStart)) {
-        currentTime = dayStart;
+      const dayStart = new Date(currentTime);
+      dayStart.setHours(startH, startM, 0, 0);
+      const dayEnd = new Date(currentTime);
+      dayEnd.setHours(endH, endM, 0, 0);
+
+      // Clamp to day start
+      if (currentTime < dayStart) {
+        currentTime = new Date(dayStart);
       }
 
-      if (isAfter(currentTime, dayEnd) || currentTime.getTime() === dayEnd.getTime()) {
-        currentTime = startOfDay(addDays(currentTime, 1));
+      // Past day end → next day
+      if (currentTime >= dayEnd) {
+        currentTime = this.nextDay(currentTime);
         continue;
       }
 
-      // 3. Find next available slot (check collisions with existingEvents)
+      // Find next collision
       const collision = this.findNextCollision(currentTime, existingEvents);
-      if (collision && isBefore(collision.startTime, addMinutes(currentTime, 30))) {
-        // Skip over the event
-        currentTime = collision.endTime;
-        continue;
+
+      // If collision starts within 15 min, skip over it
+      if (collision) {
+        const collisionStart = new Date(collision.startTime);
+        const collisionEnd = new Date(collision.endTime);
+        if (collisionStart.getTime() - currentTime.getTime() < 15 * 60000) {
+          currentTime = new Date(Math.max(collisionEnd.getTime(), currentTime.getTime() + 60000));
+          continue;
+        }
       }
 
-      // 4. Schedule block
-      const task = tasks[currentTaskIndex];
-      // Max block size is 2 hours before forcing a break
-      const blockDuration = Math.min(remainingTaskTime, 120); 
-      let endTime = addMinutes(currentTime, blockDuration);
+      // Schedule a study block
+      const task = todoTasks[taskIdx];
+      const maxBlock = Math.min(remainingTime, 120); // Max 2h per block
+      let blockEnd = new Date(currentTime.getTime() + maxBlock * 60000);
 
-      // If block crosses a collision, truncate it
-      if (collision && isBefore(endTime, collision.startTime) === false) {
-        endTime = collision.startTime;
+      // Truncate at collision
+      if (collision) {
+        const cs = new Date(collision.startTime);
+        if (blockEnd > cs) blockEnd = cs;
       }
 
-      // If block crosses day boundary, truncate it
-      if (isAfter(endTime, dayEnd)) {
-        endTime = dayEnd;
-      }
+      // Truncate at day end
+      if (blockEnd > dayEnd) blockEnd = new Date(dayEnd);
 
-      const actualDuration = differenceInMinutes(endTime, currentTime);
-      
-      if (actualDuration > 0) {
+      const actualMinutes = Math.round((blockEnd.getTime() - currentTime.getTime()) / 60000);
+
+      if (actualMinutes >= 15) { // Minimum 15 min session
         sessions.push({
           id: uuidv4(),
           taskId: task.id,
-          startTime: currentTime,
-          endTime: endTime,
-          isBuffer: false
+          startTime: currentTime.toISOString(),
+          endTime: blockEnd.toISOString(),
+          isBuffer: false,
         });
-
-        remainingTaskTime -= actualDuration;
+        remainingTime -= actualMinutes;
       }
 
-      // Move time forward
-      currentTime = endTime;
+      currentTime = new Date(blockEnd);
 
-      // Check if task is done
-      if (remainingTaskTime <= 0) {
-        currentTaskIndex++;
-        if (currentTaskIndex < tasks.length) {
-          remainingTaskTime = tasks[currentTaskIndex].estimatedDuration;
-          
-          const dynamicBuffer = getDynamicBuffer(task);
-
-          // Add buffer after finishing a task
+      // Task completed → move to next
+      if (remainingTime <= 0) {
+        // Add dynamic buffer
+        const bufferMin = this.getDynamicBuffer(task, history);
+        if (bufferMin > 0) {
+          const bufferEnd = new Date(currentTime.getTime() + bufferMin * 60000);
           sessions.push({
             id: uuidv4(),
             taskId: 'buffer',
-            startTime: currentTime,
-            endTime: addMinutes(currentTime, dynamicBuffer),
-            isBuffer: true
+            startTime: currentTime.toISOString(),
+            endTime: bufferEnd.toISOString(),
+            isBuffer: true,
           });
-          currentTime = addMinutes(currentTime, dynamicBuffer);
+          currentTime = bufferEnd;
+        }
+
+        taskIdx++;
+        if (taskIdx < todoTasks.length) {
+          remainingTime = todoTasks[taskIdx].estimatedDuration;
         }
       }
     }
@@ -124,22 +124,45 @@ export class SchedulerEngine {
     return sessions;
   }
 
-  private static findNextCollision(time: Date, events: CalendarEvent[]): CalendarEvent | undefined {
-    return events
-      .filter(e => isAfter(e.endTime, time))
-      .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())[0];
-  }
-}
+  /**
+   * Adaptive buffer: base 10 min, increases if the user historically overruns for this course.
+   */
+  private static getDynamicBuffer(task: Task, history: PerformanceRecord[]): number {
+    let buffer = 10;
 
-// Helper functions (since they were used above but missing imports for brevity)
-function differenceInDays(dateLeft: Date, dateRight: Date): number {
-  return Math.floor((dateLeft.getTime() - dateRight.getTime()) / (1000 * 60 * 60 * 24));
-}
-function differenceInMinutes(dateLeft: Date, dateRight: Date): number {
-  return Math.floor((dateLeft.getTime() - dateRight.getTime()) / (1000 * 60));
-}
-function addDays(date: Date, amount: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + amount);
-  return result;
+    if (task.courseId && history.length > 0) {
+      const courseHist = history.filter(h => h.courseId === task.courseId);
+      if (courseHist.length >= 2) {
+        const avgOverrun = courseHist.reduce((a, h) => a + Math.max(0, h.actualMinutes - h.estimatedMinutes), 0) / courseHist.length;
+        buffer += Math.min(Math.round(avgOverrun * 0.5), 30); // Max +30 min extra buffer
+      }
+    }
+
+    // High priority tasks get extra buffer
+    if (task.priorityScore > 80) buffer += 5;
+
+    return buffer;
+  }
+
+  private static findNextCollision(time: Date, events: CalendarEvent[]): CalendarEvent | undefined {
+    let nearest: CalendarEvent | undefined;
+    let nearestTime = Infinity;
+
+    for (const e of events) {
+      const eEnd = new Date(e.endTime).getTime();
+      const eStart = new Date(e.startTime).getTime();
+      if (eEnd > time.getTime() && eStart > time.getTime() && eStart < nearestTime) {
+        nearest = e;
+        nearestTime = eStart;
+      }
+    }
+    return nearest;
+  }
+
+  private static nextDay(d: Date): Date {
+    const next = new Date(d);
+    next.setDate(next.getDate() + 1);
+    next.setHours(0, 0, 0, 0);
+    return next;
+  }
 }

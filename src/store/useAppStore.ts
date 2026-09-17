@@ -1,48 +1,310 @@
 import { create } from 'zustand';
-import type { Task, Course, CalendarEvent, UserPreferences } from '../core/types';
+import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord, AppUser, DayStudyHours } from '../core/types';
+import { saveState, loadState } from '../core/persistence';
+import { TaskManager } from '../core/TaskManager';
+import { PriorityEngine } from '../core/PriorityEngine';
+import { SchedulerEngine } from '../core/SchedulerEngine';
 
-interface AppState {
-  tasks: Task[];
-  courses: Course[];
-  events: CalendarEvent[];
-  preferences: UserPreferences;
-  user: { name: string; email: string; photoURL: string } | null;
-  
-  // Actions
-  setUser: (user: AppState['user']) => void;
-  addTask: (task: Task) => void;
-  updateTask: (taskId: string, updates: Partial<Task>) => void;
-  addEvent: (event: CalendarEvent) => void;
-  addCourse: (course: Course) => void;
-  updatePreferences: (prefs: Partial<UserPreferences>) => void;
+/* ─── Default per-day study hours ─── */
+function defaultDailyHours(): Record<number, DayStudyHours> {
+  const h: Record<number, DayStudyHours> = {};
+  for (let d = 0; d < 7; d++) {
+    h[d] = d === 0
+      ? { enabled: false, start: '08:00', end: '18:00' } // Sunday off
+      : { enabled: true, start: '08:00', end: '18:00' };
+  }
+  return h;
 }
 
 const defaultPreferences: UserPreferences = {
-  studyHours: { start: "08:00", end: "18:00" },
-  forbiddenDays: [0], // 0 = Sunday
+  dailyStudyHours: defaultDailyHours(),
   daysBeforeExamToIncreasePriority: 14,
 };
 
-export const useAppStore = create<AppState>((set) => ({
-  tasks: [],
-  courses: [],
-  events: [],
-  preferences: defaultPreferences,
+/* ─── State Interface ─── */
+interface AppState {
+  // Data
+  user: AppUser | null;
+  events: CalendarEvent[];
+  tasks: Task[];
+  courses: Course[];
+  preferences: UserPreferences;
+  studySessions: StudySession[];
+  performanceHistory: PerformanceRecord[];
+
+  // User Actions
+  setUser: (user: AppUser | null) => void;
+  
+  // Events
+  addEvent: (event: CalendarEvent) => void;
+  addEvents: (events: CalendarEvent[]) => void;
+  updateEvent: (id: string, updates: Partial<CalendarEvent>) => void;
+  removeEvent: (id: string) => void;
+  
+  // Tasks
+  addTask: (task: Task) => void;
+  addTasks: (tasks: Task[]) => void;
+  updateTask: (id: string, updates: Partial<Task>) => void;
+  removeTask: (id: string) => void;
+  completeTask: (id: string, actualMinutes: number) => void;
+  
+  // Courses
+  addCourse: (course: Course) => void;
+  updateCourse: (id: string, updates: Partial<Course>) => void;
+  removeCourse: (id: string) => void;
+  
+  // Sessions
+  setStudySessions: (sessions: StudySession[]) => void;
+  
+  // Performance
+  addPerformanceRecord: (record: PerformanceRecord) => void;
+  
+  // Preferences
+  updatePreferences: (prefs: Partial<UserPreferences>) => void;
+  
+  // Bulk
+  setEvents: (events: CalendarEvent[]) => void;
+  setTasks: (tasks: Task[]) => void;
+  
+  // Sync
+  syncAndSchedule: () => void;
+}
+
+/* ─── Persist middleware (manual, lightweight) ─── */
+function persist(state: AppState) {
+  saveState({
+    events: state.events,
+    tasks: state.tasks,
+    courses: state.courses,
+    preferences: state.preferences,
+    performanceHistory: state.performanceHistory,
+    studySessions: state.studySessions,
+  });
+}
+
+/* ─── Load initial state ─── */
+const saved = loadState();
+
+export const useAppStore = create<AppState>((set, get) => ({
   user: null,
+  events: (saved?.events as CalendarEvent[]) || [],
+  tasks: (saved?.tasks as Task[]) || [],
+  courses: (saved?.courses as Course[]) || [],
+  preferences: (saved?.preferences as UserPreferences) || defaultPreferences,
+  studySessions: (saved?.studySessions as StudySession[]) || [],
+  performanceHistory: (saved?.performanceHistory as PerformanceRecord[]) || [],
 
   setUser: (user) => set({ user }),
-  
-  addTask: (task) => set((state) => ({ tasks: [...state.tasks, task] })),
-  
-  updateTask: (taskId, updates) => set((state) => ({
-    tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t)
-  })),
 
-  addEvent: (event) => set((state) => ({ events: [...state.events, event] })),
-  
-  addCourse: (course) => set((state) => ({ courses: [...state.courses, course] })),
+  // ── Events ──
+  addEvent: (event) => {
+    set((s) => {
+      // Duplicate check by sourceCalendarId
+      if (event.sourceCalendarId && s.events.some(e => e.sourceCalendarId === event.sourceCalendarId)) {
+        return s; // Skip duplicate
+      }
+      const next = { ...s, events: [...s.events, event] };
+      persist(next as AppState);
+      return next;
+    });
+  },
 
-  updatePreferences: (prefs) => set((state) => ({
-    preferences: { ...state.preferences, ...prefs }
-  })),
+  addEvents: (events) => {
+    set((s) => {
+      const existingIds = new Set(s.events.map(e => e.sourceCalendarId).filter(Boolean));
+      const newEvents = events.filter(e => !e.sourceCalendarId || !existingIds.has(e.sourceCalendarId));
+      if (newEvents.length === 0) return s;
+      const next = { ...s, events: [...s.events, ...newEvents] };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  updateEvent: (id, updates) => {
+    set((s) => {
+      const next = { ...s, events: s.events.map(e => e.id === id ? { ...e, ...updates } : e) };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  removeEvent: (id) => {
+    set((s) => {
+      const next = { ...s, events: s.events.filter(e => e.id !== id) };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  setEvents: (events) => {
+    set((s) => {
+      const next = { ...s, events };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  // ── Tasks ──
+  addTask: (task) => {
+    set((s) => {
+      const next = { ...s, tasks: [...s.tasks, task] };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  addTasks: (tasks) => {
+    set((s) => {
+      const next = { ...s, tasks: [...s.tasks, ...tasks] };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  updateTask: (id, updates) => {
+    set((s) => {
+      const next = { ...s, tasks: s.tasks.map(t => t.id === id ? { ...t, ...updates } : t) };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  removeTask: (id) => {
+    set((s) => {
+      const next = { ...s, tasks: s.tasks.filter(t => t.id !== id) };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  completeTask: (id, actualMinutes) => {
+    const state = get();
+    const task = state.tasks.find(t => t.id === id);
+    if (!task) return;
+
+    const now = new Date().toISOString();
+
+    // Record performance
+    if (task.courseId) {
+      state.addPerformanceRecord({
+        courseId: task.courseId,
+        taskId: id,
+        estimatedMinutes: task.estimatedDuration,
+        actualMinutes,
+        completedAt: now,
+      });
+    }
+
+    state.updateTask(id, {
+      status: 'done',
+      actualDuration: actualMinutes,
+      completedAt: now,
+    });
+  },
+
+  setTasks: (tasks) => {
+    set((s) => {
+      const next = { ...s, tasks };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  // ── Courses ──
+  addCourse: (course) => {
+    set((s) => {
+      const next = { ...s, courses: [...s.courses, course] };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  updateCourse: (id, updates) => {
+    set((s) => {
+      const next = { ...s, courses: s.courses.map(c => c.id === id ? { ...c, ...updates } : c) };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  removeCourse: (id) => {
+    set((s) => {
+      const next = { ...s, courses: s.courses.filter(c => c.id !== id) };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  // ── Sessions ──
+  setStudySessions: (sessions) => {
+    set((s) => {
+      const next = { ...s, studySessions: sessions };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  // ── Performance ──
+  addPerformanceRecord: (record) => {
+    set((s) => {
+      const next = { ...s, performanceHistory: [...s.performanceHistory, record] };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  // ── Preferences ──
+  updatePreferences: (prefs) => {
+    set((s) => {
+      const next = { ...s, preferences: { ...s.preferences, ...prefs } };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  // ── Sync & Schedule ──
+  syncAndSchedule: () => {
+    const state = get();
+    
+    // 1. Generate tasks from past events
+    const { updatedEvents, newTasks } = TaskManager.generateTasksFromPastEvents(state.events, state.courses, state.tasks);
+    const allTasks = [...state.tasks, ...newTasks];
+
+    // 2. Sort/Prioritize tasks
+    const coursesMap = new Map(state.courses.map(c => [c.id, c]));
+    const activeTasks = allTasks.filter(t => t.status !== 'done');
+    const sortedActiveTasks = PriorityEngine.sortTasks(
+      activeTasks,
+      coursesMap,
+      updatedEvents,
+      state.preferences,
+      state.performanceHistory
+    );
+
+    const finalTasks = [
+      ...sortedActiveTasks,
+      ...allTasks.filter(t => t.status === 'done')
+    ];
+
+    // 3. Schedule sessions
+    const sessions = SchedulerEngine.generateSchedule(
+      sortedActiveTasks, 
+      updatedEvents, 
+      state.preferences, 
+      new Date(), 
+      7, // Schedule for next 7 days
+      state.performanceHistory
+    );
+
+    set((s) => {
+      const next = { 
+        ...s, 
+        events: updatedEvents, 
+        tasks: finalTasks,
+        studySessions: sessions 
+      };
+      persist(next as AppState);
+      return next;
+    });
+  },
 }));
