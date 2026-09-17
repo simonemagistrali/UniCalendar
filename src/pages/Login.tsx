@@ -4,15 +4,18 @@ import { GlassPanel } from '../components/ui/GlassPanel';
 import { Button } from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { mockBackend } from '../core/mockBackend';
+import { useAppStore } from '../store/useAppStore';
 
 export function Login() {
   const navigate = useNavigate();
+  const setUser = useAppStore(state => state.setUser);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
     setIsLoading(true);
     try {
       await mockBackend.loginWithGoogle();
+      setUser({ name: 'Utente Prova', email: 'prova@google.com', photoURL: '' });
       navigate('/home');
     } catch (error) {
       console.error('Login failed', error);
