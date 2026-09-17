@@ -1,15 +1,24 @@
-import React from 'react';
+import { useState } from 'react';
 import { CalendarIcon } from 'lucide-react';
 import { GlassPanel } from '../components/ui/GlassPanel';
 import { Button } from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
+import { mockBackend } from '../core/mockBackend';
 
 export function Login() {
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    // Simulazione di login
-    navigate('/home');
+  const handleLogin = async () => {
+    setIsLoading(true);
+    try {
+      await mockBackend.loginWithGoogle();
+      navigate('/home');
+    } catch (error) {
+      console.error('Login failed', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -24,8 +33,13 @@ export function Login() {
           Organizza le tue giornate, calcola le priorità e non rimanere mai più indietro.
         </p>
         
-        <Button variant="primary" className="w-full py-3 text-base shadow-md hover:shadow-lg" onClick={handleLogin}>
-          Accedi con Google
+        <Button 
+          variant="primary" 
+          className="w-full py-3 text-base shadow-md hover:shadow-lg disabled:opacity-50" 
+          onClick={handleLogin}
+          disabled={isLoading}
+        >
+          {isLoading ? 'Accesso in corso...' : 'Accedi con Google'}
         </Button>
       </GlassPanel>
     </div>

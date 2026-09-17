@@ -1,33 +1,34 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&display=swap');
 
 :root {
-  /* Google Material Design / Workspace Theme */
-  --bg-primary: #f0f4f9; /* Soft light blue/grey background typical of new Google apps */
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #f8f9fa;
+  /* Authentic Google Workspace Theme */
+  --bg-primary: #ffffff; 
+  --bg-secondary: #f8f9fa; /* Light grey for subtle separation */
+  --bg-tertiary: #f1f3f4;
   --bg-surface: #ffffff;
   --bg-hover: #f1f3f4;
   
   --text-primary: #202124;
   --text-secondary: #5f6368;
-  --text-muted: #80868b;
+  --text-muted: #70757a;
 
-  /* Google Colors */
-  --accent-primary: #1a73e8; /* Google Blue */
-  --accent-primary-hover: #1b66c9;
-  --accent-secondary: #e8f0fe; /* Light blue for active states */
+  /* Google Colors - Refined and serious */
+  --accent-primary: #1a73e8; 
+  --accent-primary-hover: #174ea6;
+  --accent-secondary: #e8f0fe; /* Active state background */
   
-  --accent-danger: #d93025;  /* Google Red */
-  --accent-warning: #f9ab00; /* Google Yellow */
-  --accent-success: #1e8e3e; /* Google Green */
+  --accent-danger: #d93025;
+  --accent-warning: #f29900;
+  --accent-success: #188038;
 
   /* Borders & Shadows */
   --border-color: #dadce0;
-  --shadow-sm: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
-  --shadow-md: 0 4px 6px -1px rgba(60,64,67,0.3), 0 2px 4px -1px rgba(60,64,67,0.15);
+  --shadow-google: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+  --shadow-hover: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
   
   /* Typography */
-  --font-sans: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --font-sans: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Google Sans', 'Roboto', sans-serif;
 }
 
 * {
@@ -50,39 +51,57 @@ body {
 .glass-panel {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
-  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.1);
+  border-radius: 8px; /* Google standard is 8px for cards, not huge rounded corners */
   transition: box-shadow 0.2s ease;
 }
 
 .glass-panel:hover {
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
 }
 
-/* Buttons (Material Pill Style) */
+/* Buttons (Google Workspace Style) */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.6rem 1.5rem;
-  border-radius: 100px; /* Fully rounded like Google */
+  padding: 0 24px;
+  height: 36px;
+  border-radius: 4px;
+  font-family: var(--font-display);
   font-weight: 500;
   font-size: 0.875rem;
+  letter-spacing: 0.25px;
   cursor: pointer;
   transition: all 0.2s ease;
   border: 1px solid transparent;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .btn-primary {
   background-color: var(--accent-primary);
   color: #ffffff;
-  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3);
 }
 
 .btn-primary:hover {
   background-color: var(--accent-primary-hover);
-  box-shadow: 0 2px 3px 0 rgba(60,64,67,0.3);
+  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+}
+
+.btn-create {
+  background-color: #ffffff;
+  color: #3c4043;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+  border-radius: 24px; /* The specific FAB button is rounded in Google */
+  padding: 0 24px 0 16px;
+  height: 48px;
+  font-size: 0.875rem;
+  transition: box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.btn-create:hover {
+  box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
+  background-color: #f8f9fa;
 }
 
 /* Base Utility Classes */
@@ -101,31 +120,34 @@ body {
 .text-sm { font-size: 0.875rem; }
 .text-xs { font-size: 0.75rem; }
 .font-medium { font-weight: 500; }
-.font-semibold { font-weight: 500; } /* Roboto uses 500 for standard boldish text */
+.font-semibold { font-weight: 500; }
 .font-bold { font-weight: 700; }
 .text-muted { color: var(--text-muted); }
 .text-secondary { color: var(--text-secondary); }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
 
 /* Sidebar Layout */
 .layout-wrapper {
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background-color: var(--bg-secondary); /* Main bg is white, content is light blue */
+  background-color: var(--bg-primary);
 }
 
 .sidebar {
-  width: 260px;
-  background-color: var(--bg-secondary);
+  width: 256px;
+  background-color: var(--bg-primary);
   display: flex;
   flex-direction: column;
-  padding: 1.5rem 1rem;
+  padding: 8px 0;
 }
 
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding: 2rem;
+  padding: 24px;
   background-color: var(--bg-primary);
-  border-top-left-radius: 24px;
 }
