@@ -6,12 +6,18 @@ import { Button } from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { EventFormModal } from '../components/features/events/EventFormModal';
+import { ImportCalendarModal } from '../components/features/events/ImportCalendarModal';
+import { EfficiencyDashboard } from '../components/features/dashboard/EfficiencyDashboard';
 
 export function Home() {
   const navigate = useNavigate();
   const user = useAppStore(state => state.user);
+  const tasks = useAppStore(state => state.tasks);
   
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  return (
     <div className="layout-wrapper animate-in fade-in duration-300">
       
       {/* Sidebar Authentic Google Style */}
@@ -24,7 +30,7 @@ export function Home() {
         </div>
 
         {/* Floating Action Button (Google Style) */}
-        <div className="px-2 mb-6">
+        <div className="px-2 mb-4">
           <Button 
             variant="primary" 
             icon={<Plus size={20} />} 
@@ -32,6 +38,17 @@ export function Home() {
             onClick={() => setIsEventModalOpen(true)}
           >
             Crea Evento
+          </Button>
+        </div>
+        
+        <div className="px-2 mb-6">
+          <Button 
+            variant="ghost" 
+            icon={<Upload size={20} />} 
+            className="w-full py-2 shadow-sm rounded-xl text-[var(--text-secondary)] border border-[var(--border-color)] hover:bg-[var(--bg-hover)]"
+            onClick={() => setIsImportModalOpen(true)}
+          >
+            Importa .ics
           </Button>
         </div>
 
@@ -68,46 +85,49 @@ export function Home() {
 
           {/* Right Column: Analytics & Tasks */}
           <div className="flex flex-col gap-6">
-            <GlassPanel className="p-5">
-              <div className="flex items-center gap-2 text-sm font-medium text-secondary mb-4 uppercase tracking-wider">
-                <Activity size={18} />
-                Statistiche Efficienza
-              </div>
-              <div className="flex items-end gap-2">
-                <span className="text-[40px] leading-none font-normal text-[var(--accent-primary)]">86%</span>
-                <span className="text-[var(--accent-success)] text-sm font-medium mb-1 bg-[#e6f4ea] px-2 py-0.5 rounded">+2% questa sett.</span>
-              </div>
-              <p className="text-muted text-sm mt-4 border-t border-[var(--border-color)] pt-3">Ottimo lavoro! Stai rispettando le stime temporali calcolate dall'algoritmo.</p>
-            </GlassPanel>
+            <EfficiencyDashboard />
 
-            <GlassPanel className="flex-1 p-0 overflow-hidden">
-              <div className="flex items-center gap-2 text-sm font-medium text-secondary p-5 pb-2 uppercase tracking-wider border-b border-[var(--border-color)]">
-                <BookOpen size={18} />
-                Prossime Attività
+            <GlassPanel className="flex-1">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
+                  <BookOpen size={18} />
+                  PROSSIME ATTIVITÀ
+                </div>
+                <span className="text-xs bg-[var(--bg-secondary)] px-2 py-1 rounded-full border border-[var(--border-color)]">
+                  Ordinate per Priorità
+                </span>
               </div>
               
-              <ul className="flex flex-col">
-                <li className="p-4 border-b border-[var(--border-color)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer flex flex-col gap-1">
-                  <div className="flex justify-between items-start">
-                    <span className="font-medium text-sm text-[var(--text-primary)]">Esercizi Analisi I</span>
-                    <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[#fce8e6] text-[var(--accent-danger)]">URGENTE</span>
+              <ul className="flex flex-col gap-3">
+                {tasks.length === 0 ? (
+                  <div className="text-center p-6 text-sm text-[var(--text-secondary)]">
+                    Nessuna attività programmata.<br/>Importa il calendario o attendi la fine delle lezioni!
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
-                    <Clock size={14} />
-                    Scadenza: Esame tra 10 giorni
-                  </div>
-                </li>
-                
-                <li className="p-4 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer flex flex-col gap-1">
-                  <div className="flex justify-between items-start">
-                    <span className="font-medium text-sm text-[var(--text-primary)]">Sistemazione Appunti Fisica II</span>
-                    <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[#fef7e0] text-[var(--accent-warning)]">MEDIA</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
-                    <Clock size={14} />
-                    Tempo stimato: 1h 30m
-                  </div>
-                </li>
+                ) : (
+                  tasks.map(task => (
+                    <li key={task.id} className="p-4 rounded-xl border border-[var(--border-color)] bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium text-sm text-[var(--text-primary)]">{task.title}</span>
+                        {task.priorityScore > 50 ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#fce8e6] text-[var(--accent-danger)]">URGENTE</span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#fef7e0] text-[var(--accent-warning)]">MEDIA</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mt-1">
+                        <div className="flex items-center gap-1">
+                          <Clock size={14} />
+                          Stima: {task.estimatedDuration} min
+                        </div>
+                        {task.status === 'done' ? (
+                          <span className="text-[var(--accent-success)] font-medium">Completata</span>
+                        ) : (
+                          <span className="text-[var(--accent-primary)] font-medium">Da fare</span>
+                        )}
+                      </div>
+                    </li>
+                  ))
+                )}
               </ul>
             </GlassPanel>
           </div>
@@ -118,6 +138,10 @@ export function Home() {
       <EventFormModal 
         isOpen={isEventModalOpen} 
         onClose={() => setIsEventModalOpen(false)} 
+      />
+      <ImportCalendarModal 
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
       />
     </div>
   );

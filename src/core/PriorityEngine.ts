@@ -10,6 +10,7 @@ export class PriorityEngine {
     task: Task, 
     course: Course | undefined, 
     upcomingExam: CalendarEvent | undefined,
+    upcomingLesson: CalendarEvent | undefined,
     prefs: UserPreferences
   ): number {
     let score = 0;
@@ -50,6 +51,15 @@ export class PriorityEngine {
       score += 20; // Long tasks get a bump to be scheduled earlier
     }
 
+    // 5. Look-ahead Logic: if a lesson of the same course is coming up within 48h, prioritize preparation!
+    if (upcomingLesson && task.title.toLowerCase().includes('appunti')) {
+      const hoursToLesson = differenceInHours(upcomingLesson.startTime, now);
+      if (hoursToLesson > 0 && hoursToLesson < 48) {
+        // Boost priority dramatically so you are ready for the next lesson
+        score += 80;
+      }
+    }
+
     return Math.round(score);
   }
 
@@ -57,12 +67,13 @@ export class PriorityEngine {
    * Sorts tasks considering dependencies and priority scores.
    * If Task B depends on Task A, Task A must come first regardless of score.
    */
-  static sortTasks(tasks: Task[], courses: Map<string, Course>, exams: CalendarEvent[], prefs: UserPreferences): Task[] {
+  static sortTasks(tasks: Task[], courses: Map<string, Course>, exams: CalendarEvent[], upcomingLessons: CalendarEvent[], prefs: UserPreferences): Task[] {
     // 1. Update all scores
     tasks.forEach(t => {
       const course = t.courseId ? courses.get(t.courseId) : undefined;
       const exam = exams.find(e => e.courseId === t.courseId && e.type === 'exam' && e.startTime > new Date());
-      t.priorityScore = this.calculatePriority(t, course, exam, prefs);
+      const nextLesson = upcomingLessons.find(e => e.courseId === t.courseId && e.type === 'lesson' && e.startTime > new Date());
+      t.priorityScore = this.calculatePriority(t, course, exam, nextLesson, prefs);
     });
 
     // 2. Sort by score descending

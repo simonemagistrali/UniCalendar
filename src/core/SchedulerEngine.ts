@@ -26,8 +26,18 @@ export class SchedulerEngine {
     let remainingTaskTime = tasks.length > 0 ? tasks[0].estimatedDuration : 0;
 
     // Buffer Logic: dynamically adjusted based on history.
-    // For now we use a default of 15 mins buffer between tasks.
-    const standardBufferMinutes = 15;
+    // Base is 15 mins. If priority is high, increase to absorb delays.
+    const getDynamicBuffer = (task: Task) => {
+      let buffer = 15;
+      if (task.priorityScore > 50) buffer += 15; // Harder tasks get more buffer
+      
+      const relatedCourse = existingEvents.find(e => e.courseId === task.courseId && e.location?.type === 'in_person');
+      if (relatedCourse) {
+        // If it involves traveling to campus, add travel buffer
+        buffer += 30;
+      }
+      return buffer;
+    };
 
     while (currentTaskIndex < tasks.length && differenceInDays(currentTime, startDate) < daysToSchedule) {
       // 1. Check if current day is forbidden
@@ -96,15 +106,17 @@ export class SchedulerEngine {
         if (currentTaskIndex < tasks.length) {
           remainingTaskTime = tasks[currentTaskIndex].estimatedDuration;
           
+          const dynamicBuffer = getDynamicBuffer(task);
+
           // Add buffer after finishing a task
           sessions.push({
             id: uuidv4(),
             taskId: 'buffer',
             startTime: currentTime,
-            endTime: addMinutes(currentTime, standardBufferMinutes),
+            endTime: addMinutes(currentTime, dynamicBuffer),
             isBuffer: true
           });
-          currentTime = addMinutes(currentTime, standardBufferMinutes);
+          currentTime = addMinutes(currentTime, dynamicBuffer);
         }
       }
     }
