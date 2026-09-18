@@ -129,7 +129,7 @@ export class SchedulerEngine {
 
       const actualMinutes = Math.round((blockEnd.getTime() - currentTime.getTime()) / 60000);
 
-      if (actualMinutes >= 15) { // Minimum 15 min session
+      if (actualMinutes >= 15 || (actualMinutes > 0 && remainingTime < 15)) { // Minimum 15 min session, unless it's the final chunk
         sessions.push({
           id: uuidv4(),
           taskId: task.id,
