@@ -143,17 +143,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ user });
     
     try {
+      console.log("[Sync] Tentativo di caricamento dati per:", user.id);
       const cloudData = await loadFromCloud(user.id);
+      console.log("[Sync] Dati ricevuti dal cloud:", cloudData);
+      
       if (cloudData) {
-        set((s) => ({
-          ...s,
-          events: cloudData.events || s.events,
-          tasks: cloudData.tasks || s.tasks,
-          courses: cloudData.courses || s.courses,
-          preferences: mergePreferences(cloudData.preferences || s.preferences),
-          studySessions: cloudData.studySessions || s.studySessions,
-          performanceHistory: cloudData.performanceHistory || s.performanceHistory,
-        }));
+        set((s) => {
+          const next = {
+            ...s,
+            events: cloudData.events || s.events,
+            tasks: cloudData.tasks || s.tasks,
+            courses: cloudData.courses || s.courses,
+            preferences: mergePreferences(cloudData.preferences || s.preferences),
+            studySessions: cloudData.studySessions || s.studySessions,
+            performanceHistory: cloudData.performanceHistory || s.performanceHistory,
+          };
+          
+          // Forza il salvataggio locale per cache
+          setTimeout(() => persist(next as AppState), 500);
+          return next;
+        });
       }
     } catch (error) {
       console.error("Failed to hydrate from cloud", error);
