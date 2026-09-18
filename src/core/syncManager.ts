@@ -19,8 +19,13 @@ export interface UserSyncData {
 export async function syncToCloud(userId: string, data: UserSyncData) {
   try {
     const userDocRef = doc(db, "users", userId);
+    
+    // Firestore non accetta campi con valore "undefined". 
+    // Usiamo stringify/parse per rimuovere ricorsivamente tutte le chiavi undefined
+    const sanitizedData = JSON.parse(JSON.stringify(data));
+    
     await setDoc(userDocRef, {
-      ...data,
+      ...sanitizedData,
       updatedAt: serverTimestamp()
     }, { merge: true });
     console.log("[Sync] Data saved to cloud successfully.");
