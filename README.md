@@ -1,32 +1,71 @@
-# React + TypeScript + Vite
+# 🎓 UniCalendar
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Benvenuto in **UniCalendar**, l'applicazione definitiva per la gestione e la pianificazione della vita universitaria! 🚀
 
-Currently, two official plugins are available:
+UniCalendar è un'app web moderna e intuitiva progettata specificamente per gli studenti universitari che vogliono ottimizzare la gestione del proprio tempo, bilanciando in modo efficace lezioni, studio individuale e impegni personali.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## ✨ Perché usare UniCalendar? (Utilità)
 
-## React Compiler
+La vita universitaria può essere caotica. Tra orari delle lezioni che cambiano, sessioni di studio da programmare, recuperi di lezioni perse e tempi di spostamento tra una sede e l'altra, avere tutto sotto controllo è una sfida. 
+UniCalendar risolve questo problema offrendo una piattaforma centralizzata in cui il tuo calendario accademico prende vita e si adatta in modo intelligente alle tue esigenze.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Le funzionalità principali includono:
 
-## Expanding the Oxlint configuration
+- **📅 Gestione Avanzata del Calendario:** Visualizza e gestisci le tue lezioni ed eventi con un'interfaccia elegante. Salva la tua vista (zoom/scorrimento) preferita per un accesso rapido.
+- **🔄 Sincronizzazione con Google Calendar:** Collega il tuo account Google per avere tutti i tuoi impegni (personali e universitari) sincronizzati in un unico posto bidirezionalmente.
+- **🚶‍♂️ Ottimizzazione dei Tempi di Spostamento:** Calcola automaticamente e tiene conto dei tempi di viaggio tra diverse sedi o aule, assicurandoti di non arrivare mai in ritardo e pianificando pause realistiche.
+- **📚 Pianificazione Intelligente dello Studio:** Gestisci i task e assegnali direttamente agli slot vuoti del calendario. L'app ti aiuta a trovare il tempo migliore per studiare.
+- **🔁 Gestione Recupero Lezioni:** Se salti una lezione o un professore sposta un corso, puoi gestire facilmente la riprogrammazione come "task" specifico da recuperare.
+- **🏖️ Focus Fine Settimana:** Una vista dedicata per gestire e visualizzare in modo chiaro i task e gli impegni del weekend, separandoli dal flusso feriale.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## 🛠️ Tecnologie Utilizzate
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+- **Frontend:** React 19, TypeScript, Vite
+- **Stato & Dati:** Zustand, Firebase
+- **UI & Stile:** CSS personalizzato con un design "Glassmorphism" e icone Lucide-React
+- **Date & Orari:** Date-fns
+
+## 🚀 Come iniziare (Installazione e Uso)
+
+### Prerequisiti
+Assicurati di avere [Node.js](https://nodejs.org/) (versione 18+) installato sul tuo computer.
+
+### 1. Clonare il repository
+```bash
+git clone https://github.com/simonemagistrali/UniCalendar.git
+cd UniCalendar
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+### 2. Installare le dipendenze
+```bash
+npm install
+```
+
+### 3. Configurare l'ambiente (Variabili d'ambiente)
+Crea un file `.env` nella directory principale del progetto. Dovrai aggiungere le tue chiavi API di Firebase e (opzionalmente) di Google Calendar.
+```env
+VITE_FIREBASE_API_KEY=tua_chiave_api
+VITE_FIREBASE_AUTH_DOMAIN=tuo_dominio_auth
+VITE_FIREBASE_PROJECT_ID=tuo_project_id
+# Aggiungi altre variabili necessarie per Firebase o Google Calendar
+```
+
+### 4. Avviare l'applicazione in locale
+```bash
+npm run dev
+```
+L'applicazione sarà disponibile all'indirizzo `http://localhost:5173`.
+
+## 📖 Come usarla
+
+1. **Dashboard Principale:** Una volta effettuato l'accesso, ti troverai di fronte alla tua settimana. Puoi subito iniziare ad aggiungere corsi e lezioni.
+2. **Aggiunta Corsi:** Vai nella sezione dedicata ai corsi per configurare le tue materie (nome, crediti, professore).
+3. **Pianificazione Task:** Nel pannello laterale, aggiungi le attività da svolgere (es. "Studiare Capitolo 3") e trascinale o assegnale a specifici orari liberi nel calendario.
+4. **Sincronizzazione:** Vai in "Impostazioni" per collegare il tuo Google Calendar. Gli eventi verranno importati automaticamente e mostrati accanto alle lezioni.
+5. **Tempi di viaggio:** Quando crei eventi in luoghi diversi, l'app ti suggerirà di inserire dei tempi cuscinetto per lo spostamento.
+
+## 🤝 Contribuire
+I contributi sono benvenuti! Se hai idee per nuove funzionalità o hai trovato un bug, sentiti libero di aprire una *Issue* o inviare una *Pull Request*.
+
+## 📄 Licenza
+Questo progetto è distribuito sotto licenza MIT.
