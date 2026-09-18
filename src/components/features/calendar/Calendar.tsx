@@ -1,8 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, subDays, addWeeks, subWeeks } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
+import { TravelManager } from '../../../core/TravelManager';
+import { fetchGoogleCalendarEvents } from '../../../core/googleCalendar';
+import { EventDetailsModal } from '../events/EventDetailsModal';
+import { EventFormModal } from '../events/EventFormModal';
 import './Calendar.css';
 
 type ViewMode = 'month' | 'week' | 'day';
@@ -11,12 +15,43 @@ const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6:00 - 21:00
 
 export function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    return (localStorage.getItem('calendarView') as ViewMode) || 'month';
+  });
+  
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('calendarView', viewMode);
+  }, [viewMode]);
 
   const events = useAppStore(s => s.events);
   const tasks = useAppStore(s => s.tasks);
   const courses = useAppStore(s => s.courses);
   const studySessions = useAppStore(s => s.studySessions);
+  const preferences = useAppStore(s => s.preferences);
+  const addEvents = useAppStore(s => s.addEvents);
+
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleGoogleSync = async () => {
+    setIsSyncing(true);
+    try {
+      // Chiama l'API reale di Google tramite l'autenticazione Firebase
+      const realEvents = await fetchGoogleCalendarEvents();
+      if (realEvents.length > 0) {
+        addEvents(realEvents as any[]);
+        // Opzionale: richiamare syncAndSchedule dello store per ripianificare in base ai nuovi eventi
+      }
+    } catch (error) {
+      console.error("Sincronizzazione Google fallita:", error);
+      alert("Errore durante la sincronizzazione con Google Calendar. Assicurati che le API siano abilitate su Firebase.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const next = () => {
     if (viewMode === 'month') setCurrentDate(addMonths(currentDate, 1));
@@ -31,9 +66,12 @@ export function Calendar() {
 
   // Merge events + study sessions for display
   const allItems = useMemo(() => {
-    const items: { id: string; title: string; start: Date; end: Date; color: string; type: string }[] = [];
+    const items: { id: string; title: string; start: Date; end: Date; color: string; type: string; isTravelStudyTime?: boolean }[] = [];
 
-    for (const e of events) {
+    const computedTravelEvents = TravelManager.generateTravelEvents(events, preferences);
+    const allEvents = [...events, ...computedTravelEvents];
+
+    for (const e of allEvents) {
       const course = e.courseId ? courses.find(c => c.id === e.courseId) : undefined;
       let color = course?.color || 'var(--accent-primary)';
       if (e.type === 'exam') color = '#d93025';
@@ -48,7 +86,22 @@ export function Calendar() {
         end: new Date(e.endTime),
         color,
         type: e.type,
+        isTravelStudyTime: e.isTravelStudyTime,
       });
+    }
+
+    for (const t of tasks) {
+      if (t.deadline) {
+        const course = t.courseId ? courses.find(c => c.id === t.courseId) : undefined;
+        items.push({
+          id: `deadline-${t.id}`,
+          title: `Scadenza: ${t.title}`,
+          start: new Date(t.deadline),
+          end: new Date(new Date(t.deadline).getTime() + 30 * 60000), // 30 min duration for display
+          color: '#d93025', // Red color for deadline
+          type: 'deadline',
+        });
+      }
     }
 
     for (const s of studySessions) {
@@ -69,7 +122,7 @@ export function Calendar() {
           title: task?.title || 'Studio',
           start: new Date(s.startTime),
           end: new Date(s.endTime),
-          color: course?.color ? course.color + '88' : '#e8f0fe',
+          color: course?.color ? course.color + 'aa' : '#c2e7ff', // slightly more opaque
           type: 'study',
         });
       }
@@ -84,6 +137,16 @@ export function Calendar() {
     ? "'Settimana del' d MMMM"
     : "EEEE d MMMM yyyy";
 
+  const handleEventClick = (id: string) => {
+    // Only handle actual events (not tasks/deadlines/study sessions for now)
+    if (events.some(e => e.id === id)) {
+      setSelectedEventId(id);
+      setIsDetailsOpen(true);
+    }
+  };
+
+  const selectedEvent = events.find(e => e.id === selectedEventId) || null;
+
   return (
     <div className="calendar-container">
       {/* Header */}
@@ -96,29 +159,53 @@ export function Calendar() {
             <button onClick={next} className="calendar-nav-btn"><ChevronRight size={20} /></button>
           </div>
         </div>
-        <div className="calendar-view-toggle">
-          {(['month', 'week', 'day'] as ViewMode[]).map(m => (
-            <button
-              key={m}
-              onClick={() => setViewMode(m)}
-              className={`calendar-view-btn ${viewMode === m ? 'active' : ''}`}
-            >
-              {m === 'month' ? 'Mese' : m === 'week' ? 'Settimana' : 'Giorno'}
-            </button>
-          ))}
+        <div className="calendar-header-right" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button 
+            className="calendar-sync-btn"
+            onClick={handleGoogleSync}
+            disabled={isSyncing}
+            title="Scarica eventi da Google Calendar"
+          >
+            <RefreshCw size={14} className={isSyncing ? 'spin' : ''} />
+            {isSyncing ? 'Sincronizzazione...' : 'Sincronizza Google'}
+          </button>
+          <div className="calendar-view-toggle">
+            {(['month', 'week', 'day'] as ViewMode[]).map(m => (
+              <button
+                key={m}
+                onClick={() => setViewMode(m)}
+                className={`calendar-view-btn ${viewMode === m ? 'active' : ''}`}
+              >
+                {m === 'month' ? 'Mese' : m === 'week' ? 'Settimana' : 'Giorno'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Body */}
-      {viewMode === 'month' && <MonthView currentDate={currentDate} items={allItems} />}
-      {viewMode === 'week' && <WeekView currentDate={currentDate} items={allItems} />}
-      {viewMode === 'day' && <DayView currentDate={currentDate} items={allItems} />}
+      {viewMode === 'month' && <MonthView currentDate={currentDate} items={allItems} onEventClick={handleEventClick} />}
+      {viewMode === 'week' && <WeekView currentDate={currentDate} items={allItems} onEventClick={handleEventClick} />}
+      {viewMode === 'day' && <DayView currentDate={currentDate} items={allItems} onEventClick={handleEventClick} />}
+
+      <EventDetailsModal
+        isOpen={isDetailsOpen}
+        onClose={() => setIsDetailsOpen(false)}
+        event={selectedEvent}
+        onEdit={() => setIsFormOpen(true)}
+      />
+
+      <EventFormModal
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        initialEvent={selectedEvent}
+      />
     </div>
   );
 }
 
 /* ─── Month View ─── */
-function MonthView({ currentDate, items }: { currentDate: Date; items: { id: string; title: string; start: Date; end: Date; color: string; type: string }[] }) {
+function MonthView({ currentDate, items, onEventClick }: { currentDate: Date; items: { id: string; title: string; start: Date; end: Date; color: string; type: string }[]; onEventClick: (id: string) => void }) {
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -139,12 +226,21 @@ function MonthView({ currentDate, items }: { currentDate: Date; items: { id: str
       <div className={cls} key={d.toISOString()}>
         <span className="calendar-day-num">{format(d, 'd')}</span>
         <div className="calendar-events">
-          {dayItems.slice(0, 3).map(it => (
-            <div key={it.id} className="calendar-event" style={{ backgroundColor: it.color, color: it.type === 'buffer' || it.type === 'study' ? 'var(--text-primary)' : '#fff' }}>
-              {it.title}
+          {dayItems.slice(0, 4).map(it => (
+            <div key={it.id} className="calendar-event" title={it.title} onClick={() => onEventClick(it.id)} style={{ cursor: 'pointer' }}>
+              <span
+                className="calendar-event-dot"
+                style={{
+                  backgroundColor: it.type === 'study' || it.type === 'buffer' ? (it.type === 'buffer' ? '#dadce0' : it.color) : it.color,
+                  borderColor: it.color,
+                  borderWidth: it.type === 'study' || it.type === 'buffer' ? '0' : '0',
+                  borderStyle: 'solid'
+                }}
+              />
+              <span className="calendar-event-text">{it.title}</span>
             </div>
           ))}
-          {dayItems.length > 3 && <div className="calendar-event-more">+{dayItems.length - 3}</div>}
+          {dayItems.length > 4 && <div className="calendar-event-more">+{dayItems.length - 4} altri</div>}
         </div>
       </div>
     );
@@ -153,16 +249,14 @@ function MonthView({ currentDate, items }: { currentDate: Date; items: { id: str
 
   return (
     <div className="calendar-month">
-      <div className="calendar-grid-header">
-        {weekDays.map(w => <div key={w} className="calendar-weekday">{w}</div>)}
-      </div>
-      <div className="calendar-grid-body">{days}</div>
+      {weekDays.map(w => <div key={w} className="calendar-weekday">{w}</div>)}
+      {days}
     </div>
   );
 }
 
 /* ─── Week View ─── */
-function WeekView({ currentDate, items }: { currentDate: Date; items: { id: string; title: string; start: Date; end: Date; color: string; type: string }[] }) {
+function WeekView({ currentDate, items, onEventClick }: { currentDate: Date; items: { id: string; title: string; start: Date; end: Date; color: string; type: string }[]; onEventClick: (id: string) => void }) {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
@@ -188,18 +282,23 @@ function WeekView({ currentDate, items }: { currentDate: Date; items: { id: stri
             <div key={d.toISOString()} className="timeline-column">
               {HOURS.map(h => <div key={h} className="timeline-cell" />)}
               {/* Render events */}
-              {items.filter(it => isSameDay(it.start, d)).map(it => {
+              {calculateEventPositions(items.filter(it => isSameDay(it.start, d))).map(it => {
                 const top = getTimePosition(it.start);
-                const height = Math.max(getTimePosition(it.end) - top, 20);
+                const height = Math.max(0, getTimePosition(it.end) - top - 1);
                 return (
                   <div
                     key={it.id}
                     className="timeline-event"
+                    onClick={() => onEventClick(it.id)}
                     style={{
                       top: `${top}px`,
                       height: `${height}px`,
+                      left: it._left,
+                      width: it._width,
                       backgroundColor: it.color,
+                      backgroundImage: it.isTravelStudyTime ? 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px)' : undefined,
                       color: it.type === 'buffer' || it.type === 'study' ? 'var(--text-primary)' : '#fff',
+                      cursor: 'pointer'
                     }}
                     title={it.title}
                   >
@@ -219,7 +318,7 @@ function WeekView({ currentDate, items }: { currentDate: Date; items: { id: stri
 }
 
 /* ─── Day View ─── */
-function DayView({ currentDate, items }: { currentDate: Date; items: { id: string; title: string; start: Date; end: Date; color: string; type: string }[] }) {
+function DayView({ currentDate, items, onEventClick }: { currentDate: Date; items: { id: string; title: string; start: Date; end: Date; color: string; type: string; isTravelStudyTime?: boolean }[]; onEventClick: (id: string) => void }) {
   const dayItems = items.filter(it => isSameDay(it.start, currentDate));
 
   return (
@@ -233,18 +332,23 @@ function DayView({ currentDate, items }: { currentDate: Date; items: { id: strin
         <div className="timeline-grid">
           <div className="timeline-column timeline-single-col">
             {HOURS.map(h => <div key={h} className="timeline-cell" />)}
-            {dayItems.map(it => {
+            {calculateEventPositions(dayItems).map(it => {
               const top = getTimePosition(it.start);
-              const height = Math.max(getTimePosition(it.end) - top, 20);
+              const height = Math.max(0, getTimePosition(it.end) - top - 1);
               return (
                 <div
                   key={it.id}
                   className="timeline-event"
+                  onClick={() => onEventClick(it.id)}
                   style={{
                     top: `${top}px`,
                     height: `${height}px`,
+                    left: it._left,
+                    width: it._width,
                     backgroundColor: it.color,
+                    backgroundImage: it.isTravelStudyTime ? 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px)' : undefined,
                     color: it.type === 'buffer' || it.type === 'study' ? 'var(--text-primary)' : '#fff',
+                    cursor: 'pointer'
                   }}
                 >
                   <span className="timeline-event-title">{it.title}</span>
@@ -265,4 +369,58 @@ function DayView({ currentDate, items }: { currentDate: Date; items: { id: strin
 function getTimePosition(date: Date): number {
   const hours = date.getHours() + date.getMinutes() / 60;
   return Math.max(0, (hours - 6) * 60); // 60px per hour, starting at 6:00
+}
+
+/** Calculates left and width for events to avoid overlapping visually */
+function calculateEventPositions(dayItems: any[]) {
+  const sorted = [...dayItems].sort((a, b) => a.start.getTime() - b.start.getTime());
+  
+  const clusters: any[][] = [];
+  let currentCluster: any[] = [];
+  let clusterMaxEnd = 0;
+  
+  for (const item of sorted) {
+    if (currentCluster.length > 0 && item.start.getTime() >= clusterMaxEnd) {
+      clusters.push(currentCluster);
+      currentCluster = [];
+      clusterMaxEnd = 0;
+    }
+    currentCluster.push(item);
+    clusterMaxEnd = Math.max(clusterMaxEnd, item.end.getTime());
+  }
+  if (currentCluster.length > 0) {
+    clusters.push(currentCluster);
+  }
+  
+  const positionedItems = [];
+  for (const cluster of clusters) {
+    const columns: any[][] = [];
+    for (const item of cluster) {
+      let placed = false;
+      for (const col of columns) {
+        const lastInCol = col[col.length - 1];
+        if (item.start.getTime() >= lastInCol.end.getTime()) {
+          col.push(item);
+          item._col = columns.indexOf(col);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        item._col = columns.length;
+        columns.push([item]);
+      }
+    }
+    
+    const colCount = columns.length;
+    for (const item of cluster) {
+      positionedItems.push({
+        ...item,
+        _left: `calc(${(item._col / colCount) * 100}% + 2px)`,
+        _width: `calc(${100 / colCount}% - 4px)`
+      });
+    }
+  }
+  
+  return positionedItems;
 }

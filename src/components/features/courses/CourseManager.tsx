@@ -79,7 +79,7 @@ export function CourseManager({ isOpen, onClose }: CourseManagerProps) {
         {/* Course List */}
         <div className="course-list">
           {courses.length === 0 && !isAdding && (
-            <p className="text-sm text-[var(--text-secondary)] text-center p-4">
+            <p className="course-empty-msg">
               Nessun corso aggiunto. Aggiungine uno o importa un calendario.
             </p>
           )}

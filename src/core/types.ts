@@ -66,6 +66,7 @@ export interface Task {
   completedAt?: string;
   postponedCount: number; // How many times postponed
   isProjectTask?: boolean; // From a project/deadline
+  isTravelCompatible?: boolean; // Can this task be done during travel?
 }
 
 /* ─── Study Session ─── */
@@ -99,6 +100,8 @@ export interface UserPreferences {
   dailyStudyHours: Record<number, DayStudyHours>;
   daysBeforeExamToIncreasePriority: number;
   defaultHomeAddress?: string; // To detect travel needs
+  defaultCommuteTimeMinutes?: number; // Estimated commute time in minutes
+  isCommuteProductive?: boolean; // True if commute is by train/bus and can be used for study
 }
 
 /* ─── App User ─── */

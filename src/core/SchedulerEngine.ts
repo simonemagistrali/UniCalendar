@@ -12,7 +12,7 @@ export class SchedulerEngine {
     existingEvents: CalendarEvent[],
     prefs: UserPreferences,
     startDate: Date,
-    daysToSchedule: number = 7,
+    daysToSchedule: number = 14,
     history: PerformanceRecord[] = []
   ): StudySession[] {
     const sessions: StudySession[] = [];
@@ -26,7 +26,12 @@ export class SchedulerEngine {
     const endScheduleDate = new Date(startDate);
     endScheduleDate.setDate(endScheduleDate.getDate() + daysToSchedule);
 
-    while (taskIdx < todoTasks.length && currentTime < endScheduleDate) {
+    // Safety counter to prevent infinite loops
+    let iterations = 0;
+    const maxIterations = daysToSchedule * 100;
+
+    while (taskIdx < todoTasks.length && currentTime < endScheduleDate && iterations < maxIterations) {
+      iterations++;
       const dayOfWeek = currentTime.getDay();
       const dayConfig = prefs.dailyStudyHours ? prefs.dailyStudyHours[dayOfWeek] : undefined;
 
@@ -56,28 +61,44 @@ export class SchedulerEngine {
         continue;
       }
 
-      // Find next collision
-      const collision = this.findNextCollision(currentTime, existingEvents);
+      // Check if current time is inside an existing event — if so, skip past it
+      const overlapping = this.findOverlappingEvent(currentTime, existingEvents);
+      const task = todoTasks[taskIdx];
+
+      if (overlapping) {
+        const isProductiveTravel = overlapping.type === 'travel' && overlapping.isTravelStudyTime;
+        const isTaskCompatible = task.isTravelCompatible;
+
+        if (!(isProductiveTravel && isTaskCompatible)) {
+          const overlapEnd = new Date(overlapping.endTime);
+          currentTime = new Date(Math.max(overlapEnd.getTime(), currentTime.getTime() + 60000));
+          continue;
+        }
+      }
+
+      // Find next collision (event that starts after current time)
+      const collision = this.findNextCollision(currentTime, existingEvents, dayEnd, task);
 
       // If collision starts within 15 min, skip over it
       if (collision) {
         const collisionStart = new Date(collision.startTime);
         const collisionEnd = new Date(collision.endTime);
-        if (collisionStart.getTime() - currentTime.getTime() < 15 * 60000) {
+        const gapMinutes = (collisionStart.getTime() - currentTime.getTime()) / 60000;
+        if (gapMinutes < 15) {
           currentTime = new Date(Math.max(collisionEnd.getTime(), currentTime.getTime() + 60000));
           continue;
         }
       }
 
       // Schedule a study block
-      const task = todoTasks[taskIdx];
+      // (task is already defined above)
       const maxBlock = Math.min(remainingTime, 120); // Max 2h per block
       let blockEnd = new Date(currentTime.getTime() + maxBlock * 60000);
 
       // Truncate at collision
       if (collision) {
         const cs = new Date(collision.startTime);
-        if (blockEnd > cs) blockEnd = cs;
+        if (blockEnd > cs) blockEnd = new Date(cs);
       }
 
       // Truncate at day end
@@ -104,14 +125,17 @@ export class SchedulerEngine {
         const bufferMin = this.getDynamicBuffer(task, history);
         if (bufferMin > 0) {
           const bufferEnd = new Date(currentTime.getTime() + bufferMin * 60000);
-          sessions.push({
-            id: uuidv4(),
-            taskId: 'buffer',
-            startTime: currentTime.toISOString(),
-            endTime: bufferEnd.toISOString(),
-            isBuffer: true,
-          });
-          currentTime = bufferEnd;
+          // Only add buffer if it fits within the day
+          if (bufferEnd <= dayEnd) {
+            sessions.push({
+              id: uuidv4(),
+              taskId: 'buffer',
+              startTime: currentTime.toISOString(),
+              endTime: bufferEnd.toISOString(),
+              isBuffer: true,
+            });
+            currentTime = bufferEnd;
+          }
         }
 
         taskIdx++;
@@ -144,14 +168,34 @@ export class SchedulerEngine {
     return buffer;
   }
 
-  private static findNextCollision(time: Date, events: CalendarEvent[]): CalendarEvent | undefined {
+  /**
+   * Find an event that the current time falls inside of.
+   */
+  private static findOverlappingEvent(time: Date, events: CalendarEvent[]): CalendarEvent | undefined {
+    const t = time.getTime();
+    for (const e of events) {
+      const eStart = new Date(e.startTime).getTime();
+      const eEnd = new Date(e.endTime).getTime();
+      if (t >= eStart && t < eEnd) {
+        return e;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Find the next event that starts after the given time (and before dayEnd).
+   */
+  private static findNextCollision(time: Date, events: CalendarEvent[], dayEnd: Date, task: Task): CalendarEvent | undefined {
     let nearest: CalendarEvent | undefined;
-    let nearestTime = Infinity;
+    let nearestTime = dayEnd.getTime(); // Don't look beyond day end
 
     for (const e of events) {
-      const eEnd = new Date(e.endTime).getTime();
       const eStart = new Date(e.startTime).getTime();
-      if (eEnd > time.getTime() && eStart > time.getTime() && eStart < nearestTime) {
+      if (eStart > time.getTime() && eStart < nearestTime) {
+        if (e.type === 'travel' && e.isTravelStudyTime && task.isTravelCompatible) {
+          continue; // Not a collision for this task
+        }
         nearest = e;
         nearestTime = eStart;
       }

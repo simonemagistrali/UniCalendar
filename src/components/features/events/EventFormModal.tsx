@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { useAppStore } from '../../../store/useAppStore';
@@ -10,10 +10,14 @@ interface EventFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onEventAdded?: (event: CalendarEvent) => void;
+  initialEvent?: CalendarEvent | null;
 }
 
-export function EventFormModal({ isOpen, onClose, onEventAdded }: EventFormModalProps) {
+export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: EventFormModalProps) {
   const addEvent = useAppStore(s => s.addEvent);
+  const updateEvent = useAppStore(s => s.updateEvent);
+  const setEvents = useAppStore(s => s.setEvents);
+  const events = useAppStore(s => s.events);
   const addTasks = useAppStore(s => s.addTasks);
   const courses = useAppStore(s => s.courses);
 
@@ -38,11 +42,43 @@ export function EventFormModal({ isOpen, onClose, onEventAdded }: EventFormModal
   // Travel fields
   const [isTravelStudyTime, setIsTravelStudyTime] = useState(false);
 
+  useEffect(() => {
+    if (initialEvent && isOpen) {
+      setTitle(initialEvent.title);
+      setType(initialEvent.type);
+      setDate(initialEvent.startTime.split('T')[0]);
+      setStartTime(new Date(initialEvent.startTime).toTimeString().substring(0, 5));
+      setEndTime(new Date(initialEvent.endTime).toTimeString().substring(0, 5));
+      setCourseId(initialEvent.courseId || '');
+      setLessonType(initialEvent.lessonType || 'theory');
+      if (initialEvent.location) {
+        setLocationType(initialEvent.location.type);
+        setAddress(initialEvent.location.address || '');
+      }
+      setSportType(initialEvent.sportType || '');
+      setProjectTotalHours(initialEvent.projectTotalHours?.toString() || '10');
+      setProjectFrequency(initialEvent.projectScheduleFrequencyDays?.toString() || '3');
+      setProjectImportance(initialEvent.projectImportance?.toString() || '5');
+      setIsTravelStudyTime(initialEvent.isTravelStudyTime || false);
+    } else if (isOpen && !initialEvent) {
+      resetForm();
+    }
+  }, [initialEvent, isOpen]);
+
   const resetForm = () => {
     setTitle(''); setDate(''); setStartTime(''); setEndTime('');
     setCourseId(''); setLessonType('theory'); setLocationType('in_person');
     setAddress(''); setSportType(''); setProjectTotalHours('10');
     setProjectFrequency('3'); setProjectImportance('5'); setIsTravelStudyTime(false);
+  };
+
+  const isSimilarEvent = (e1: CalendarEvent, e2: CalendarEvent) => {
+    const d1 = new Date(e1.startTime);
+    const d2 = new Date(e2.startTime);
+    const sameCourseOrTitle = e1.courseId === e2.courseId && (!e1.courseId ? e1.title === e2.title : true);
+    const sameDayOfWeek = d1.getDay() === d2.getDay();
+    const sameTime = d1.getHours() === d2.getHours() && d1.getMinutes() === d2.getMinutes();
+    return sameCourseOrTitle && sameDayOfWeek && sameTime;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -52,8 +88,7 @@ export function EventFormModal({ isOpen, onClose, onEventAdded }: EventFormModal
     const start = new Date(`${date}T${startTime}`).toISOString();
     const end = new Date(`${date}T${endTime}`).toISOString();
 
-    const event = {
-      id: uuidv4(),
+    const eventData = {
       title,
       type,
       startTime: start,
@@ -61,9 +96,8 @@ export function EventFormModal({ isOpen, onClose, onEventAdded }: EventFormModal
       courseId: courseId || undefined,
       lessonType: type === 'lesson' ? lessonType : undefined,
       location: { type: locationType, address: locationType === 'in_person' ? address : undefined },
-      isDone: false,
-      postponedCount: 0,
-      // Type-specific
+      isDone: initialEvent ? initialEvent.isDone : false,
+      postponedCount: initialEvent ? initialEvent.postponedCount : 0,
       sportType: type === 'sport' ? sportType : undefined,
       isTravelStudyTime: type === 'travel' ? isTravelStudyTime : undefined,
       projectTotalHours: type === 'project_deadline' ? parseFloat(projectTotalHours) : undefined,
@@ -71,14 +105,52 @@ export function EventFormModal({ isOpen, onClose, onEventAdded }: EventFormModal
       projectImportance: type === 'project_deadline' ? parseInt(projectImportance) : undefined,
     };
 
-    addEvent(event);
-    if (onEventAdded) onEventAdded(event);
+    if (initialEvent) {
+      // Editing
+      const similarEvents = events.filter(e => e.id !== initialEvent.id && isSimilarEvent(e, initialEvent));
+      
+      let updateAll = false;
+      if (similarEvents.length > 0) {
+        updateAll = window.confirm(`Hai modificato un evento ricorrente.\nVuoi applicare queste modifiche anche agli altri ${similarEvents.length} eventi uguali (stessa materia, giorno della settimana e orario)?\n\nOK = Modifica tutti\nAnnulla = Solo questo evento`);
+      }
 
-    // Auto-generate project tasks
-    if (type === 'project_deadline') {
-      const course = courses.find(c => c.id === courseId);
-      const projectTasks = TaskManager.generateProjectTasks(event, course);
-      if (projectTasks.length > 0) addTasks(projectTasks);
+      if (updateAll) {
+        const idsToUpdate = [initialEvent.id, ...similarEvents.map(e => e.id)];
+        const updatedEvents = events.map(e => {
+          if (idsToUpdate.includes(e.id)) {
+            const eStart = new Date(e.startTime);
+            const eEnd = new Date(e.endTime);
+            // Manteniamo la data dell'evento originale, modifichiamo solo l'orario e altri campi
+            const newStart = new Date(eStart);
+            newStart.setHours(parseInt(startTime.split(':')[0]), parseInt(startTime.split(':')[1]));
+            const newEnd = new Date(eEnd);
+            newEnd.setHours(parseInt(endTime.split(':')[0]), parseInt(endTime.split(':')[1]));
+            
+            return {
+              ...e,
+              ...eventData,
+              startTime: newStart.toISOString(),
+              endTime: newEnd.toISOString()
+            };
+          }
+          return e;
+        });
+        setEvents(updatedEvents);
+      } else {
+        updateEvent(initialEvent.id, eventData);
+      }
+    } else {
+      // Creating
+      const newEvent = { id: uuidv4(), ...eventData };
+      addEvent(newEvent);
+      if (onEventAdded) onEventAdded(newEvent);
+
+      // Auto-generate project tasks
+      if (type === 'project_deadline') {
+        const course = courses.find(c => c.id === courseId);
+        const projectTasks = TaskManager.generateProjectTasks(newEvent, course);
+        if (projectTasks.length > 0) addTasks(projectTasks);
+      }
     }
 
     resetForm();
@@ -86,7 +158,7 @@ export function EventFormModal({ isOpen, onClose, onEventAdded }: EventFormModal
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Nuovo Evento">
+    <Modal isOpen={isOpen} onClose={onClose} title={initialEvent ? "Modifica Evento" : "Nuovo Evento"}>
       <form onSubmit={handleSubmit} className="event-form">
 
         <div className="form-field">

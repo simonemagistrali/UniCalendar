@@ -29,7 +29,7 @@ export function TravelPromptModal({ isOpen, onClose, targetEvent }: TravelPrompt
         title: `Viaggio per ${targetEvent.title}`,
         type: 'travel',
         startTime: new Date(travelStart).toISOString(),
-endTime: new Date(targetEvent.startTime).toISOString(),
+        endTime: new Date(targetEvent.startTime).toISOString(),
         isDone: false
       });
 
@@ -52,37 +52,35 @@ endTime: new Date(targetEvent.startTime).toISOString(),
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Aggiungi Evento Viaggio">
-      <div className="flex flex-col gap-4">
-        <p className="text-sm text-[var(--text-secondary)]">
-          Hai aggiunto un evento in presenza presso <strong>{targetEvent.location?.address || 'un\'altra sede'}</strong>. Vuoi bloccare del tempo per il viaggio?
+      <div className="event-form">
+        <p className="import-desc">
+          Hai aggiunto un evento in presenza presso <strong>{targetEvent.location?.address || "un'altra sede"}</strong>. Vuoi bloccare del tempo per il viaggio?
         </p>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Durata stimata viaggio (minuti)</label>
+        <div className="form-field">
+          <label>Durata stimata viaggio (minuti)</label>
           <input 
             type="number" 
             value={travelDuration}
             onChange={(e) => setTravelDuration(e.target.value)}
-            className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg px-3 py-2"
             min="5"
             step="5"
           />
         </div>
 
-        <div className="flex items-center gap-2 mt-2">
+        <div className="form-checkbox">
           <input 
             type="checkbox" 
             id="study-travel"
             checked={isStudyTime}
             onChange={(e) => setIsStudyTime(e.target.checked)}
-            className="w-4 h-4 text-[var(--accent-primary)] rounded border-[var(--border-color)]"
           />
-          <label htmlFor="study-travel" className="text-sm font-medium">
+          <label htmlFor="study-travel">
             Considera questo tempo come studio (es. leggere appunti sul treno)
           </label>
         </div>
 
-        <div className="flex justify-end gap-2 mt-4">
+        <div className="form-actions">
           <Button variant="ghost" onClick={onClose} type="button">Salta</Button>
           <Button variant="primary" onClick={handleSave} type="button">Aggiungi Viaggio</Button>
         </div>

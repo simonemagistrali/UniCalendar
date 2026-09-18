@@ -26,6 +26,8 @@ export function Settings() {
   );
   const [daysBeforeExam, setDaysBeforeExam] = useState(preferences.daysBeforeExamToIncreasePriority.toString());
   const [homeAddress, setHomeAddress] = useState(preferences.defaultHomeAddress || '');
+  const [commuteTime, setCommuteTime] = useState((preferences.defaultCommuteTimeMinutes || 45).toString());
+  const [isCommuteProductive, setIsCommuteProductive] = useState(preferences.isCommuteProductive || false);
   const [saved, setSaved] = useState(false);
 
   const handleToggleDay = (dayId: number) => {
@@ -47,6 +49,8 @@ export function Settings() {
       dailyStudyHours: dailyHours,
       daysBeforeExamToIncreasePriority: parseInt(daysBeforeExam) || 14,
       defaultHomeAddress: homeAddress || undefined,
+      defaultCommuteTimeMinutes: parseInt(commuteTime) || 45,
+      isCommuteProductive,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -129,17 +133,44 @@ export function Settings() {
 
           {/* Home Address */}
           <GlassPanel>
-            <h2 className="settings-section-title">Indirizzo Casa</h2>
+            <h2 className="settings-section-title">Spostamenti e Casa</h2>
             <p className="settings-section-desc">
-              Inserisci dove abiti per ricevere suggerimenti su spostamenti quando le lezioni sono in posti diversi.
+              Inserisci l'indirizzo di casa e il tempo medio di spostamento verso l'università (in minuti).
             </p>
-            <input
-              type="text"
-              value={homeAddress}
-              onChange={e => setHomeAddress(e.target.value)}
-              placeholder="Es: Via Roma 1, Milano"
-              className="settings-text-input"
-            />
+            <div className="settings-address-group" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1rem' }}>
+              <input
+                type="text"
+                value={homeAddress}
+                onChange={e => setHomeAddress(e.target.value)}
+                placeholder="Es: Via Roma 1, Milano"
+                className="settings-text-input"
+              />
+              <div className="settings-inline-field">
+                <span className="settings-field-label" style={{ width: '120px' }}>Tempo medio:</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="300"
+                  value={commuteTime}
+                  onChange={e => setCommuteTime(e.target.value)}
+                  className="settings-number-input"
+                />
+                <span className="settings-field-label">minuti</span>
+              </div>
+            </div>
+            
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={isCommuteProductive}
+                onChange={e => setIsCommuteProductive(e.target.checked)}
+                style={{ width: '18px', height: '18px' }}
+              />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Viaggio Produttivo</span>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Posso studiare o ripassare durante il tragitto (es. in treno)</span>
+              </div>
+            </label>
           </GlassPanel>
 
           {/* Save */}

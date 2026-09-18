@@ -4,14 +4,17 @@ import { saveState, loadState } from '../core/persistence';
 import { TaskManager } from '../core/TaskManager';
 import { PriorityEngine } from '../core/PriorityEngine';
 import { SchedulerEngine } from '../core/SchedulerEngine';
+import { TravelManager } from '../core/TravelManager';
 
 /* ─── Default per-day study hours ─── */
 function defaultDailyHours(): Record<number, DayStudyHours> {
   const h: Record<number, DayStudyHours> = {};
   for (let d = 0; d < 7; d++) {
     h[d] = d === 0
-      ? { enabled: false, start: '08:00', end: '18:00' } // Sunday off
-      : { enabled: true, start: '08:00', end: '18:00' };
+      ? { enabled: true, start: '09:00', end: '14:00' } // Sunday: shorter hours
+      : d === 6
+      ? { enabled: true, start: '09:00', end: '17:00' } // Saturday: slightly shorter
+      : { enabled: true, start: '08:00', end: '18:00' }; // Weekdays
   }
   return h;
 }
@@ -19,7 +22,35 @@ function defaultDailyHours(): Record<number, DayStudyHours> {
 const defaultPreferences: UserPreferences = {
   dailyStudyHours: defaultDailyHours(),
   daysBeforeExamToIncreasePriority: 14,
+  defaultCommuteTimeMinutes: 45,
+  isCommuteProductive: false,
 };
+
+/**
+ * Merge saved preferences with defaults to ensure all 7 days are present
+ * and no data is missing from older saved versions.
+ */
+function mergePreferences(saved: unknown): UserPreferences {
+  if (!saved || typeof saved !== 'object') return defaultPreferences;
+  const p = saved as Partial<UserPreferences>;
+  const defaults = defaultDailyHours();
+  const merged: Record<number, DayStudyHours> = {};
+
+  for (let d = 0; d < 7; d++) {
+    const savedDay = p.dailyStudyHours?.[d];
+    merged[d] = savedDay && typeof savedDay.enabled === 'boolean'
+      ? savedDay
+      : defaults[d];
+  }
+
+  return {
+    dailyStudyHours: merged,
+    daysBeforeExamToIncreasePriority: p.daysBeforeExamToIncreasePriority ?? 14,
+    defaultHomeAddress: p.defaultHomeAddress,
+    defaultCommuteTimeMinutes: p.defaultCommuteTimeMinutes ?? 45,
+    isCommuteProductive: p.isCommuteProductive ?? false,
+  };
+}
 
 /* ─── State Interface ─── */
 interface AppState {
@@ -68,6 +99,11 @@ interface AppState {
   
   // Sync
   syncAndSchedule: () => void;
+
+  // History
+  pastStates: string[];
+  saveSnapshot: () => void;
+  undo: () => void;
 }
 
 /* ─── Persist middleware (manual, lightweight) ─── */
@@ -90,14 +126,40 @@ export const useAppStore = create<AppState>((set, get) => ({
   events: (saved?.events as CalendarEvent[]) || [],
   tasks: (saved?.tasks as Task[]) || [],
   courses: (saved?.courses as Course[]) || [],
-  preferences: (saved?.preferences as UserPreferences) || defaultPreferences,
+  preferences: mergePreferences(saved?.preferences),
   studySessions: (saved?.studySessions as StudySession[]) || [],
   performanceHistory: (saved?.performanceHistory as PerformanceRecord[]) || [],
+  pastStates: [],
 
   setUser: (user) => set({ user }),
 
+  saveSnapshot: () => {
+    const state = get();
+    const snap = JSON.stringify({
+      events: state.events,
+      tasks: state.tasks,
+      courses: state.courses,
+      preferences: state.preferences,
+      studySessions: state.studySessions,
+    });
+    set((s) => ({ ...s, pastStates: [...s.pastStates, snap].slice(-10) }));
+  },
+
+  undo: () => {
+    set((s) => {
+      if (s.pastStates.length === 0) return s;
+      const lastSnap = s.pastStates[s.pastStates.length - 1];
+      const parsed = JSON.parse(lastSnap);
+      const nextPast = s.pastStates.slice(0, -1);
+      const next = { ...s, ...parsed, pastStates: nextPast };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
   // ── Events ──
   addEvent: (event) => {
+    get().saveSnapshot();
     set((s) => {
       // Duplicate check by sourceCalendarId
       if (event.sourceCalendarId && s.events.some(e => e.sourceCalendarId === event.sourceCalendarId)) {
@@ -110,6 +172,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addEvents: (events) => {
+    get().saveSnapshot();
     set((s) => {
       const existingIds = new Set(s.events.map(e => e.sourceCalendarId).filter(Boolean));
       const newEvents = events.filter(e => !e.sourceCalendarId || !existingIds.has(e.sourceCalendarId));
@@ -121,6 +184,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateEvent: (id, updates) => {
+    get().saveSnapshot();
     set((s) => {
       const next = { ...s, events: s.events.map(e => e.id === id ? { ...e, ...updates } : e) };
       persist(next as AppState);
@@ -129,6 +193,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   removeEvent: (id) => {
+    get().saveSnapshot();
     set((s) => {
       const next = { ...s, events: s.events.filter(e => e.id !== id) };
       persist(next as AppState);
@@ -137,6 +202,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setEvents: (events) => {
+    get().saveSnapshot();
     set((s) => {
       const next = { ...s, events };
       persist(next as AppState);
@@ -146,6 +212,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ── Tasks ──
   addTask: (task) => {
+    get().saveSnapshot();
     set((s) => {
       const next = { ...s, tasks: [...s.tasks, task] };
       persist(next as AppState);
@@ -154,6 +221,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addTasks: (tasks) => {
+    get().saveSnapshot();
     set((s) => {
       const next = { ...s, tasks: [...s.tasks, ...tasks] };
       persist(next as AppState);
@@ -162,6 +230,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateTask: (id, updates) => {
+    get().saveSnapshot();
     set((s) => {
       const next = { ...s, tasks: s.tasks.map(t => t.id === id ? { ...t, ...updates } : t) };
       persist(next as AppState);
@@ -170,6 +239,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   removeTask: (id) => {
+    get().saveSnapshot();
     set((s) => {
       const next = { ...s, tasks: s.tasks.filter(t => t.id !== id) };
       persist(next as AppState);
@@ -178,6 +248,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   completeTask: (id, actualMinutes) => {
+    get().saveSnapshot();
     const state = get();
     const task = state.tasks.find(t => t.id === id);
     if (!task) return;
@@ -203,6 +274,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setTasks: (tasks) => {
+    get().saveSnapshot();
     set((s) => {
       const next = { ...s, tasks };
       persist(next as AppState);
@@ -212,6 +284,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ── Courses ──
   addCourse: (course) => {
+    get().saveSnapshot();
     set((s) => {
       const next = { ...s, courses: [...s.courses, course] };
       persist(next as AppState);
@@ -220,6 +293,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateCourse: (id, updates) => {
+    get().saveSnapshot();
     set((s) => {
       const next = { ...s, courses: s.courses.map(c => c.id === id ? { ...c, ...updates } : c) };
       persist(next as AppState);
@@ -228,6 +302,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   removeCourse: (id) => {
+    get().saveSnapshot();
     set((s) => {
       const next = { ...s, courses: s.courses.filter(c => c.id !== id) };
       persist(next as AppState);
@@ -264,6 +339,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ── Sync & Schedule ──
   syncAndSchedule: () => {
+    get().saveSnapshot();
     const state = get();
     
     // 1. Generate tasks from past events
@@ -287,12 +363,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     ];
 
     // 3. Schedule sessions
+    const travelEvents = TravelManager.generateTravelEvents(updatedEvents, state.preferences);
+    const allEventsForScheduling = [...updatedEvents, ...travelEvents];
+
     const sessions = SchedulerEngine.generateSchedule(
       sortedActiveTasks, 
-      updatedEvents, 
+      allEventsForScheduling, 
       state.preferences, 
       new Date(), 
-      7, // Schedule for next 7 days
+      14, // Schedule for next 14 days
       state.performanceHistory
     );
 

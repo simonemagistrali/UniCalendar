@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Clock } from 'lucide-react';
+import { CheckCircle, Clock, BookOpen, Zap } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { PriorityEngine } from '../../../core/PriorityEngine';
 import { TaskManager } from '../../../core/TaskManager';
 import { SchedulerEngine } from '../../../core/SchedulerEngine';
+import { TravelManager } from '../../../core/TravelManager';
 import { TaskCard } from './TaskCard';
 
 
@@ -40,7 +41,11 @@ export function TaskPanel() {
   useEffect(() => {
     const todoTasks = sortedTasks.filter(t => t.status !== 'done');
     if (todoTasks.length === 0) return;
-    const sessions = SchedulerEngine.generateSchedule(todoTasks, events, preferences, new Date(), 7, performanceHistory);
+    
+    // Include travel events so the scheduler knows when travels happen
+    const allEvents = [...events, ...TravelManager.generateTravelEvents(events, preferences)];
+    
+    const sessions = SchedulerEngine.generateSchedule(todoTasks, allEvents, preferences, new Date(), 14, performanceHistory);
     setStudySessions(sessions);
   }, [sortedTasks, events, preferences, performanceHistory]); // eslint-disable-line
 

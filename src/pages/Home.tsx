@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X } from "lucide-react";
+import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2 } from "lucide-react";
 
 import { Calendar } from '../components/features/calendar/Calendar';
 
@@ -15,6 +15,8 @@ import { authService } from '../core/mockBackend';
 export function Home() {
   const navigate = useNavigate();
   const user = useAppStore(s => s.user);
+  const undo = useAppStore(s => s.undo);
+  const pastStates = useAppStore(s => s.pastStates);
 
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -104,8 +106,25 @@ export function Home() {
 
       {/* Main Content */}
       <main className="main-content">
-        <header className="main-header">
-          <h1 className="main-title">
+        <header className="main-header" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button 
+            className="sidebar-action-btn" 
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: '8px', 
+              padding: '8px 12px', borderRadius: '6px', 
+              border: '1px solid var(--border)', 
+              background: 'var(--bg-secondary)', 
+              cursor: pastStates.length > 0 ? 'pointer' : 'not-allowed',
+              opacity: pastStates.length > 0 ? 1 : 0.5
+            }}
+            onClick={undo}
+            disabled={pastStates.length === 0}
+            title="Annulla l'ultima modifica (Torna indietro)"
+          >
+            <Undo2 size={16} />
+            <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>Annulla</span>
+          </button>
+          <h1 className="main-title" style={{ margin: 0 }}>
             {activeTab === 'calendar' ? 'Calendario' : activeTab === 'tasks' ? 'Attività' : 'Dashboard Efficienza'}
           </h1>
         </header>

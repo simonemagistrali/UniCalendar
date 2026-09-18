@@ -19,27 +19,60 @@ export class TaskManager {
     const nowMs = Date.now();
     const newTasks: Task[] = [];
     const updatedEvents = [...events];
-    const existingRelatedIds = new Set(existingTasks.map(t => t.relatedEventId).filter(Boolean));
+    const existingFollowTasks = new Set(existingTasks.filter(t => t.title.startsWith('Seguire/Recuperare lezione')).map(t => t.relatedEventId).filter(Boolean));
+    const existingNotesTasks = new Set(existingTasks.filter(t => t.title.startsWith('Sistemare appunti')).map(t => t.relatedEventId).filter(Boolean));
+    const existingExerciseTasks = new Set(existingTasks.filter(t => t.title.startsWith('Esercizi')).map(t => t.relatedEventId).filter(Boolean));
 
     for (let i = 0; i < updatedEvents.length; i++) {
       const event = updatedEvents[i];
 
-      // Skip if already processed or not past
-      if (event.isDone || event.type !== 'lesson' || new Date(event.endTime).getTime() > nowMs) continue;
-      // Skip if task already exists for this event
-      if (existingRelatedIds.has(event.id)) continue;
+      // Skip if not past lesson
+      if (event.type !== 'lesson' || new Date(event.endTime).getTime() > nowMs) continue;
 
       const course = courses.find(c => c.id === event.courseId);
       if (!course) {
-        updatedEvents[i] = { ...event, isDone: true };
+        if (!event.isDone) updatedEvents[i] = { ...event, isDone: true };
         continue;
       }
 
       const prefs = course.defaultStudyPreferences;
+      
+      const needsFollow = !existingFollowTasks.has(event.id);
+      const needsNotes = prefs.requiresNotesRevision && !existingNotesTasks.has(event.id);
+      const needsExercises = prefs.requiresExercises && !existingExerciseTasks.has(event.id);
+
+      if (!needsFollow && !needsNotes && !needsExercises) {
+        if (!event.isDone) updatedEvents[i] = { ...event, isDone: true };
+        continue;
+      }
+
       const eventDate = new Date(event.startTime).toLocaleDateString('it-IT');
+      const eventDurationMinutes = Math.max(0, Math.round((new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) / 60000)) || 120;
+
+      let followTaskId: string | null = null;
+      let notesTaskId: string | null = null;
+
+      // Lesson follow/recover task
+      if (needsFollow) {
+        const followTask: Task = {
+          id: uuidv4(),
+          title: `Seguire/Recuperare lezione: ${event.title} (${eventDate})`,
+          description: `Segna come completato se hai seguito la lezione, altrimenti l'app pianificherà il recupero.`,
+          courseId: course.id,
+          relatedEventId: event.id,
+          status: 'todo',
+          priorityScore: 50, // High priority for recovering a missed lesson
+          estimatedDuration: eventDurationMinutes,
+          createdAt: now,
+          dependencies: [],
+          postponedCount: 0,
+        };
+        newTasks.push(followTask);
+        followTaskId = followTask.id;
+      }
 
       // Notes revision task
-      if (prefs.requiresNotesRevision) {
+      if (needsNotes) {
         const notesTask: Task = {
           id: uuidv4(),
           title: `Sistemare appunti: ${event.title} (${eventDate})`,
@@ -50,14 +83,20 @@ export class TaskManager {
           priorityScore: 0,
           estimatedDuration: prefs.estimatedRevisionTimePerLesson,
           createdAt: now,
-          dependencies: [],
+          dependencies: followTaskId ? [followTaskId] : [],
           postponedCount: 0,
+          isTravelCompatible: true,
         };
         newTasks.push(notesTask);
+        notesTaskId = notesTask.id;
       }
 
-      // Exercises task (depends on notes if both exist)
-      if (prefs.requiresExercises) {
+      // Exercises task
+      if (needsExercises) {
+        const dependencies: string[] = [];
+        if (notesTaskId) dependencies.push(notesTaskId);
+        else if (followTaskId) dependencies.push(followTaskId);
+
         const exerciseTask: Task = {
           id: uuidv4(),
           title: `Esercizi: ${event.title} (${eventDate})`,
@@ -68,15 +107,13 @@ export class TaskManager {
           priorityScore: 0,
           estimatedDuration: Math.round(prefs.estimatedRevisionTimePerLesson * 1.5),
           createdAt: now,
-          dependencies: prefs.requiresNotesRevision && newTasks.length > 0
-            ? [newTasks[newTasks.length - 1].id]
-            : [],
+          dependencies,
           postponedCount: 0,
         };
         newTasks.push(exerciseTask);
       }
 
-      updatedEvents[i] = { ...event, isDone: true };
+      if (!event.isDone) updatedEvents[i] = { ...event, isDone: true };
     }
 
     return { updatedEvents, newTasks };

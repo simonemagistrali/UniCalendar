@@ -6,7 +6,7 @@ interface GlassPanelProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function GlassPanel({ children, className = '', ...props }: GlassPanelProps) {
   return (
-    <div className={`glass-panel p-6 ${className}`} {...props}>
+    <div className={`glass-panel ${className}`} {...props}>
       {children}
     </div>
   );

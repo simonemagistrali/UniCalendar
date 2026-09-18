@@ -14,10 +14,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--border-color);
   flex-wrap: wrap;
   gap: 12px;
+  background: var(--bg-surface);
 }
 
 .calendar-header-left {
@@ -28,7 +29,7 @@
 }
 
 .calendar-title {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 400;
   text-transform: capitalize;
   color: var(--text-primary);
@@ -102,20 +103,52 @@
   color: var(--accent-primary);
 }
 
+.calendar-sync-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.calendar-sync-btn:hover:not(:disabled) {
+  background: var(--bg-secondary);
+}
+
+.calendar-sync-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* ─── Month View ─── */
 .calendar-month {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.calendar-grid-header {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  border-bottom: 1px solid var(--border-color);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: auto;
+  grid-auto-rows: 1fr;
+  background: var(--border-color);
+  gap: 1px;
 }
 
 .calendar-weekday {
+  background: var(--bg-surface);
   padding: 8px 0;
   text-align: center;
   font-size: 11px;
@@ -124,27 +157,27 @@
   text-transform: uppercase;
 }
 
-.calendar-grid-body {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  background: var(--border-color);
-  gap: 1px;
-  flex: 1;
-}
-
 .calendar-day {
   background: var(--bg-surface);
-  padding: 4px;
-  min-height: 100px;
+  padding: 6px;
+  min-height: 110px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  transition: background-color 0.2s;
 }
 
-.calendar-day.other-month { color: var(--text-muted); }
+.calendar-day:hover {
+  background: var(--bg-secondary);
+}
+
+.calendar-day.other-month {
+  background: var(--bg-secondary);
+  opacity: 0.7;
+}
 
 .calendar-day-num {
-  text-align: center;
+  align-self: flex-end;
   font-size: 12px;
   font-weight: 500;
   width: 24px;
@@ -164,27 +197,57 @@
 .calendar-events {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   overflow: hidden;
+  flex: 1;
 }
 
 .calendar-event {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
-  padding: 2px 6px;
+  padding: 3px 6px;
   border-radius: 4px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.calendar-event:hover {
+  background-color: var(--border-color);
+}
+
+.calendar-event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.calendar-event-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-weight: 500;
-  font-family: var(--font-sans);
-  line-height: 1.4;
+  flex: 1;
 }
 
 .calendar-event-more {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-secondary);
-  text-align: center;
-  padding: 2px;
+  text-align: left;
+  padding: 2px 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  border-radius: 4px;
+}
+
+.calendar-event-more:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 /* ─── Timeline (Week & Day Views) ─── */
@@ -205,7 +268,7 @@
 }
 
 .timeline-gutter {
-  width: 60px;
+  width: 56px;
   flex-shrink: 0;
 }
 
@@ -216,7 +279,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .timeline-day-name {
@@ -255,14 +318,14 @@
 }
 
 .timeline-hours {
-  width: 60px;
+  width: 56px;
   flex-shrink: 0;
 }
 
 .timeline-hour-label {
   height: 60px;
   padding: 0 8px;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-muted);
   display: flex;
   align-items: flex-start;
@@ -273,12 +336,14 @@
 .timeline-grid {
   flex: 1;
   display: flex;
+  position: relative;
 }
 
 .timeline-column {
   flex: 1;
   position: relative;
   border-left: 1px solid var(--border-color);
+  min-width: 0;
 }
 
 .timeline-single-col {
@@ -294,27 +359,24 @@
   border-bottom-style: dashed;
 }
 
-/* ─── Timeline Events ─── */
 .timeline-event {
   position: absolute;
-  left: 4px;
-  right: 4px;
   border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 11px;
+  padding: 2px 4px;
+  font-size: 10px;
   overflow: hidden;
   z-index: 1;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0px;
   border-left: 3px solid rgba(0,0,0,0.15);
-  transition: box-shadow 0.15s;
+  transition: box-shadow 0.15s, z-index 0s;
 }
 
 .timeline-event:hover {
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  z-index: 5;
 }
 
 .timeline-event-title {
@@ -322,16 +384,18 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .timeline-event-time {
-  font-size: 10px;
-  opacity: 0.8;
+  font-size: 9px;
+  opacity: 0.85;
+  line-height: 1.1;
 }
 
 /* ─── Day View specific ─── */
 .calendar-day-view .timeline-body {
-  max-height: 600px;
+  max-height: 700px;
 }
 
 /* ─── Responsive ─── */
