@@ -16,24 +16,26 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
 function App() {
   const user = useAppStore(s => s.user);
-  const setUser = useAppStore(s => s.setUser);
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        setUser({
+        useAppStore.getState().initializeUser({
+          id: firebaseUser.uid,
           name: firebaseUser.displayName || 'Utente Universitario',
           email: firebaseUser.email || '',
           photoURL: firebaseUser.photoURL || '',
+        }).then(() => {
+          setIsInitializing(false);
         });
       } else {
-        setUser(null);
+        useAppStore.getState().setUser(null);
+        setIsInitializing(false);
       }
-      setIsInitializing(false);
     });
     return () => unsubscribe();
-  }, [setUser]);
+  }, []);
 
   if (isInitializing) {
     return (

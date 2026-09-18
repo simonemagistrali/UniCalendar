@@ -6,6 +6,7 @@ import { PriorityEngine } from '../core/PriorityEngine';
 import { SchedulerEngine } from '../core/SchedulerEngine';
 import { TravelManager } from '../core/TravelManager';
 import { MealManager } from '../core/MealManager';
+import { persistState, loadFromCloud } from '../core/syncManager';
 
 /* ─── Default per-day study hours ─── */
 function defaultDailyHours(): Record<number, DayStudyHours> {
@@ -66,6 +67,8 @@ interface AppState {
 
   // User Actions
   setUser: (user: AppUser | null) => void;
+  initializeUser: (user: AppUser) => Promise<void>;
+  
   
   // Events
   addEvent: (event: CalendarEvent) => void;
@@ -109,14 +112,14 @@ interface AppState {
 
 /* ─── Persist middleware (manual, lightweight) ─── */
 function persist(state: AppState) {
-  saveState({
+  persistState({
     events: state.events,
     tasks: state.tasks,
     courses: state.courses,
     preferences: state.preferences,
     performanceHistory: state.performanceHistory,
     studySessions: state.studySessions,
-  });
+  }, state.user?.id || null);
 }
 
 /* ─── Load initial state ─── */
@@ -132,7 +135,30 @@ export const useAppStore = create<AppState>((set, get) => ({
   performanceHistory: (saved?.performanceHistory as PerformanceRecord[]) || [],
   pastStates: [],
 
-  setUser: (user) => set({ user }),
+  setUser: (user) => {
+    set({ user });
+  },
+
+  initializeUser: async (user) => {
+    set({ user });
+    
+    try {
+      const cloudData = await loadFromCloud(user.id);
+      if (cloudData) {
+        set((s) => ({
+          ...s,
+          events: cloudData.events || s.events,
+          tasks: cloudData.tasks || s.tasks,
+          courses: cloudData.courses || s.courses,
+          preferences: mergePreferences(cloudData.preferences || s.preferences),
+          studySessions: cloudData.studySessions || s.studySessions,
+          performanceHistory: cloudData.performanceHistory || s.performanceHistory,
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to hydrate from cloud", error);
+    }
+  },
 
   saveSnapshot: () => {
     const state = get();
