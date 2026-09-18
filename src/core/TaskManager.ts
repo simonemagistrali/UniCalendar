@@ -23,6 +23,10 @@ export class TaskManager {
     const existingNotesTasks = new Set(existingTasks.filter(t => t.title.startsWith('Sistemare appunti')).map(t => t.relatedEventId).filter(Boolean));
     const existingExerciseTasks = new Set(existingTasks.filter(t => t.title.startsWith('Esercizi')).map(t => t.relatedEventId).filter(Boolean));
 
+    const existingFollowTaskTitles = new Set(existingTasks.filter(t => t.title.startsWith('Seguire/Recuperare lezione')).map(t => `${t.courseId}-${t.title}`));
+    const existingNotesTaskTitles = new Set(existingTasks.filter(t => t.title.startsWith('Sistemare appunti')).map(t => `${t.courseId}-${t.title}`));
+    const existingExerciseTaskTitles = new Set(existingTasks.filter(t => t.title.startsWith('Esercizi')).map(t => `${t.courseId}-${t.title}`));
+
     for (let i = 0; i < updatedEvents.length; i++) {
       const event = updatedEvents[i];
 
@@ -37,16 +41,24 @@ export class TaskManager {
 
       const prefs = event.studyPreferencesOverride || course.defaultStudyPreferences;
       
-      const needsFollow = !existingFollowTasks.has(event.id);
-      const needsNotes = prefs.requiresNotesRevision && !existingNotesTasks.has(event.id);
-      const needsExercises = prefs.requiresExercises && !existingExerciseTasks.has(event.id);
+      const eventDate = new Date(event.startTime).toLocaleDateString('it-IT');
+      const followTitle = `Seguire/Recuperare lezione: ${event.title} (${eventDate})`;
+      const notesTitle = `Sistemare appunti: ${event.title} (${eventDate})`;
+      const exerciseTitle = `Esercizi: ${event.title} (${eventDate})`;
+
+      const followKey = `${course.id}-${followTitle}`;
+      const notesKey = `${course.id}-${notesTitle}`;
+      const exerciseKey = `${course.id}-${exerciseTitle}`;
+
+      const needsFollow = !existingFollowTasks.has(event.id) && !existingFollowTaskTitles.has(followKey);
+      const needsNotes = prefs.requiresNotesRevision && !existingNotesTasks.has(event.id) && !existingNotesTaskTitles.has(notesKey);
+      const needsExercises = prefs.requiresExercises && !existingExerciseTasks.has(event.id) && !existingExerciseTaskTitles.has(exerciseKey);
 
       if (!needsFollow && !needsNotes && !needsExercises) {
         if (!event.isDone) updatedEvents[i] = { ...event, isDone: true };
         continue;
       }
 
-      const eventDate = new Date(event.startTime).toLocaleDateString('it-IT');
       const eventDurationMinutes = Math.max(0, Math.round((new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) / 60000)) || 120;
 
       let followTaskId: string | null = null;
@@ -69,6 +81,9 @@ export class TaskManager {
         };
         newTasks.push(followTask);
         followTaskId = followTask.id;
+        
+        if (event.id) existingFollowTasks.add(event.id);
+        existingFollowTaskTitles.add(followKey);
       }
 
       // Notes revision task
@@ -89,6 +104,9 @@ export class TaskManager {
         };
         newTasks.push(notesTask);
         notesTaskId = notesTask.id;
+        
+        if (event.id) existingNotesTasks.add(event.id);
+        existingNotesTaskTitles.add(notesKey);
       }
 
       // Exercises task
@@ -111,6 +129,9 @@ export class TaskManager {
           postponedCount: 0,
         };
         newTasks.push(exerciseTask);
+        
+        if (event.id) existingExerciseTasks.add(event.id);
+        existingExerciseTaskTitles.add(exerciseKey);
       }
 
       if (!event.isDone) updatedEvents[i] = { ...event, isDone: true };

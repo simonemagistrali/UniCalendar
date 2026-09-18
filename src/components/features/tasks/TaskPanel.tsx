@@ -20,6 +20,25 @@ export function TaskPanel() {
   const setTasks = useAppStore(s => s.setTasks);
 
   const [filter, setFilter] = useState<'all' | 'todo' | 'done'>('todo');
+  const [typeFilter, setTypeFilter] = useState<string>('ALL');
+  const [courseFilter, setCourseFilter] = useState<string>('ALL');
+
+  const TASK_TYPES = {
+    ALL: 'Tutte le tipologie',
+    FOLLOW_LESSON: 'Seguire/Recuperare lezione',
+    NOTES: 'Sistemare appunti',
+    EXERCISES: 'Esercizi',
+    PROJECT: 'Progetto',
+    OTHER: 'Altro'
+  };
+
+  const getTaskType = (task: typeof tasks[0]) => {
+    if (task.isProjectTask) return 'PROJECT';
+    if (task.title.startsWith('Seguire/Recuperare lezione')) return 'FOLLOW_LESSON';
+    if (task.title.startsWith('Sistemare appunti')) return 'NOTES';
+    if (task.title.startsWith('Esercizi')) return 'EXERCISES';
+    return 'OTHER';
+  };
 
   // Auto-generate tasks from past events
   useEffect(() => {
@@ -62,8 +81,12 @@ export function TaskPanel() {
   }, [sortedTasks]); // eslint-disable-line
 
   const filteredTasks = sortedTasks.filter(t => {
-    if (filter === 'todo') return t.status !== 'done';
-    if (filter === 'done') return t.status === 'done';
+    if (filter === 'todo' && t.status === 'done') return false;
+    if (filter === 'done' && t.status !== 'done') return false;
+    
+    if (typeFilter !== 'ALL' && getTaskType(t) !== typeFilter) return false;
+    if (courseFilter !== 'ALL' && t.courseId !== courseFilter) return false;
+    
     return true;
   });
 
@@ -93,6 +116,29 @@ export function TaskPanel() {
             {f === 'todo' ? 'Da fare' : f === 'done' ? 'Completate' : 'Tutte'}
           </button>
         ))}
+      </div>
+
+      <div className="task-type-filter-bar" style={{ display: 'flex', gap: '8px' }}>
+        <select 
+          className="task-type-select" 
+          value={typeFilter} 
+          onChange={(e) => setTypeFilter(e.target.value)}
+        >
+          {Object.entries(TASK_TYPES).map(([key, label]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
+
+        <select 
+          className="task-type-select" 
+          value={courseFilter} 
+          onChange={(e) => setCourseFilter(e.target.value)}
+        >
+          <option value="ALL">Tutte le materie</option>
+          {courses.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
       </div>
 
       <div className="task-list">

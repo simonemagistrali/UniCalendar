@@ -598,10 +598,31 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   background: transparent;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
   color: var(--text-secondary);
-  transition: all 0.15s;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.task-type-filter-bar {
+  padding: 0 4px;
+}
+
+.task-type-select {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.task-type-select:hover {
+  border-color: var(--accent-primary);
 }
 .task-filter-btn.active {
   background: #fff;

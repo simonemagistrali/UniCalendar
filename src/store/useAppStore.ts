@@ -122,13 +122,31 @@ function persist(state: AppState) {
   }, state.user?.id || null);
 }
 
+/* ─── Deduplicate Tasks Helper ─── */
+function deduplicateTasks(tasks: Task[]): Task[] {
+  const uniqueMap = new Map<string, Task>();
+  for (const t of tasks) {
+    const key = `${t.courseId}-${t.title}`;
+    if (uniqueMap.has(key)) {
+      const existing = uniqueMap.get(key)!;
+      // Prefer keeping 'done' tasks over 'todo'
+      if (existing.status !== 'done' && t.status === 'done') {
+        uniqueMap.set(key, t);
+      }
+    } else {
+      uniqueMap.set(key, t);
+    }
+  }
+  return Array.from(uniqueMap.values());
+}
+
 /* ─── Load initial state ─── */
 const saved = loadState();
 
 export const useAppStore = create<AppState>((set, get) => ({
   user: null,
   events: (saved?.events as CalendarEvent[]) || [],
-  tasks: (saved?.tasks as Task[]) || [],
+  tasks: deduplicateTasks((saved?.tasks as Task[]) || []),
   courses: (saved?.courses as Course[]) || [],
   preferences: mergePreferences(saved?.preferences),
   studySessions: (saved?.studySessions as StudySession[]) || [],
@@ -152,7 +170,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           const next = {
             ...s,
             events: cloudData.events || s.events,
-            tasks: cloudData.tasks || s.tasks,
+            tasks: deduplicateTasks(cloudData.tasks || s.tasks),
             courses: cloudData.courses || s.courses,
             preferences: mergePreferences(cloudData.preferences || s.preferences),
             studySessions: cloudData.studySessions || s.studySessions,
@@ -259,7 +277,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addTasks: (tasks) => {
     get().saveSnapshot();
     set((s) => {
-      const next = { ...s, tasks: [...s.tasks, ...tasks] };
+      const next = { ...s, tasks: deduplicateTasks([...s.tasks, ...tasks]) };
       persist(next as AppState);
       return next;
     });
@@ -312,7 +330,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setTasks: (tasks) => {
     get().saveSnapshot();
     set((s) => {
-      const next = { ...s, tasks };
+      const next = { ...s, tasks: deduplicateTasks(tasks) };
       persist(next as AppState);
       return next;
     });
