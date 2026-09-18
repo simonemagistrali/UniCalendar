@@ -1,5 +1,5 @@
 /* ─── Enums ─── */
-export type EventType = 'generic' | 'lesson' | 'exam' | 'travel' | 'sport' | 'project_deadline';
+export type EventType = 'generic' | 'lesson' | 'exam' | 'travel' | 'sport' | 'project_deadline' | 'meal';
 export type LessonType = 'theory' | 'exercise' | 'theory_exercise' | 'lab';
 export type LocationType = 'in_person' | 'remote';
 export type TaskStatus = 'todo' | 'in_progress' | 'done';
@@ -47,6 +47,11 @@ export interface CalendarEvent {
   // Recurrence
   rrule?: string; // Simple recurrence: 'weekly', 'daily', etc.
   sourceCalendarId?: string; // To detect duplicates from Google Calendar
+  // Override course preferences for this specific event
+  studyPreferencesOverride?: {
+    requiresNotesRevision: boolean;
+    requiresExercises: boolean;
+  };
 }
 
 /* ─── Task ─── */
@@ -92,6 +97,11 @@ export interface DayStudyHours {
   enabled: boolean;
   start: string; // "08:00"
   end: string;   // "18:00"
+  lunchBreak?: {
+    enabled: boolean;
+    start: string;
+    end: string;
+  };
 }
 
 /* ─── User Preferences ─── */

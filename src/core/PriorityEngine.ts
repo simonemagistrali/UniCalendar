@@ -11,6 +11,7 @@ export class PriorityEngine {
     course: Course | undefined,
     upcomingExam: CalendarEvent | undefined,
     upcomingLesson: CalendarEvent | undefined,
+    originalEvent: CalendarEvent | undefined,
     prefs: UserPreferences,
     history: PerformanceRecord[]
   ): number {
@@ -64,11 +65,31 @@ export class PriorityEngine {
       score += 20;
     }
 
-    // 7. Look-ahead: if a lesson of same course is within 48h, prepare!
-    if (upcomingLesson && task.title.toLowerCase().includes('appunti')) {
-      const hoursToLesson = (new Date(upcomingLesson.startTime).getTime() - now) / 3600000;
-      if (hoursToLesson > 0 && hoursToLesson < 48) {
-        score += 80;
+    // 7. Dynamic Lesson Recovery Priority (D1 and D2)
+    if (originalEvent && originalEvent.type === 'lesson') {
+      const d2Time = new Date(originalEvent.startTime).getTime() + (7 * 24 * 60 * 60 * 1000); // Original + 7 days
+      const d1Time = upcomingLesson ? new Date(upcomingLesson.startTime).getTime() : d2Time;
+      
+      const hoursToD1 = (d1Time - now) / 3600000;
+      const hoursToD2 = (d2Time - now) / 3600000;
+
+      if (hoursToD1 > 0) {
+        // Phase 1: Approaching D1 (Next Lesson)
+        if (hoursToD1 <= 72) {
+          // Bonus scaling up to 120 as D1 approaches
+          const ratio = (72 - hoursToD1) / 72;
+          score += 120 * Math.pow(ratio, 1.5);
+        } else {
+          // Base bonus just for having a next lesson pending
+          score += 20; 
+        }
+      } else if (hoursToD2 > 0) {
+        // Phase 2: Missed D1, approaching D2 (1 week after original lesson)
+        const ratio = ((7 * 24) - hoursToD2) / (7 * 24); // 0 at D1, 1 at D2
+        score += 120 + 80 * Math.pow(ratio, 2); // scales from 120 up to 200
+      } else {
+        // Phase 3: Missed D2 (More than a week late!)
+        score += 250; // Critical priority to force recovery
       }
     }
 
@@ -120,9 +141,10 @@ export class PriorityEngine {
       const course = t.courseId ? courses.get(t.courseId) : undefined;
       const exam = t.courseId ? examsByCourse.get(t.courseId) : undefined;
       const lesson = t.courseId ? lessonsByCourse.get(t.courseId) : undefined;
+      const originalEvent = t.relatedEventId ? events.find(e => e.id === t.relatedEventId) : undefined;
       return {
         ...t,
-        priorityScore: this.calculatePriority(t, course, exam, lesson, prefs, history)
+        priorityScore: this.calculatePriority(t, course, exam, lesson, originalEvent, prefs, history)
       };
     });
 

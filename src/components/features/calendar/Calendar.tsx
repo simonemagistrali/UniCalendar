@@ -4,6 +4,7 @@ import { it } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { TravelManager } from '../../../core/TravelManager';
+import { MealManager } from '../../../core/MealManager';
 import { fetchGoogleCalendarEvents } from '../../../core/googleCalendar';
 import { EventDetailsModal } from '../events/EventDetailsModal';
 import { EventFormModal } from '../events/EventFormModal';
@@ -69,7 +70,10 @@ export function Calendar() {
     const items: { id: string; title: string; start: Date; end: Date; color: string; type: string; isTravelStudyTime?: boolean }[] = [];
 
     const computedTravelEvents = TravelManager.generateTravelEvents(events, preferences);
-    const allEvents = [...events, ...computedTravelEvents];
+    // Generate meal events for the current viewed month/week/day window (+/- some buffer)
+    const viewStartDate = subDays(currentDate, 14);
+    const computedMealEvents = MealManager.generateMealEvents(preferences, viewStartDate, 45);
+    const allEvents = [...events, ...computedTravelEvents, ...computedMealEvents];
 
     for (const e of allEvents) {
       const course = e.courseId ? courses.find(c => c.id === e.courseId) : undefined;
@@ -78,6 +82,7 @@ export function Calendar() {
       else if (e.type === 'sport') color = '#188038';
       else if (e.type === 'travel') color = '#5f6368';
       else if (e.type === 'project_deadline') color = '#a142f4';
+      else if (e.type === 'meal') color = '#f09300'; // Orange for lunch break
 
       items.push({
         id: e.id,
@@ -295,9 +300,10 @@ function WeekView({ currentDate, items, onEventClick }: { currentDate: Date; ite
                       height: `${height}px`,
                       left: it._left,
                       width: it._width,
-                      backgroundColor: it.color,
+                      backgroundColor: it.type === 'meal' ? `${it.color}33` : it.color,
+                      border: it.type === 'meal' ? `1px dashed ${it.color}` : 'none',
                       backgroundImage: it.isTravelStudyTime ? 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px)' : undefined,
-                      color: it.type === 'buffer' || it.type === 'study' ? 'var(--text-primary)' : '#fff',
+                      color: it.type === 'buffer' || it.type === 'study' || it.type === 'meal' ? 'var(--text-primary)' : '#fff',
                       cursor: 'pointer'
                     }}
                     title={it.title}
@@ -345,9 +351,10 @@ function DayView({ currentDate, items, onEventClick }: { currentDate: Date; item
                     height: `${height}px`,
                     left: it._left,
                     width: it._width,
-                    backgroundColor: it.color,
+                    backgroundColor: it.type === 'meal' ? `${it.color}33` : it.color,
+                    border: it.type === 'meal' ? `1px dashed ${it.color}` : 'none',
                     backgroundImage: it.isTravelStudyTime ? 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px)' : undefined,
-                    color: it.type === 'buffer' || it.type === 'study' ? 'var(--text-primary)' : '#fff',
+                    color: it.type === 'buffer' || it.type === 'study' || it.type === 'meal' ? 'var(--text-primary)' : '#fff',
                     cursor: 'pointer'
                   }}
                 >

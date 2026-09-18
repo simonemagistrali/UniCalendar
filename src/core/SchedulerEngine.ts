@@ -61,6 +61,24 @@ export class SchedulerEngine {
         continue;
       }
 
+      // Check lunch break
+      let breakStart: Date | undefined;
+      let breakEnd: Date | undefined;
+      if (dayConfig.lunchBreak && dayConfig.lunchBreak.enabled) {
+        const [bStartH, bStartM] = dayConfig.lunchBreak.start.split(':').map(Number);
+        const [bEndH, bEndM] = dayConfig.lunchBreak.end.split(':').map(Number);
+        breakStart = new Date(currentTime);
+        breakStart.setHours(bStartH, bStartM, 0, 0);
+        breakEnd = new Date(currentTime);
+        breakEnd.setHours(bEndH, bEndM, 0, 0);
+      }
+
+      // Skip past lunch break if inside it
+      if (breakStart && breakEnd && currentTime >= breakStart && currentTime < breakEnd) {
+        currentTime = new Date(breakEnd);
+        continue;
+      }
+
       // Check if current time is inside an existing event — if so, skip past it
       const overlapping = this.findOverlappingEvent(currentTime, existingEvents);
       const task = todoTasks[taskIdx];
@@ -103,6 +121,11 @@ export class SchedulerEngine {
 
       // Truncate at day end
       if (blockEnd > dayEnd) blockEnd = new Date(dayEnd);
+
+      // Truncate at lunch break
+      if (breakStart && blockEnd > breakStart && currentTime < breakStart) {
+        blockEnd = new Date(breakStart);
+      }
 
       const actualMinutes = Math.round((blockEnd.getTime() - currentTime.getTime()) / 60000);
 

@@ -35,7 +35,7 @@ export class TaskManager {
         continue;
       }
 
-      const prefs = course.defaultStudyPreferences;
+      const prefs = event.studyPreferencesOverride || course.defaultStudyPreferences;
       
       const needsFollow = !existingFollowTasks.has(event.id);
       const needsNotes = prefs.requiresNotesRevision && !existingNotesTasks.has(event.id);

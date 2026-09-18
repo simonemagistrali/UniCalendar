@@ -5,16 +5,17 @@ import { TaskManager } from '../core/TaskManager';
 import { PriorityEngine } from '../core/PriorityEngine';
 import { SchedulerEngine } from '../core/SchedulerEngine';
 import { TravelManager } from '../core/TravelManager';
+import { MealManager } from '../core/MealManager';
 
 /* ─── Default per-day study hours ─── */
 function defaultDailyHours(): Record<number, DayStudyHours> {
   const h: Record<number, DayStudyHours> = {};
   for (let d = 0; d < 7; d++) {
     h[d] = d === 0
-      ? { enabled: true, start: '09:00', end: '14:00' } // Sunday: shorter hours
+      ? { enabled: true, start: '09:00', end: '14:00', lunchBreak: { enabled: true, start: '13:00', end: '14:00' } } // Sunday: shorter hours
       : d === 6
-      ? { enabled: true, start: '09:00', end: '17:00' } // Saturday: slightly shorter
-      : { enabled: true, start: '08:00', end: '18:00' }; // Weekdays
+      ? { enabled: true, start: '09:00', end: '17:00', lunchBreak: { enabled: true, start: '13:00', end: '14:00' } } // Saturday: slightly shorter
+      : { enabled: true, start: '08:00', end: '18:00', lunchBreak: { enabled: true, start: '13:00', end: '14:00' } }; // Weekdays
   }
   return h;
 }
@@ -364,7 +365,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // 3. Schedule sessions
     const travelEvents = TravelManager.generateTravelEvents(updatedEvents, state.preferences);
-    const allEventsForScheduling = [...updatedEvents, ...travelEvents];
+    const mealEvents = MealManager.generateMealEvents(state.preferences, new Date(), 14);
+    const allEventsForScheduling = [...updatedEvents, ...travelEvents, ...mealEvents];
 
     const sessions = SchedulerEngine.generateSchedule(
       sortedActiveTasks, 

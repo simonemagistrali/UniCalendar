@@ -42,6 +42,10 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
   // Travel fields
   const [isTravelStudyTime, setIsTravelStudyTime] = useState(false);
 
+  // Lesson overrides
+  const [overrideNotesRevision, setOverrideNotesRevision] = useState<boolean | null>(null);
+  const [overrideExercises, setOverrideExercises] = useState<boolean | null>(null);
+
   useEffect(() => {
     if (initialEvent && isOpen) {
       setTitle(initialEvent.title);
@@ -60,6 +64,8 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
       setProjectFrequency(initialEvent.projectScheduleFrequencyDays?.toString() || '3');
       setProjectImportance(initialEvent.projectImportance?.toString() || '5');
       setIsTravelStudyTime(initialEvent.isTravelStudyTime || false);
+      setOverrideNotesRevision(initialEvent.studyPreferencesOverride?.requiresNotesRevision ?? null);
+      setOverrideExercises(initialEvent.studyPreferencesOverride?.requiresExercises ?? null);
     } else if (isOpen && !initialEvent) {
       resetForm();
     }
@@ -70,6 +76,7 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
     setCourseId(''); setLessonType('theory'); setLocationType('in_person');
     setAddress(''); setSportType(''); setProjectTotalHours('10');
     setProjectFrequency('3'); setProjectImportance('5'); setIsTravelStudyTime(false);
+    setOverrideNotesRevision(null); setOverrideExercises(null);
   };
 
   const isSimilarEvent = (e1: CalendarEvent, e2: CalendarEvent) => {
@@ -104,6 +111,17 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
       projectScheduleFrequencyDays: type === 'project_deadline' ? parseInt(projectFrequency) : undefined,
       projectImportance: type === 'project_deadline' ? parseInt(projectImportance) : undefined,
     };
+
+    const selectedCourse = courses.find(c => c.id === courseId);
+    if (type === 'lesson' && (lessonType === 'exercise' || lessonType === 'lab') && selectedCourse && (overrideNotesRevision !== null || overrideExercises !== null)) {
+      (eventData as any).studyPreferencesOverride = {
+        requiresNotesRevision: overrideNotesRevision !== null ? overrideNotesRevision : selectedCourse.defaultStudyPreferences.requiresNotesRevision,
+        requiresExercises: overrideExercises !== null ? overrideExercises : selectedCourse.defaultStudyPreferences.requiresExercises,
+      };
+    } else if (initialEvent?.studyPreferencesOverride && (type !== 'lesson' || (lessonType !== 'exercise' && lessonType !== 'lab'))) {
+       // if we changed type, clear the override
+       (eventData as any).studyPreferencesOverride = undefined;
+    }
 
     if (initialEvent) {
       // Editing
@@ -156,6 +174,11 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
     resetForm();
     onClose();
   };
+
+  const selectedCourseUI = courses.find(c => c.id === courseId);
+  const showOverrides = type === 'lesson' && (lessonType === 'exercise' || lessonType === 'lab') && selectedCourseUI;
+  const currentNotesRevision = overrideNotesRevision !== null ? overrideNotesRevision : (selectedCourseUI?.defaultStudyPreferences.requiresNotesRevision ?? true);
+  const currentExercises = overrideExercises !== null ? overrideExercises : (selectedCourseUI?.defaultStudyPreferences.requiresExercises ?? false);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={initialEvent ? "Modifica Evento" : "Nuovo Evento"}>
@@ -213,6 +236,28 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
                 <option value="lab">Laboratorio</option>
               </select>
             </div>
+          </div>
+        )}
+
+        {showOverrides && (
+          <div className="form-field" style={{ marginTop: '10px', padding: '10px', backgroundColor: 'rgba(0,0,0,0.03)', borderRadius: '6px' }}>
+            <label style={{ marginBottom: '8px', fontWeight: '500' }}>Generazione Task per questa sessione:</label>
+            <label className="form-checkbox" style={{ marginBottom: '4px' }}>
+              <input 
+                type="checkbox" 
+                checked={currentNotesRevision} 
+                onChange={e => setOverrideNotesRevision(e.target.checked)} 
+              />
+              Sistemazione appunti
+            </label>
+            <label className="form-checkbox">
+              <input 
+                type="checkbox" 
+                checked={currentExercises} 
+                onChange={e => setOverrideExercises(e.target.checked)} 
+              />
+              Svolgimento esercizi
+            </label>
           </div>
         )}
 

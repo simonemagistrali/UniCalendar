@@ -44,6 +44,37 @@ export function Settings() {
     }));
   };
 
+  const handleToggleLunch = (dayId: number) => {
+    setDailyHours(prev => ({
+      ...prev,
+      [dayId]: {
+        ...prev[dayId],
+        lunchBreak: {
+          ...prev[dayId].lunchBreak,
+          enabled: !(prev[dayId].lunchBreak?.enabled ?? true),
+          start: prev[dayId].lunchBreak?.start || '13:00',
+          end: prev[dayId].lunchBreak?.end || '14:00',
+        }
+      },
+    }));
+  };
+
+  const handleLunchTimeChange = (dayId: number, field: 'start' | 'end', value: string) => {
+    setDailyHours(prev => ({
+      ...prev,
+      [dayId]: {
+        ...prev[dayId],
+        lunchBreak: {
+          ...prev[dayId].lunchBreak,
+          enabled: prev[dayId].lunchBreak?.enabled ?? true,
+          start: prev[dayId].lunchBreak?.start || '13:00',
+          end: prev[dayId].lunchBreak?.end || '14:00',
+          [field]: value
+        }
+      },
+    }));
+  };
+
   const handleSave = () => {
     updatePreferences({
       dailyStudyHours: dailyHours,
@@ -87,20 +118,51 @@ export function Settings() {
                       {day.name}
                     </button>
                     {config.enabled && (
-                      <div className="settings-day-times">
-                        <input
-                          type="time"
-                          value={config.start}
-                          onChange={e => handleDayTimeChange(day.id, 'start', e.target.value)}
-                          className="settings-time-input"
-                        />
-                        <span className="settings-time-sep">—</span>
-                        <input
-                          type="time"
-                          value={config.end}
-                          onChange={e => handleDayTimeChange(day.id, 'end', e.target.value)}
-                          className="settings-time-input"
-                        />
+                      <div className="settings-day-times" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input
+                            type="time"
+                            value={config.start}
+                            onChange={e => handleDayTimeChange(day.id, 'start', e.target.value)}
+                            className="settings-time-input"
+                          />
+                          <span className="settings-time-sep">—</span>
+                          <input
+                            type="time"
+                            value={config.end}
+                            onChange={e => handleDayTimeChange(day.id, 'end', e.target.value)}
+                            className="settings-time-input"
+                          />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
+                            <input 
+                              type="checkbox"
+                              checked={config.lunchBreak?.enabled ?? true}
+                              onChange={() => handleToggleLunch(day.id)}
+                            />
+                            Pausa:
+                          </label>
+                          {(config.lunchBreak?.enabled ?? true) && (
+                            <>
+                              <input
+                                type="time"
+                                value={config.lunchBreak?.start || '13:00'}
+                                onChange={e => handleLunchTimeChange(day.id, 'start', e.target.value)}
+                                className="settings-time-input"
+                                style={{ padding: '0.2rem', fontSize: '0.85rem' }}
+                              />
+                              <span className="settings-time-sep">-</span>
+                              <input
+                                type="time"
+                                value={config.lunchBreak?.end || '14:00'}
+                                onChange={e => handleLunchTimeChange(day.id, 'end', e.target.value)}
+                                className="settings-time-input"
+                                style={{ padding: '0.2rem', fontSize: '0.85rem' }}
+                              />
+                            </>
+                          )}
+                        </div>
                       </div>
                     )}
                     {!config.enabled && (
