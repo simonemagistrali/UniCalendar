@@ -72,6 +72,7 @@ export interface Task {
   postponedCount: number; // How many times postponed
   isProjectTask?: boolean; // From a project/deadline
   isTravelCompatible?: boolean; // Can this task be done during travel?
+  completionMode?: 'attended' | 'recovered' | 'normal'; // Track how the task was completed
 }
 
 /* ─── Study Session ─── */
@@ -112,6 +113,28 @@ export interface UserPreferences {
   defaultHomeAddress?: string; // To detect travel needs
   defaultCommuteTimeMinutes?: number; // Estimated commute time in minutes
   isCommuteProductive?: boolean; // True if commute is by train/bus and can be used for study
+}
+
+/* ─── Phantom Task (Future Projection) ─── */
+export type PhantomTaskType = 'follow_recover' | 'notes' | 'exercises';
+
+export interface PhantomTask {
+  courseId: string;
+  courseName: string;
+  sourceEventId: string;        // The future lesson that will generate this
+  expectedAvailableAfter: string; // When the lesson ends (ISO)
+  estimatedDuration: number;     // Minutes
+  type: PhantomTaskType;
+  title: string;
+}
+
+export interface FutureWorkloadProjection {
+  phantomTasks: PhantomTask[];
+  totalProjectedMinutes: number;
+  /** Maps date string "YYYY-MM-DD" → projected minutes arriving that day */
+  projectionByDay: Record<string, number>;
+  /** Maps courseId → total projected minutes */
+  projectionByCourse: Record<string, number>;
 }
 
 /* ─── App User ─── */

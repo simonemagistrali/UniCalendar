@@ -6,6 +6,7 @@ import { PriorityEngine } from '../core/PriorityEngine';
 import { SchedulerEngine } from '../core/SchedulerEngine';
 import { TravelManager } from '../core/TravelManager';
 import { MealManager } from '../core/MealManager';
+import { FutureProjectionEngine } from '../core/FutureProjectionEngine';
 import { persistState, loadFromCloud } from '../core/syncManager';
 
 /* ─── Default per-day study hours ─── */
@@ -81,7 +82,7 @@ interface AppState {
   addTasks: (tasks: Task[]) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   removeTask: (id: string) => void;
-  completeTask: (id: string, actualMinutes: number) => void;
+  completeTask: (id: string, actualMinutes: number, completionMode?: 'attended' | 'recovered' | 'normal') => void;
   
   // Courses
   addCourse: (course: Course) => void;
@@ -301,7 +302,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  completeTask: (id, actualMinutes) => {
+  completeTask: (id, actualMinutes, completionMode = 'normal') => {
     get().saveSnapshot();
     const state = get();
     const task = state.tasks.find(t => t.id === id);
@@ -324,6 +325,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       status: 'done',
       actualDuration: actualMinutes,
       completedAt: now,
+      completionMode,
     });
   },
 
@@ -400,7 +402,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { updatedEvents, newTasks } = TaskManager.generateTasksFromPastEvents(state.events, state.courses, state.tasks);
     const allTasks = [...state.tasks, ...newTasks];
 
-    // 2. Sort/Prioritize tasks
+    // 1.5 Future Workload Projection — predict tasks from upcoming lessons
+    const futureProjection = FutureProjectionEngine.project(
+      updatedEvents,
+      state.courses,
+      allTasks,
+      state.performanceHistory,
+      14 // Project 14 days ahead
+    );
+
+    // 2. Sort/Prioritize tasks (now with future workload awareness)
     const coursesMap = new Map(state.courses.map(c => [c.id, c]));
     const activeTasks = allTasks.filter(t => t.status !== 'done');
     const sortedActiveTasks = PriorityEngine.sortTasks(
@@ -408,7 +419,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       coursesMap,
       updatedEvents,
       state.preferences,
-      state.performanceHistory
+      state.performanceHistory,
+      futureProjection
     );
 
     const finalTasks = [
@@ -427,7 +439,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       state.preferences, 
       new Date(), 
       14, // Schedule for next 14 days
-      state.performanceHistory
+      state.performanceHistory,
+      futureProjection
     );
 
     set((s) => {

@@ -1,4 +1,5 @@
-import type { Task, StudySession, UserPreferences, CalendarEvent, PerformanceRecord } from './types';
+import type { Task, StudySession, UserPreferences, CalendarEvent, PerformanceRecord, FutureWorkloadProjection } from './types';
+import { FutureProjectionEngine } from './FutureProjectionEngine';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -13,7 +14,8 @@ export class SchedulerEngine {
     prefs: UserPreferences,
     startDate: Date,
     daysToSchedule: number = 14,
-    history: PerformanceRecord[] = []
+    history: PerformanceRecord[] = [],
+    futureProjection?: FutureWorkloadProjection
   ): StudySession[] {
     const sessions: StudySession[] = [];
     const todoTasks = tasks.filter(t => t.status !== 'done');
@@ -25,6 +27,9 @@ export class SchedulerEngine {
 
     const endScheduleDate = new Date(startDate);
     endScheduleDate.setDate(endScheduleDate.getDate() + daysToSchedule);
+
+    // Track minutes used per day for reservation enforcement
+    const minutesUsedPerDay: Record<string, number> = {};
 
     // Safety counter to prevent infinite loops
     let iterations = 0;
@@ -108,6 +113,26 @@ export class SchedulerEngine {
         }
       }
 
+      // --- Future workload reservation check ---
+      // If we have a projection, check if we've already used too much time today
+      // (leaving room for future phantom tasks)
+      if (futureProjection) {
+        const todayKey = currentTime.toISOString().split('T')[0];
+        const reservedMinutes = FutureProjectionEngine.getReservedMinutesForDay(currentTime, futureProjection);
+        const totalDayMinutes = (endH * 60 + endM) - (startH * 60 + startM)
+          - (dayConfig.lunchBreak?.enabled
+            ? this.parseLunchBreakMinutes(dayConfig.lunchBreak.start, dayConfig.lunchBreak.end)
+            : 0);
+        const budgetForCurrentTasks = Math.max(30, totalDayMinutes - reservedMinutes);
+        const usedToday = minutesUsedPerDay[todayKey] || 0;
+
+        if (usedToday >= budgetForCurrentTasks) {
+          // Day budget exhausted for current tasks; move to next day
+          currentTime = this.nextDay(currentTime);
+          continue;
+        }
+      }
+
       // Schedule a study block
       // (task is already defined above)
       const maxBlock = Math.min(remainingTime, 120); // Max 2h per block
@@ -130,6 +155,10 @@ export class SchedulerEngine {
       const actualMinutes = Math.round((blockEnd.getTime() - currentTime.getTime()) / 60000);
 
       if (actualMinutes >= 15 || (actualMinutes > 0 && remainingTime < 15)) { // Minimum 15 min session, unless it's the final chunk
+        // Track minutes used today for reservation enforcement
+        const todayKey = currentTime.toISOString().split('T')[0];
+        minutesUsedPerDay[todayKey] = (minutesUsedPerDay[todayKey] || 0) + actualMinutes;
+
         sessions.push({
           id: uuidv4(),
           taskId: task.id,
@@ -224,6 +253,13 @@ export class SchedulerEngine {
       }
     }
     return nearest;
+  }
+
+  /** Parse lunch break duration in minutes from start/end time strings */
+  private static parseLunchBreakMinutes(start: string, end: string): number {
+    const [sH, sM] = start.split(':').map(Number);
+    const [eH, eM] = end.split(':').map(Number);
+    return (eH * 60 + eM) - (sH * 60 + sM);
   }
 
   private static nextDay(d: Date): Date {

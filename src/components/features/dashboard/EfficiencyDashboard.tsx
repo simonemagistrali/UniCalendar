@@ -66,7 +66,21 @@ export function EfficiencyDashboard() {
       else if (last < prev - 2) trend = 'down';
     }
 
-    return { efficiency, doneTasks: doneTasks.length, todoTasks: todoTasks.length, courseStats, weeklyEfficiency, trend };
+    // Attendance rate
+    const lessonTasks = doneTasks.filter(t => t.title.startsWith('Seguire/Recuperare lezione'));
+    let attendanceRate: number | null = null;
+    let attendedCount = 0;
+    let recoveredCount = 0;
+    if (lessonTasks.length > 0) {
+      attendedCount = lessonTasks.filter(t => t.completionMode === 'attended').length;
+      recoveredCount = lessonTasks.filter(t => t.completionMode === 'recovered').length;
+      const totalTracked = attendedCount + recoveredCount;
+      if (totalTracked > 0) {
+        attendanceRate = Math.round((attendedCount / totalTracked) * 100);
+      }
+    }
+
+    return { efficiency, doneTasks: doneTasks.length, todoTasks: todoTasks.length, courseStats, weeklyEfficiency, trend, attendanceRate, attendedCount, recoveredCount };
   }, [tasks, performanceHistory, courses]);
 
   const barData = {
@@ -141,8 +155,21 @@ export function EfficiencyDashboard() {
               <span className="dashboard-stat-num">{stats.doneTasks}</span>
               <span className="dashboard-stat-label">Completate</span>
             </div>
+            {stats.attendanceRate !== null && (
+              <div className="dashboard-stat">
+                <span className="dashboard-stat-num" style={{ color: stats.attendanceRate < 50 ? 'var(--accent-danger)' : 'inherit' }}>
+                  {stats.attendanceRate}%
+                </span>
+                <span className="dashboard-stat-label">Frequenza</span>
+              </div>
+            )}
           </div>
         </div>
+        {stats.attendanceRate !== null && stats.attendanceRate < 50 && (
+          <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: 'rgba(220, 53, 69, 0.1)', color: 'var(--accent-danger)', borderRadius: '8px', fontSize: '0.85rem' }}>
+            <strong>Attenzione:</strong> Stai saltando molte lezioni (tasso di recupero: {100 - stats.attendanceRate}%). Questo potrebbe rallentare la tua preparazione!
+          </div>
+        )}
         {stats.doneTasks === 0 && (
           <p className="dashboard-hint">Completa delle attività per vedere le statistiche!</p>
         )}

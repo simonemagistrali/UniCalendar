@@ -1,4 +1,4 @@
-import type { Task, Course, CalendarEvent, UserPreferences, PerformanceRecord } from './types';
+import type { Task, Course, CalendarEvent, UserPreferences, PerformanceRecord, FutureWorkloadProjection } from './types';
 
 /**
  * PriorityEngine — Calculates dynamic priority scores for tasks.
@@ -13,7 +13,8 @@ export class PriorityEngine {
     upcomingLesson: CalendarEvent | undefined,
     originalEvent: CalendarEvent | undefined,
     prefs: UserPreferences,
-    history: PerformanceRecord[]
+    history: PerformanceRecord[],
+    futureProjection?: FutureWorkloadProjection
   ): number {
     let score = 0;
     const now = Date.now();
@@ -105,6 +106,38 @@ export class PriorityEngine {
       score += 30;
     }
 
+    // 9. Future Workload Pressure — completion window narrowing
+    // If many phantom tasks are expected in the next few days, current tasks
+    // should be prioritized to be done BEFORE the wave of new tasks arrives.
+    if (futureProjection && futureProjection.totalProjectedMinutes > 0) {
+      const now = Date.now();
+      // Sum phantom load arriving in the next 3 days
+      let nearTermLoad = 0;
+      for (let d = 0; d < 3; d++) {
+        const futureDay = new Date(now + d * 86400000);
+        const dayKey = futureDay.toISOString().split('T')[0];
+        nearTermLoad += futureProjection.projectionByDay[dayKey] || 0;
+      }
+
+      if (nearTermLoad > 0) {
+        // The more load coming, the more pressure on current tasks
+        // Scale: 120 min of incoming load → +15 priority, 360 min → +45
+        const pressureBonus = Math.min(60, Math.round(nearTermLoad / 8));
+        score += pressureBonus;
+      }
+
+      // Extra boost if this specific task's course has a lot of future load
+      if (task.courseId && futureProjection.projectionByCourse[task.courseId]) {
+        const courseLoad = futureProjection.projectionByCourse[task.courseId];
+        // If 180+ min of the same course are coming, clear the backlog first
+        if (courseLoad >= 180) {
+          score += 20;
+        } else if (courseLoad >= 90) {
+          score += 10;
+        }
+      }
+    }
+
     return Math.round(score);
   }
 
@@ -116,7 +149,8 @@ export class PriorityEngine {
     courses: Map<string, Course>,
     events: CalendarEvent[],
     prefs: UserPreferences,
-    history: PerformanceRecord[]
+    history: PerformanceRecord[],
+    futureProjection?: FutureWorkloadProjection
   ): Task[] {
     const now = Date.now();
 
@@ -151,7 +185,7 @@ export class PriorityEngine {
       const originalEvent = t.relatedEventId ? events.find(e => e.id === t.relatedEventId) : undefined;
       return {
         ...t,
-        priorityScore: this.calculatePriority(t, course, exam, lesson, originalEvent, prefs, history)
+        priorityScore: this.calculatePriority(t, course, exam, lesson, originalEvent, prefs, history, futureProjection)
       };
     });
 

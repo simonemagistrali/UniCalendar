@@ -60,6 +60,28 @@ export class TaskManager {
       }
 
       const eventDurationMinutes = Math.max(0, Math.round((new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) / 60000)) || 120;
+      
+      // Calculate historical multiplier for unbiased smart estimation
+      let lessonMultiplier = 1.0;
+      let totalNominal = 0;
+      let totalActual = 0;
+      for (const t of existingTasks) {
+        if (t.status === 'done' && t.actualDuration && t.courseId === course.id && t.title.startsWith('Seguire/Recuperare')) {
+           const ev = events.find(e => e.id === t.relatedEventId);
+           if (ev) {
+             const nominal = Math.max(0, Math.round((new Date(ev.endTime).getTime() - new Date(ev.startTime).getTime()) / 60000)) || 120;
+             totalNominal += nominal;
+             totalActual += t.actualDuration;
+           }
+        }
+      }
+      if (totalNominal > 0) {
+        lessonMultiplier = totalActual / totalNominal;
+        // Cap the multiplier to avoid crazy values (e.g., between 0.5 and 3.0)
+        lessonMultiplier = Math.max(0.5, Math.min(3.0, lessonMultiplier));
+      }
+      
+      const adjustedLessonDuration = Math.round(eventDurationMinutes * lessonMultiplier);
 
       let followTaskId: string | null = null;
       let notesTaskId: string | null = null;
@@ -74,7 +96,7 @@ export class TaskManager {
           relatedEventId: event.id,
           status: 'todo',
           priorityScore: 50, // High priority for recovering a missed lesson
-          estimatedDuration: eventDurationMinutes,
+          estimatedDuration: adjustedLessonDuration,
           createdAt: now,
           dependencies: [],
           postponedCount: 0,
