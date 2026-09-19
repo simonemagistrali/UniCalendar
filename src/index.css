@@ -425,6 +425,9 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   .main-content {
     padding-top: 72px !important;
   }
+  .calendar-sidebar {
+    display: none;
+  }
 }
 
 /* ─── Main Content ─── */

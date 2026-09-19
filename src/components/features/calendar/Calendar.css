@@ -416,8 +416,26 @@
     height: 20px;
   }
   .calendar-event {
+    padding: 2px;
+    gap: 0;
+  }
+  .calendar-event-text {
+    display: none;
+  }
+  .calendar-events {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px;
+    align-content: flex-start;
+  }
+  .calendar-event-more {
     font-size: 9px;
     padding: 1px 3px;
+    margin-top: 1px;
+  }
+  .calendar-container {
+    min-height: auto;
   }
   .timeline-gutter {
     width: 40px;
