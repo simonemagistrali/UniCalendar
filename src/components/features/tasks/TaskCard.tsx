@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Task } from '../../../core/types';
 import { useAppStore } from '../../../store/useAppStore';
-import { Clock, Check, ChevronRight, AlertTriangle, SkipForward } from 'lucide-react';
+import { Clock, Check, ChevronRight, AlertTriangle, SkipForward, RotateCcw } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
@@ -11,20 +11,30 @@ export function TaskCard({ task }: TaskCardProps) {
   const completeTask = useAppStore(s => s.completeTask);
   const updateTask = useAppStore(s => s.updateTask);
   const courses = useAppStore(s => s.courses);
-  const [showComplete, setShowComplete] = useState(false);
+  const [completeMode, setCompleteMode] = useState<'attended' | 'recovered' | 'normal' | null>(null);
   const [actualTime, setActualTime] = useState(task.estimatedDuration.toString());
 
   const course = courses.find(c => c.id === task.courseId);
   const isUrgent = task.priorityScore > 80;
   const isDone = task.status === 'done';
+  const isLessonTask = task.title.startsWith('Seguire/Recuperare lezione');
 
   const handleComplete = () => {
-    completeTask(task.id, parseInt(actualTime) || task.estimatedDuration);
-    setShowComplete(false);
+    completeTask(task.id, parseInt(actualTime) || task.estimatedDuration, completeMode || 'normal');
+    setCompleteMode(null);
   };
 
   const handlePostpone = () => {
     updateTask(task.id, { postponedCount: task.postponedCount + 1 });
+  };
+
+  const handleUncomplete = () => {
+    updateTask(task.id, { 
+      status: 'todo', 
+      actualDuration: undefined, 
+      completedAt: undefined, 
+      completionMode: undefined 
+    });
   };
 
   return (
@@ -82,13 +92,24 @@ export function TaskCard({ task }: TaskCardProps) {
         </div>
       )}
 
-      {!isDone && (
+      {!isDone ? (
         <div className="task-card-actions">
-          {!showComplete ? (
+          {!completeMode ? (
             <>
-              <button className="task-action-btn task-complete-btn" onClick={() => setShowComplete(true)}>
-                <Check size={14} /> Completa
-              </button>
+              {isLessonTask ? (
+                <>
+                  <button className="task-action-btn task-complete-btn" onClick={() => setCompleteMode('attended')}>
+                    <Check size={14} /> Seguita
+                  </button>
+                  <button className="task-action-btn task-complete-btn" onClick={() => setCompleteMode('recovered')} style={{ backgroundColor: '#f29900', color: 'white' }}>
+                    <Check size={14} /> Recuperata
+                  </button>
+                </>
+              ) : (
+                <button className="task-action-btn task-complete-btn" onClick={() => setCompleteMode('normal')}>
+                  <Check size={14} /> Completa
+                </button>
+              )}
               <button className="task-action-btn task-postpone-btn" onClick={handlePostpone}>
                 <SkipForward size={14} /> Rimanda
               </button>
@@ -106,11 +127,17 @@ export function TaskCard({ task }: TaskCardProps) {
               <button className="task-action-btn task-confirm-btn" onClick={handleComplete}>
                 <Check size={14} /> Conferma
               </button>
-              <button className="task-action-btn task-cancel-btn" onClick={() => setShowComplete(false)}>
+              <button className="task-action-btn task-cancel-btn" onClick={() => setCompleteMode(null)}>
                 Annulla
               </button>
             </div>
           )}
+        </div>
+      ) : (
+        <div className="task-card-actions">
+          <button className="task-action-btn task-cancel-btn" onClick={handleUncomplete} style={{ opacity: 0.8 }}>
+            <RotateCcw size={14} /> Segna da fare
+          </button>
         </div>
       )}
     </div>
