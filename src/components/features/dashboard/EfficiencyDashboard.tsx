@@ -15,6 +15,7 @@ import { Bar, Line } from 'react-chartjs-2';
 import { GlassPanel } from '../../ui/GlassPanel';
 import { useAppStore } from '../../../store/useAppStore';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { CatchUpIndicator } from './CatchUpIndicator';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -174,6 +175,9 @@ export function EfficiencyDashboard() {
           <p className="dashboard-hint">Completa delle attività per vedere le statistiche!</p>
         )}
       </GlassPanel>
+
+      {/* Catch-Up Status */}
+      <CatchUpIndicator />
 
       {/* Bar Chart */}
       <GlassPanel className="dashboard-chart-panel">

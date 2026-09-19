@@ -52,6 +52,11 @@ export interface CalendarEvent {
     requiresNotesRevision: boolean;
     requiresExercises: boolean;
   };
+  // Manual travel overrides
+  travelInStartOffset?: number; // Minutes before lesson start to begin commute
+  travelInEndOffset?: number;   // Minutes before lesson start to arrive
+  travelOutStartOffset?: number; // Minutes after lesson end to begin return commute
+  travelOutEndOffset?: number;   // Minutes after lesson end to arrive
 }
 
 /* ─── Task ─── */
@@ -73,6 +78,8 @@ export interface Task {
   isProjectTask?: boolean; // From a project/deadline
   isTravelCompatible?: boolean; // Can this task be done during travel?
   completionMode?: 'attended' | 'recovered' | 'normal'; // Track how the task was completed
+  isPhantom?: boolean; // True for predicted future tasks (not yet real)
+  phantomSourceLesson?: string; // Description of the future lesson that will generate this task
 }
 
 /* ─── Study Session ─── */

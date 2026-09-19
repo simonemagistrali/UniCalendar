@@ -28,7 +28,7 @@ export class TravelManager {
       
       // Check if we need travel BEFORE current
       let needsTravelBefore = true;
-      if (prev) {
+      if (prev && current.travelInStartOffset === undefined) {
         const prevEnd = new Date(prev.endTime);
         const gapMinutes = (currentStart.getTime() - prevEnd.getTime()) / 60000;
         // If they are on the same day and gap is small (less than time to go and come back), no travel before
@@ -38,21 +38,28 @@ export class TravelManager {
       }
       
       if (needsTravelBefore) {
-        const travelStart = new Date(currentStart.getTime() - commuteTime * 60000);
-        travelEvents.push({
-          id: `travel-in-${current.id}`,
-          title: `Viaggio (Andata)`,
-          type: 'travel',
-          startTime: travelStart.toISOString(),
-          endTime: currentStart.toISOString(),
-          isDone: false,
-          isTravelStudyTime: isProductive
-        });
+        const inStartOffset = current.travelInStartOffset ?? commuteTime;
+        const inEndOffset = current.travelInEndOffset ?? 0;
+        
+        const travelStart = new Date(currentStart.getTime() - inStartOffset * 60000);
+        const travelEnd = new Date(currentStart.getTime() - inEndOffset * 60000);
+        
+        if (travelEnd.getTime() > travelStart.getTime()) {
+          travelEvents.push({
+            id: `travel-in-${current.id}`,
+            title: `Viaggio (Andata)`,
+            type: 'travel',
+            startTime: travelStart.toISOString(),
+            endTime: travelEnd.toISOString(),
+            isDone: false,
+            isTravelStudyTime: isProductive
+          });
+        }
       }
       
       // Check if we need travel AFTER current
       let needsTravelAfter = true;
-      if (next) {
+      if (next && current.travelOutStartOffset === undefined) {
         const nextStart = new Date(next.startTime);
         const gapMinutes = (nextStart.getTime() - currentEnd.getTime()) / 60000;
         // If they are on the same day and gap is small, no travel after
@@ -62,16 +69,23 @@ export class TravelManager {
       }
       
       if (needsTravelAfter) {
-        const travelEnd = new Date(currentEnd.getTime() + commuteTime * 60000);
-        travelEvents.push({
-          id: `travel-out-${current.id}`,
-          title: `Viaggio (Ritorno)`,
-          type: 'travel',
-          startTime: currentEnd.toISOString(),
-          endTime: travelEnd.toISOString(),
-          isDone: false,
-          isTravelStudyTime: isProductive
-        });
+        const outStartOffset = current.travelOutStartOffset ?? 0;
+        const outEndOffset = current.travelOutEndOffset ?? commuteTime;
+
+        const travelStart = new Date(currentEnd.getTime() + outStartOffset * 60000);
+        const travelEnd = new Date(currentEnd.getTime() + outEndOffset * 60000);
+        
+        if (travelEnd.getTime() > travelStart.getTime()) {
+          travelEvents.push({
+            id: `travel-out-${current.id}`,
+            title: `Viaggio (Ritorno)`,
+            type: 'travel',
+            startTime: travelStart.toISOString(),
+            endTime: travelEnd.toISOString(),
+            isDone: false,
+            isTravelStudyTime: isProductive
+          });
+        }
       }
     }
     

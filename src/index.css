@@ -667,6 +667,39 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   opacity: 0.6;
 }
 
+/* Phantom Tasks */
+.task-phantom {
+  opacity: 0.6;
+  border-style: dashed;
+  background-color: var(--bg-tertiary);
+}
+.task-badge-phantom {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+.task-phantom-source {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+.task-phantom-separator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 16px 0 8px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.task-count-phantom {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
 .task-card-header {
   display: flex;
   justify-content: space-between;
@@ -1300,3 +1333,234 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
+
+/* ─── Phantom Task Styles ─── */
+.task-card.task-phantom {
+  opacity: 0.55;
+  border: 1.5px dashed var(--border-color);
+  background: linear-gradient(135deg, rgba(161, 66, 244, 0.03), rgba(26, 115, 232, 0.03));
+  position: relative;
+  transition: opacity 0.2s ease;
+}
+.task-card.task-phantom:hover {
+  opacity: 0.8;
+}
+.task-badge-phantom {
+  background: rgba(161, 66, 244, 0.12);
+  color: var(--accent-purple);
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.task-phantom-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--accent-purple);
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: rgba(161, 66, 244, 0.06);
+  border-radius: 6px;
+}
+.task-phantom-separator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 6px;
+  margin-top: 8px;
+  border-top: 1px dashed var(--border-color);
+  color: var(--accent-purple);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.task-count-phantom {
+  background: rgba(161, 66, 244, 0.1);
+  color: var(--accent-purple);
+}
+
+/* ─── Catch-Up Indicator ─── */
+.catchup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+.catchup-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.catchup-global {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.catchup-global-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.catchup-circle-text {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+}
+.catchup-courses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.catchup-course-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.catchup-course-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.catchup-course-left {
+  flex-shrink: 0;
+}
+.catchup-course-info {
+  flex: 1;
+  min-width: 0;
+}
+.catchup-course-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 2px;
+}
+.catchup-course-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+.catchup-course-details {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.catchup-course-date {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* ─── Catch-Up Mini (Sidebar Widget) ─── */
+.catchup-mini {
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.catchup-mini-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+.catchup-mini-header svg:first-child {
+  color: var(--accent-primary);
+}
+.catchup-mini-header .catchup-circle {
+  margin-left: auto;
+}
+.catchup-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.catchup-mini-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+}
+.catchup-mini-name {
+  flex-shrink: 0;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.catchup-mini-bar-container {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.catchup-mini-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease-out;
+}
+.catchup-mini-pct {
+  font-weight: 700;
+  font-size: 0.72rem;
+  min-width: 30px;
+  text-align: right;
+}
+.catchup-mini-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* ─── Calendar Catch-Up Markers ─── */
+.calendar-catchup-markers {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+  margin-top: 1px;
+  margin-bottom: 2px;
+}
+.calendar-catchup-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.8);
+  cursor: help;
+  animation: catchup-pulse 2s infinite;
+}
+@keyframes catchup-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+

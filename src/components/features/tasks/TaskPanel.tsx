@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Clock, BookOpen, Zap } from 'lucide-react';
+import { CheckCircle, Clock, BookOpen, Zap, Eye } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { PriorityEngine } from '../../../core/PriorityEngine';
 import { TaskManager } from '../../../core/TaskManager';
 import { SchedulerEngine } from '../../../core/SchedulerEngine';
 import { TravelManager } from '../../../core/TravelManager';
+import { FutureProjectionEngine } from '../../../core/FutureProjectionEngine';
 import { TaskCard } from './TaskCard';
 
 
@@ -19,7 +20,7 @@ export function TaskPanel() {
   const setStudySessions = useAppStore(s => s.setStudySessions);
   const setTasks = useAppStore(s => s.setTasks);
 
-  const [filter, setFilter] = useState<'all' | 'todo' | 'done'>('todo');
+  const [filter, setFilter] = useState<'all' | 'todo' | 'done' | 'forecast'>('todo');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [courseFilter, setCourseFilter] = useState<string>('ALL');
 
@@ -34,9 +35,9 @@ export function TaskPanel() {
 
   const getTaskType = (task: typeof tasks[0]) => {
     if (task.isProjectTask) return 'PROJECT';
-    if (task.title.startsWith('Seguire/Recuperare lezione')) return 'FOLLOW_LESSON';
-    if (task.title.startsWith('Sistemare appunti')) return 'NOTES';
-    if (task.title.startsWith('Esercizi')) return 'EXERCISES';
+    if (task.title.startsWith('Seguire/Recuperare lezione') || task.title.includes('Recuperare:')) return 'FOLLOW_LESSON';
+    if (task.title.startsWith('Sistemare appunti') || task.title.includes('Appunti:')) return 'NOTES';
+    if (task.title.startsWith('Esercizi') || task.title.includes('Esercizi:')) return 'EXERCISES';
     return 'OTHER';
   };
 
@@ -50,11 +51,23 @@ export function TaskPanel() {
     }
   }, [events, courses]); // eslint-disable-line
 
+  // Generate future projection for phantom tasks
+  const futureProjection = useMemo(() => {
+    if (events.length === 0 || courses.length === 0) return null;
+    return FutureProjectionEngine.project(events, courses, tasks, performanceHistory, 14);
+  }, [events, courses, tasks, performanceHistory]);
+
+  // Generate visible phantom tasks
+  const phantomTasks = useMemo(() => {
+    if (!futureProjection) return [];
+    return FutureProjectionEngine.generateVisiblePhantomTasks(futureProjection, events);
+  }, [futureProjection, events]);
+
   // Sort tasks by priority
   const sortedTasks = useMemo(() => {
     const courseMap = new Map(courses.map(c => [c.id, c]));
-    return PriorityEngine.sortTasks(tasks, courseMap, events, preferences, performanceHistory);
-  }, [tasks, courses, events, preferences, performanceHistory]);
+    return PriorityEngine.sortTasks(tasks, courseMap, events, preferences, performanceHistory, futureProjection || undefined);
+  }, [tasks, courses, events, preferences, performanceHistory, futureProjection]);
 
   // Auto-generate study sessions
   useEffect(() => {
@@ -64,9 +77,11 @@ export function TaskPanel() {
     // Include travel events so the scheduler knows when travels happen
     const allEvents = [...events, ...TravelManager.generateTravelEvents(events, preferences)];
     
-    const sessions = SchedulerEngine.generateSchedule(todoTasks, allEvents, preferences, new Date(), 14, performanceHistory);
+    const sessions = SchedulerEngine.generateSchedule(
+      todoTasks, allEvents, preferences, new Date(), 14, performanceHistory, futureProjection || undefined
+    );
     setStudySessions(sessions);
-  }, [sortedTasks, events, preferences, performanceHistory]); // eslint-disable-line
+  }, [sortedTasks, events, preferences, performanceHistory, futureProjection]); // eslint-disable-line
 
   // Update task scores in store (for display)
   useEffect(() => {
@@ -80,18 +95,40 @@ export function TaskPanel() {
     }
   }, [sortedTasks]); // eslint-disable-line
 
-  const filteredTasks = sortedTasks.filter(t => {
-    if (filter === 'todo' && t.status === 'done') return false;
-    if (filter === 'done' && t.status !== 'done') return false;
-    
-    if (typeFilter !== 'ALL' && getTaskType(t) !== typeFilter) return false;
-    if (courseFilter !== 'ALL' && t.courseId !== courseFilter) return false;
-    
-    return true;
-  });
+  const filteredTasks = useMemo(() => {
+    if (filter === 'forecast') {
+      // Show only phantom tasks
+      return phantomTasks.filter(t => {
+        if (typeFilter !== 'ALL' && getTaskType(t) !== typeFilter) return false;
+        if (courseFilter !== 'ALL' && t.courseId !== courseFilter) return false;
+        return true;
+      });
+    }
+
+    const realTasks = sortedTasks.filter(t => {
+      if (filter === 'todo' && t.status === 'done') return false;
+      if (filter === 'done' && t.status !== 'done') return false;
+      if (typeFilter !== 'ALL' && getTaskType(t) !== typeFilter) return false;
+      if (courseFilter !== 'ALL' && t.courseId !== courseFilter) return false;
+      return true;
+    });
+
+    // In 'todo' view, append phantom tasks at the end
+    if (filter === 'todo' && phantomTasks.length > 0) {
+      const filteredPhantoms = phantomTasks.filter(t => {
+        if (typeFilter !== 'ALL' && getTaskType(t) !== typeFilter) return false;
+        if (courseFilter !== 'ALL' && t.courseId !== courseFilter) return false;
+        return true;
+      });
+      return [...realTasks, ...filteredPhantoms];
+    }
+
+    return realTasks;
+  }, [sortedTasks, phantomTasks, filter, typeFilter, courseFilter]);
 
   const todoCount = tasks.filter(t => t.status !== 'done').length;
   const doneCount = tasks.filter(t => t.status === 'done').length;
+  const phantomCount = phantomTasks.length;
 
   return (
     <div className="task-panel">
@@ -103,17 +140,20 @@ export function TaskPanel() {
         <div className="task-panel-counts">
           <span className="task-count-badge">{todoCount} da fare</span>
           <span className="task-count-badge task-count-done">{doneCount} fatte</span>
+          {phantomCount > 0 && (
+            <span className="task-count-badge task-count-phantom">{phantomCount} previste</span>
+          )}
         </div>
       </div>
 
       <div className="task-filter-bar">
-        {(['todo', 'all', 'done'] as const).map(f => (
+        {(['todo', 'all', 'done', 'forecast'] as const).map(f => (
           <button
             key={f}
             className={`task-filter-btn ${filter === f ? 'active' : ''}`}
             onClick={() => setFilter(f)}
           >
-            {f === 'todo' ? 'Da fare' : f === 'done' ? 'Completate' : 'Tutte'}
+            {f === 'todo' ? 'Da fare' : f === 'done' ? 'Completate' : f === 'forecast' ? '🔮 Previste' : 'Tutte'}
           </button>
         ))}
       </div>
@@ -148,13 +188,37 @@ export function TaskPanel() {
             <p>
               {filter === 'done'
                 ? 'Nessuna attività completata ancora.'
+                : filter === 'forecast'
+                ? 'Nessuna attività prevista. Aggiungi lezioni future al calendario!'
                 : 'Nessuna attività. Importa il calendario o attendi la fine delle lezioni!'}
             </p>
           </div>
         ) : (
-          filteredTasks.map(task => (
-            <TaskCard key={task.id} task={task} />
-          ))
+          <>
+            {/* Separator before phantom tasks in 'todo' view */}
+            {filter === 'todo' && phantomTasks.length > 0 && (
+              filteredTasks.map((task, idx) => {
+                const isFirstPhantom = task.isPhantom && (idx === 0 || !filteredTasks[idx - 1]?.isPhantom);
+                return (
+                  <div key={task.id}>
+                    {isFirstPhantom && (
+                      <div className="task-phantom-separator">
+                        <Eye size={14} />
+                        <span>Previste in futuro</span>
+                      </div>
+                    )}
+                    <TaskCard task={task} />
+                  </div>
+                );
+              })
+            )}
+            {/* Normal rendering for other views */}
+            {filter !== 'todo' && (
+              filteredTasks.map(task => (
+                <TaskCard key={task.id} task={task} />
+              ))
+            )}
+          </>
         )}
       </div>
     </div>

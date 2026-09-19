@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Task } from '../../../core/types';
 import { useAppStore } from '../../../store/useAppStore';
-import { Clock, Check, ChevronRight, AlertTriangle, SkipForward, RotateCcw } from 'lucide-react';
+import { Clock, Check, ChevronRight, AlertTriangle, SkipForward, RotateCcw, Eye } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
@@ -19,6 +19,43 @@ export function TaskCard({ task }: TaskCardProps) {
   const isDone = task.status === 'done';
   const isLessonTask = task.title.startsWith('Seguire/Recuperare lezione');
 
+  // ─── Phantom Task Rendering ───
+  if (task.isPhantom) {
+    return (
+      <div className="task-card task-phantom">
+        <div className="task-card-header">
+          <div className="task-card-left">
+            {course && (
+              <span className="task-course-dot" style={{ backgroundColor: course.color, opacity: 0.5 }} />
+            )}
+            <span className="task-title">{task.title.replace('[Previsto] ', '')}</span>
+          </div>
+          <div className="task-card-badges">
+            <span className="task-badge task-badge-phantom">
+              <Eye size={10} /> PREVISTO
+            </span>
+          </div>
+        </div>
+
+        <div className="task-card-meta">
+          <div className="task-meta-item">
+            <Clock size={12} />
+            <span>Stima: ~{task.estimatedDuration} min</span>
+          </div>
+          {course && <span className="task-course-name">{course.name}</span>}
+        </div>
+
+        {task.phantomSourceLesson && (
+          <div className="task-phantom-source">
+            <Eye size={12} />
+            <span>{task.phantomSourceLesson}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ─── Normal Task Rendering ───
   const handleComplete = () => {
     completeTask(task.id, parseInt(actualTime) || task.estimatedDuration, completeMode || 'normal');
     setCompleteMode(null);

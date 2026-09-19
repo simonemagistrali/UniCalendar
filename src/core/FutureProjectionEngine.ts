@@ -4,31 +4,24 @@ import type {
   Task,
   PerformanceRecord,
   PhantomTask,
-  PhantomTaskType,
   FutureWorkloadProjection,
 } from './types';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * FutureProjectionEngine — Projects future workload by simulating what tasks
  * will be generated after upcoming lessons.
  *
- * This allows the SchedulerEngine to "reserve" time for predicted tasks,
- * avoiding the problem of over-scheduling current tasks and leaving no room
- * for the inevitable post-lesson work that will appear.
- *
- * Uses an adaptive approach: starts conservative (70% reservation) and
- * adjusts based on historical accuracy.
+ * Features:
+ * - Behavioral prediction: uses attendance rate to skip "recover" phantom tasks
+ *   for students who consistently attend in person
+ * - Adaptive estimation: adjusts durations based on historical performance
+ * - Visible phantom tasks: generates Task objects marked as phantom for UI display
  */
 export class FutureProjectionEngine {
 
   /**
    * Generate a full future workload projection.
-   *
-   * @param events       All calendar events (past and future)
-   * @param courses      All courses
-   * @param existingTasks Current real tasks (to compute historical multiplier)
-   * @param history      Performance history for adaptive estimation
-   * @param daysToProject How many days ahead to project (default 14)
    */
   static project(
     events: CalendarEvent[],
@@ -73,22 +66,31 @@ export class FutureProjectionEngine {
       // Apply adaptive reservation factor (from performance history)
       const reservationFactor = this.getAdaptiveReservationFactor(history, course.id);
 
-      // --- Phantom Task 1: Follow/Recover lesson ---
-      const adjustedLessonDuration = Math.round(lessonDurationMin * multiplier * reservationFactor);
       const eventDate = new Date(lesson.startTime).toLocaleDateString('it-IT');
 
-      const followPhantom: PhantomTask = {
-        courseId: course.id,
-        courseName: course.name,
-        sourceEventId: lesson.id,
-        expectedAvailableAfter: lesson.endTime,
-        estimatedDuration: adjustedLessonDuration,
-        type: 'follow_recover',
-        title: `[Previsto] Recuperare: ${lesson.title} (${eventDate})`,
-      };
-      phantomTasks.push(followPhantom);
-      this.addToProjection(projectionByDay, dayKey, adjustedLessonDuration);
-      this.addToProjection(projectionByCourse, course.id, adjustedLessonDuration);
+      // --- Behavioral Prediction: Attendance Rate ---
+      // If the student usually attends this course (≥70%), don't generate
+      // "recover lesson" phantom — they'll probably be in class.
+      const attendanceRate = this.getCourseAttendanceRate(course.id, existingTasks);
+      const willLikelyAttend = attendanceRate >= 0.70;
+
+      // --- Phantom Task 1: Follow/Recover lesson ---
+      // Only generate if student is likely to MISS the lesson
+      if (!willLikelyAttend) {
+        const adjustedLessonDuration = Math.round(lessonDurationMin * multiplier * reservationFactor);
+        const followPhantom: PhantomTask = {
+          courseId: course.id,
+          courseName: course.name,
+          sourceEventId: lesson.id,
+          expectedAvailableAfter: lesson.endTime,
+          estimatedDuration: adjustedLessonDuration,
+          type: 'follow_recover',
+          title: `[Previsto] Recuperare: ${lesson.title} (${eventDate})`,
+        };
+        phantomTasks.push(followPhantom);
+        this.addToProjection(projectionByDay, dayKey, adjustedLessonDuration);
+        this.addToProjection(projectionByCourse, course.id, adjustedLessonDuration);
+      }
 
       // --- Phantom Task 2: Notes revision (if required by course prefs) ---
       if (prefs.requiresNotesRevision) {
@@ -138,12 +140,44 @@ export class FutureProjectionEngine {
   }
 
   /**
+   * Convert phantom tasks into visible Task objects for UI display.
+   * These are NOT persisted — they are generated on-the-fly each render.
+   */
+  static generateVisiblePhantomTasks(
+    projection: FutureWorkloadProjection,
+    events: CalendarEvent[]
+  ): Task[] {
+    return projection.phantomTasks.map(pt => {
+      const sourceEvent = events.find(e => e.id === pt.sourceEventId);
+      const lessonDateStr = sourceEvent
+        ? new Date(sourceEvent.startTime).toLocaleDateString('it-IT', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+          })
+        : '';
+
+      return {
+        id: `phantom-${pt.sourceEventId}-${pt.type}`,
+        title: pt.title,
+        description: `Previsto dopo la lezione di ${lessonDateStr}`,
+        courseId: pt.courseId,
+        relatedEventId: pt.sourceEventId,
+        status: 'todo' as const,
+        priorityScore: 0,
+        estimatedDuration: pt.estimatedDuration,
+        createdAt: new Date().toISOString(),
+        dependencies: [],
+        postponedCount: 0,
+        isPhantom: true,
+        phantomSourceLesson: `Dopo lezione del ${lessonDateStr}`,
+      };
+    });
+  }
+
+  /**
    * For a given day, calculate how many minutes should be reserved
-   * for future (phantom) tasks. This is used by the SchedulerEngine
-   * to avoid over-filling days where new tasks will arrive.
-   *
-   * The reservation distributes the phantom task load across the days
-   * between "now" and the phantom task's expected date, plus 1-2 days after.
+   * for future (phantom) tasks.
    */
   static getReservedMinutesForDay(
     dayDate: Date,
@@ -155,8 +189,6 @@ export class FutureProjectionEngine {
     const directLoad = projection.projectionByDay[dayKey] || 0;
 
     // Also consider that tasks arriving on previous days may spill into this day.
-    // We distribute the load: phantom tasks arriving on day X are expected
-    // to be worked on during day X and X+1 (spread the load).
     let spillLoad = 0;
     const yesterday = new Date(dayDate);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -170,9 +202,30 @@ export class FutureProjectionEngine {
   }
 
   /**
+   * Calculate the attendance rate for a course.
+   * Returns a value between 0 and 1 (1 = always attends).
+   * If no data, returns 0.5 (neutral — will generate recovery phantom).
+   */
+  private static getCourseAttendanceRate(
+    courseId: string,
+    existingTasks: Task[]
+  ): number {
+    const lessonTasks = existingTasks.filter(
+      t =>
+        t.courseId === courseId &&
+        t.status === 'done' &&
+        t.title.startsWith('Seguire/Recuperare lezione') &&
+        t.completionMode
+    );
+
+    if (lessonTasks.length < 2) return 0.5; // Not enough data, be neutral
+
+    const attended = lessonTasks.filter(t => t.completionMode === 'attended').length;
+    return attended / lessonTasks.length;
+  }
+
+  /**
    * Calculate a historical multiplier for lesson recovery time.
-   * If the student historically takes longer or shorter than estimated,
-   * this adjusts future projections accordingly.
    */
   private static getCourseMultiplier(
     courseId: string,
@@ -205,39 +258,32 @@ export class FutureProjectionEngine {
     }
 
     if (totalNominal > 0) {
-      // Cap between 0.5x and 3.0x
       return Math.max(0.5, Math.min(3.0, totalActual / totalNominal));
     }
 
-    return 1.0; // No history, assume 1:1
+    return 1.0;
   }
 
   /**
    * Adaptive reservation factor: starts conservative (0.7) and adjusts
    * based on how accurate past projections were.
-   *
-   * If the student consistently completes tasks faster than estimated → lower factor
-   * If the student consistently takes longer → higher factor
    */
   private static getAdaptiveReservationFactor(
     history: PerformanceRecord[],
     courseId: string
   ): number {
-    const BASE_FACTOR = 0.7; // Conservative start
+    const BASE_FACTOR = 0.7;
 
     if (history.length < 3) return BASE_FACTOR;
 
     const courseHistory = history.filter(h => h.courseId === courseId);
     if (courseHistory.length < 2) return BASE_FACTOR;
 
-    // Calculate average ratio of actual/estimated
     const ratios = courseHistory.map(h =>
       h.estimatedMinutes > 0 ? h.actualMinutes / h.estimatedMinutes : 1.0
     );
     const avgRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
 
-    // Adjust factor: if student averages 1.2x estimated, bump reservation
-    // Range: 0.5 to 1.0
     const adjusted = Math.max(0.5, Math.min(1.0, BASE_FACTOR * avgRatio));
     return adjusted;
   }

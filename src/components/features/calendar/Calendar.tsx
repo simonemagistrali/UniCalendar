@@ -5,9 +5,12 @@ import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { TravelManager } from '../../../core/TravelManager';
 import { MealManager } from '../../../core/MealManager';
+import { CatchUpEngine } from '../../../core/CatchUpEngine';
+import { FutureProjectionEngine } from '../../../core/FutureProjectionEngine';
 import { fetchGoogleCalendarEvents } from '../../../core/googleCalendar';
 import { EventDetailsModal } from '../events/EventDetailsModal';
 import { EventFormModal } from '../events/EventFormModal';
+import { TravelEditModal } from '../events/TravelEditModal';
 import './Calendar.css';
 
 type ViewMode = 'month' | 'week' | 'day';
@@ -23,6 +26,11 @@ export function Calendar() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  
+  const [isTravelEditOpen, setIsTravelEditOpen] = useState(false);
+  const [travelDirection, setTravelDirection] = useState<'in' | 'out' | null>(null);
+  const [travelStart, setTravelStart] = useState<Date | null>(null);
+  const [travelEnd, setTravelEnd] = useState<Date | null>(null);
 
   useEffect(() => {
     localStorage.setItem('calendarView', viewMode);
@@ -33,6 +41,7 @@ export function Calendar() {
   const courses = useAppStore(s => s.courses);
   const studySessions = useAppStore(s => s.studySessions);
   const preferences = useAppStore(s => s.preferences);
+  const performanceHistory = useAppStore(s => s.performanceHistory);
   const addEvents = useAppStore(s => s.addEvents);
 
   const [isSyncing, setIsSyncing] = useState(false);
@@ -67,7 +76,11 @@ export function Calendar() {
 
   // Merge events + study sessions for display
   const allItems = useMemo(() => {
-    const items: { id: string; title: string; start: Date; end: Date; color: string; type: string; isTravelStudyTime?: boolean }[] = [];
+    const items: { id: string; title: string; start: Date; end: Date; color: string; type: string; isTravelStudyTime?: boolean; isAllDay?: boolean }[] = [];
+
+    const futureProjection = events.length > 0 && courses.length > 0 
+      ? FutureProjectionEngine.project(events, courses, tasks, performanceHistory, 14)
+      : null;
 
     const computedTravelEvents = TravelManager.generateTravelEvents(events, preferences);
     // Generate meal events for the current viewed month/week/day window (+/- some buffer)
@@ -133,8 +146,24 @@ export function Calendar() {
       }
     }
 
+    if (futureProjection) {
+      for (const pt of futureProjection.phantomTasks) {
+        const course = courses.find(c => c.id === pt.courseId);
+        const startDate = new Date(pt.expectedAvailableAfter);
+        items.push({
+          id: `phantom-${pt.sourceEventId}-${pt.type}`,
+          title: `🔮 ${pt.title.replace('[Previsto] ', '')}`,
+          start: startDate,
+          end: startDate,
+          color: course?.color || '#999',
+          type: 'phantom',
+          isAllDay: true
+        });
+      }
+    }
+
     return items;
-  }, [events, studySessions, tasks, courses]);
+  }, [events, studySessions, tasks, courses, preferences, performanceHistory]);
 
   const dateFormat = viewMode === 'month'
     ? "MMMM yyyy"
@@ -143,6 +172,24 @@ export function Calendar() {
     : "EEEE d MMMM yyyy";
 
   const handleEventClick = (id: string) => {
+    // Check if it's a travel event
+    if (id.startsWith('travel-in-') || id.startsWith('travel-out-')) {
+      const isOut = id.startsWith('travel-out-');
+      const lessonId = isOut ? id.replace('travel-out-', '') : id.replace('travel-in-', '');
+      const lessonEvent = events.find(e => e.id === lessonId) || null;
+      
+      const travelEvent = allItems.find(e => e.id === id);
+      
+      if (lessonEvent && travelEvent) {
+        setSelectedEventId(lessonId);
+        setTravelDirection(isOut ? 'out' : 'in');
+        setTravelStart(travelEvent.start);
+        setTravelEnd(travelEvent.end);
+        setIsTravelEditOpen(true);
+      }
+      return;
+    }
+
     // Only handle actual events (not tasks/deadlines/study sessions for now)
     if (events.some(e => e.id === id)) {
       setSelectedEventId(id);
@@ -205,16 +252,46 @@ export function Calendar() {
         onClose={() => setIsFormOpen(false)}
         initialEvent={selectedEvent}
       />
+
+      <TravelEditModal
+        isOpen={isTravelEditOpen}
+        onClose={() => setIsTravelEditOpen(false)}
+        parentEvent={selectedEvent}
+        direction={travelDirection}
+        currentTravelStart={travelStart}
+        currentTravelEnd={travelEnd}
+      />
     </div>
   );
 }
 
 /* ─── Month View ─── */
 function MonthView({ currentDate, items, onEventClick }: { currentDate: Date; items: { id: string; title: string; start: Date; end: Date; color: string; type: string }[]; onEventClick: (id: string) => void }) {
+  const events = useAppStore(s => s.events);
+  const tasks = useAppStore(s => s.tasks);
+  const courses = useAppStore(s => s.courses);
+  const studySessions = useAppStore(s => s.studySessions);
+
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+
+  // Compute catch-up dates for calendar markers
+  const catchUpDates = useMemo(() => {
+    const summary = CatchUpEngine.calculate(events, courses, tasks, studySessions);
+    const dateMap: Record<string, { courseName: string; courseColor: string }[]> = {};
+
+    for (const cs of summary.courses) {
+      if (cs.estimatedCatchUpDate && cs.catchUpPercentage < 100) {
+        const dayKey = new Date(cs.estimatedCatchUpDate).toISOString().split('T')[0];
+        if (!dateMap[dayKey]) dateMap[dayKey] = [];
+        dateMap[dayKey].push({ courseName: cs.courseName, courseColor: cs.courseColor });
+      }
+    }
+
+    return dateMap;
+  }, [events, courses, tasks, studySessions]);
 
   const weekDays = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
   const days: React.ReactNode[] = [];
@@ -227,19 +304,35 @@ function MonthView({ currentDate, items, onEventClick }: { currentDate: Date; it
     if (!isSameMonth(d, monthStart)) cls += ' other-month';
     if (isSameDay(d, new Date())) cls += ' today';
 
+    // Check for catch-up markers on this day
+    const dayKey = d.toISOString().split('T')[0];
+    const catchUpMarkers = catchUpDates[dayKey] || [];
+
     days.push(
       <div className={cls} key={d.toISOString()}>
         <span className="calendar-day-num">{format(d, 'd')}</span>
+        {catchUpMarkers.length > 0 && (
+          <div className="calendar-catchup-markers">
+            {catchUpMarkers.map((m, i) => (
+              <span
+                key={i}
+                className="calendar-catchup-dot"
+                style={{ backgroundColor: m.courseColor }}
+                title={`📌 A pari con ${m.courseName} entro questo giorno`}
+              />
+            ))}
+          </div>
+        )}
         <div className="calendar-events">
           {dayItems.slice(0, 4).map(it => (
             <div key={it.id} className="calendar-event" title={it.title} onClick={() => onEventClick(it.id)} style={{ cursor: 'pointer' }}>
               <span
-                className="calendar-event-dot"
+                className={`calendar-event-dot ${it.type === 'phantom' ? 'phantom' : ''}`}
                 style={{
-                  backgroundColor: it.type === 'study' || it.type === 'buffer' ? (it.type === 'buffer' ? '#dadce0' : it.color) : it.color,
+                  backgroundColor: it.type === 'phantom' ? 'transparent' : (it.type === 'study' || it.type === 'buffer' ? (it.type === 'buffer' ? '#dadce0' : it.color) : it.color),
                   borderColor: it.color,
-                  borderWidth: it.type === 'study' || it.type === 'buffer' ? '0' : '0',
-                  borderStyle: 'solid'
+                  borderWidth: it.type === 'phantom' ? '1px' : '0',
+                  borderStyle: it.type === 'phantom' ? 'dashed' : 'solid'
                 }}
               />
               <span className="calendar-event-text">{it.title}</span>
@@ -261,7 +354,7 @@ function MonthView({ currentDate, items, onEventClick }: { currentDate: Date; it
 }
 
 /* ─── Week View ─── */
-function WeekView({ currentDate, items, onEventClick }: { currentDate: Date; items: { id: string; title: string; start: Date; end: Date; color: string; type: string }[]; onEventClick: (id: string) => void }) {
+function WeekView({ currentDate, items, onEventClick }: { currentDate: Date; items: { id: string; title: string; start: Date; end: Date; color: string; type: string; isAllDay?: boolean }[]; onEventClick: (id: string) => void }) {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
@@ -276,6 +369,21 @@ function WeekView({ currentDate, items, onEventClick }: { currentDate: Date; ite
           </div>
         ))}
       </div>
+      <div className="timeline-allday-grid">
+        <div className="timeline-gutter"><span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>All-Day</span></div>
+        {weekDays.map(d => {
+          const dayAllDayItems = items.filter(it => isSameDay(it.start, d) && it.isAllDay);
+          return (
+            <div key={d.toISOString()} className="timeline-allday-column">
+              {dayAllDayItems.map(it => (
+                <div key={it.id} className={`allday-event ${it.type}`} style={{ backgroundColor: `${it.color}22`, color: it.color, borderColor: it.color }} title={it.title}>
+                  {it.title}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
       <div className="timeline-body">
         <div className="timeline-hours">
           {HOURS.map(h => (
@@ -289,7 +397,7 @@ function WeekView({ currentDate, items, onEventClick }: { currentDate: Date; ite
               {/* Render current time indicator */}
               <CurrentTimeIndicator date={d} />
               {/* Render events */}
-              {calculateEventPositions(items.filter(it => isSameDay(it.start, d))).map(it => {
+              {calculateEventPositions(items.filter(it => isSameDay(it.start, d) && !it.isAllDay)).map(it => {
                 const top = getTimePosition(it.start);
                 const height = Math.max(0, getTimePosition(it.end) - top - 1);
                 return (
@@ -331,6 +439,16 @@ function DayView({ currentDate, items, onEventClick }: { currentDate: Date; item
 
   return (
     <div className="calendar-timeline calendar-day-view">
+      <div className="timeline-allday-grid">
+        <div className="timeline-gutter"><span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>All-Day</span></div>
+        <div className="timeline-allday-column timeline-single-col">
+          {items.filter(it => isSameDay(it.start, currentDate) && it.isAllDay).map(it => (
+            <div key={it.id} className={`allday-event ${it.type}`} style={{ backgroundColor: `${it.color}22`, color: it.color, borderColor: it.color }} title={it.title}>
+              {it.title}
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="timeline-body">
         <div className="timeline-hours">
           {HOURS.map(h => (
@@ -341,7 +459,7 @@ function DayView({ currentDate, items, onEventClick }: { currentDate: Date; item
           <div className="timeline-column timeline-single-col">
             {HOURS.map(h => <div key={h} className="timeline-cell" />)}
             <CurrentTimeIndicator date={currentDate} />
-            {calculateEventPositions(dayItems).map(it => {
+            {calculateEventPositions(dayItems.filter(it => !it.isAllDay)).map(it => {
               const top = getTimePosition(it.start);
               const height = Math.max(0, getTimePosition(it.end) - top - 1);
               return (
