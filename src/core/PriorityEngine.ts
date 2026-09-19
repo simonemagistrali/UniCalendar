@@ -67,29 +67,34 @@ export class PriorityEngine {
 
     // 7. Dynamic Lesson Recovery Priority (D1 and D2)
     if (originalEvent && originalEvent.type === 'lesson') {
-      const d2Time = new Date(originalEvent.startTime).getTime() + (7 * 24 * 60 * 60 * 1000); // Original + 7 days
-      const d1Time = upcomingLesson ? new Date(upcomingLesson.startTime).getTime() : d2Time;
-      
-      const hoursToD1 = (d1Time - now) / 3600000;
-      const hoursToD2 = (d2Time - now) / 3600000;
+      if (upcomingLesson) {
+        const d1Time = new Date(upcomingLesson.startTime).getTime();
+        const hoursToD1 = (d1Time - now) / 3600000;
+        
+        // Massive priority to guarantee it's scheduled before the next lesson
+        score += 1000; 
 
-      if (hoursToD1 > 0) {
-        // Phase 1: Approaching D1 (Next Lesson)
-        if (hoursToD1 <= 72) {
-          // Bonus scaling up to 120 as D1 approaches
-          const ratio = (72 - hoursToD1) / 72;
-          score += 120 * Math.pow(ratio, 1.5);
+        if (hoursToD1 > 0) {
+          // As the next lesson approaches, increase priority even more (up to +500)
+          // so if there are multiple recoveries, the one closest to its next lesson wins.
+          const maxHours = 7 * 24; // 1 week reference
+          const ratio = Math.max(0, (maxHours - hoursToD1) / maxHours);
+          score += 500 * Math.pow(ratio, 2);
         } else {
-          // Base bonus just for having a next lesson pending
-          score += 20; 
+          // We missed the next lesson! Critical priority.
+          score += 2000;
         }
-      } else if (hoursToD2 > 0) {
-        // Phase 2: Missed D1, approaching D2 (1 week after original lesson)
-        const ratio = ((7 * 24) - hoursToD2) / (7 * 24); // 0 at D1, 1 at D2
-        score += 120 + 80 * Math.pow(ratio, 2); // scales from 120 up to 200
       } else {
-        // Phase 3: Missed D2 (More than a week late!)
-        score += 250; // Critical priority to force recovery
+        const d2Time = new Date(originalEvent.startTime).getTime() + (7 * 24 * 60 * 60 * 1000); // Original + 7 days
+        const hoursToD2 = (d2Time - now) / 3600000;
+        if (hoursToD2 > 0) {
+          // Phase 2: approaching D2 (1 week after original lesson)
+          const ratio = ((7 * 24) - hoursToD2) / (7 * 24); // 0 at original, 1 at D2
+          score += 120 + 80 * Math.pow(ratio, 2); // scales from 120 up to 200
+        } else {
+          // Phase 3: Missed D2 (More than a week late!)
+          score += 500; // Force recovery
+        }
       }
     }
 
