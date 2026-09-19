@@ -71,18 +71,20 @@ export class PriorityEngine {
         const d1Time = new Date(upcomingLesson.startTime).getTime();
         const hoursToD1 = (d1Time - now) / 3600000;
         
-        // Massive priority to guarantee it's scheduled before the next lesson
-        score += 1000; 
+        // Default high priority (but not "urgent" out of the box)
+        // Normal tasks are ~50-80. We give a +35 bonus to make it ~85 default.
+        score += 35; 
 
         if (hoursToD1 > 0) {
-          // As the next lesson approaches, increase priority even more (up to +500)
-          // so if there are multiple recoveries, the one closest to its next lesson wins.
-          const maxHours = 7 * 24; // 1 week reference
-          const ratio = Math.max(0, (maxHours - hoursToD1) / maxHours);
-          score += 500 * Math.pow(ratio, 2);
+          // As the next lesson approaches (< 72h), increase priority massively
+          // so it becomes genuinely urgent right before the next lesson.
+          if (hoursToD1 <= 72) {
+            const ratio = (72 - hoursToD1) / 72;
+            score += 150 * Math.pow(ratio, 1.5);
+          }
         } else {
           // We missed the next lesson! Critical priority.
-          score += 2000;
+          score += 300;
         }
       } else {
         const d2Time = new Date(originalEvent.startTime).getTime() + (7 * 24 * 60 * 60 * 1000); // Original + 7 days

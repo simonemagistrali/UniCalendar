@@ -15,7 +15,7 @@ export function TaskCard({ task }: TaskCardProps) {
   const [actualTime, setActualTime] = useState(task.estimatedDuration.toString());
 
   const course = courses.find(c => c.id === task.courseId);
-  const isUrgent = task.priorityScore > 80;
+  const isUrgent = task.priorityScore >= 100;
   const isDone = task.status === 'done';
   const isLessonTask = task.title.startsWith('Seguire/Recuperare lezione');
 
