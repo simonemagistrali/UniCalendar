@@ -38,7 +38,7 @@ export function Home() {
           {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
         <div className="mobile-logo">
-          <CalendarIcon size={20} />
+          <img src="/icon.jpg" alt="UniCalendar Logo" style={{ width: 20, height: 20, borderRadius: 4 }} />
           <span>UniCalendar</span>
         </div>
       </div>
@@ -46,8 +46,8 @@ export function Home() {
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">
-            <CalendarIcon size={24} />
+          <div className="sidebar-logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="/icon.jpg" alt="UniCalendar Logo" style={{ width: 28, height: 28, borderRadius: 6 }} />
           </div>
           <span className="sidebar-logo-text">UniCalendar</span>
         </div>
