@@ -155,8 +155,16 @@ export class PriorityEngine {
       };
     });
 
-    // Sort by score descending
-    scored.sort((a, b) => b.priorityScore - a.priorityScore);
+    // Sort by score descending, but ALWAYS put lesson recoveries first
+    scored.sort((a, b) => {
+      const aIsRecovery = a.title.startsWith('Seguire/Recuperare lezione');
+      const bIsRecovery = b.title.startsWith('Seguire/Recuperare lezione');
+      
+      if (aIsRecovery && !bIsRecovery) return -1;
+      if (!aIsRecovery && bIsRecovery) return 1;
+      
+      return b.priorityScore - a.priorityScore;
+    });
 
     // Topological sort respecting dependencies
     const resolved: Task[] = [];
