@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2 } from "lucide-react";
+import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2, TrendingUp } from "lucide-react";
 
 import { Calendar } from '../components/features/calendar/Calendar';
 
@@ -10,6 +10,8 @@ import { ImportCalendarModal } from '../components/features/events/ImportCalenda
 import { EfficiencyDashboard } from '../components/features/dashboard/EfficiencyDashboard';
 import { TaskPanel } from '../components/features/tasks/TaskPanel';
 import { CourseManager } from '../components/features/courses/CourseManager';
+import { CatchUpMini } from '../components/features/dashboard/CatchUpIndicator';
+import { CatchUpAnalysisPage } from '../components/features/dashboard/CatchUpAnalysisPage';
 import { authService } from '../core/mockBackend';
 
 export function Home() {
@@ -21,7 +23,7 @@ export function Home() {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'calendar' | 'tasks' | 'dashboard'>('calendar');
+  const [activeTab, setActiveTab] = useState<'calendar' | 'tasks' | 'dashboard' | 'analysis'>('calendar');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -79,6 +81,9 @@ export function Home() {
           <button className={`sidebar-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}>
             <Settings size={20} /> Dashboard
           </button>
+          <button className={`sidebar-nav-item ${activeTab === 'analysis' ? 'active' : ''}`} onClick={() => { setActiveTab('analysis'); setSidebarOpen(false); }}>
+            <TrendingUp size={20} /> Analisi Recupero
+          </button>
         </nav>
 
         {/* Bottom */}
@@ -125,7 +130,7 @@ export function Home() {
             <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>Annulla</span>
           </button>
           <h1 className="main-title" style={{ margin: 0 }}>
-            {activeTab === 'calendar' ? 'Calendario' : activeTab === 'tasks' ? 'Attività' : 'Dashboard Efficienza'}
+            {activeTab === 'calendar' ? 'Calendario' : activeTab === 'tasks' ? 'Attività' : activeTab === 'dashboard' ? 'Dashboard Efficienza' : 'Analisi Recupero'}
           </h1>
         </header>
 
@@ -136,6 +141,7 @@ export function Home() {
                 <Calendar />
               </div>
               <div className="calendar-sidebar">
+                <CatchUpMini />
                 <TaskPanel />
               </div>
             </div>
@@ -150,6 +156,12 @@ export function Home() {
           {activeTab === 'dashboard' && (
             <div className="dashboard-page">
               <EfficiencyDashboard />
+            </div>
+          )}
+
+          {activeTab === 'analysis' && (
+            <div className="analysis-page">
+              <CatchUpAnalysisPage />
             </div>
           )}
         </div>
