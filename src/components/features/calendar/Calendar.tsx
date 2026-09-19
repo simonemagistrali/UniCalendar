@@ -286,6 +286,8 @@ function WeekView({ currentDate, items, onEventClick }: { currentDate: Date; ite
           {weekDays.map(d => (
             <div key={d.toISOString()} className="timeline-column">
               {HOURS.map(h => <div key={h} className="timeline-cell" />)}
+              {/* Render current time indicator */}
+              <CurrentTimeIndicator date={d} />
               {/* Render events */}
               {calculateEventPositions(items.filter(it => isSameDay(it.start, d))).map(it => {
                 const top = getTimePosition(it.start);
@@ -338,6 +340,7 @@ function DayView({ currentDate, items, onEventClick }: { currentDate: Date; item
         <div className="timeline-grid">
           <div className="timeline-column timeline-single-col">
             {HOURS.map(h => <div key={h} className="timeline-cell" />)}
+            <CurrentTimeIndicator date={currentDate} />
             {calculateEventPositions(dayItems).map(it => {
               const top = getTimePosition(it.start);
               const height = Math.max(0, getTimePosition(it.end) - top - 1);
@@ -368,6 +371,32 @@ function DayView({ currentDate, items, onEventClick }: { currentDate: Date; item
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CurrentTimeIndicator({ date }: { date: Date }) {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    if (!isSameDay(date, new Date())) return;
+    
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, [date]);
+
+  if (!isSameDay(date, now)) return null;
+
+  const top = getTimePosition(now);
+  
+  // Hide if outside the rendered hours (6:00 to 22:00)
+  if (top < 0 || top > 16 * 60) return null; 
+
+  return (
+    <div className="current-time-indicator" style={{ top: `${top}px` }}>
+      <div className="current-time-indicator-dot" />
     </div>
   );
 }

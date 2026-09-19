@@ -431,3 +431,27 @@
     padding: 2px 4px;
   }
 }
+
+/* ─── Current Time Indicator ─── */
+.current-time-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--accent-primary, #d93025);
+  z-index: 4; /* Above events (z-index 1) but below hover (z-index 5) */
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.current-time-indicator-dot {
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--accent-primary, #d93025);
+}
+
