@@ -163,12 +163,22 @@ function isEventDuplicate(newEvent: CalendarEvent, existingEvents: CalendarEvent
   });
 }
 
+function deduplicateEventsList(events: CalendarEvent[]): CalendarEvent[] {
+  const uniqueEvents: CalendarEvent[] = [];
+  for (const event of events) {
+    if (!isEventDuplicate(event, uniqueEvents)) {
+      uniqueEvents.push(event);
+    }
+  }
+  return uniqueEvents;
+}
+
 /* ─── Load initial state ─── */
 const saved = loadState();
 
 export const useAppStore = create<AppState>((set, get) => ({
   user: null,
-  events: (saved?.events as CalendarEvent[]) || [],
+  events: deduplicateEventsList((saved?.events as CalendarEvent[]) || []),
   tasks: deduplicateTasks((saved?.tasks as Task[]) || []),
   courses: (saved?.courses as Course[]) || [],
   preferences: mergePreferences(saved?.preferences),
@@ -192,7 +202,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         set((s) => {
           const next = {
             ...s,
-            events: cloudData.events || s.events,
+            events: deduplicateEventsList(cloudData.events || s.events),
             tasks: deduplicateTasks(cloudData.tasks || s.tasks),
             courses: cloudData.courses || s.courses,
             preferences: mergePreferences(cloudData.preferences || s.preferences),
