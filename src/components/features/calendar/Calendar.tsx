@@ -6,7 +6,6 @@ import { useAppStore } from '../../../store/useAppStore';
 import { TravelManager } from '../../../core/TravelManager';
 import { MealManager } from '../../../core/MealManager';
 import { CatchUpEngine } from '../../../core/CatchUpEngine';
-import { FutureProjectionEngine } from '../../../core/FutureProjectionEngine';
 import { fetchGoogleCalendarEvents } from '../../../core/googleCalendar';
 import { EventDetailsModal } from '../events/EventDetailsModal';
 import { EventFormModal } from '../events/EventFormModal';
@@ -78,10 +77,6 @@ export function Calendar() {
   const allItems = useMemo(() => {
     const items: { id: string; title: string; start: Date; end: Date; color: string; type: string; isTravelStudyTime?: boolean; isAllDay?: boolean }[] = [];
 
-    const futureProjection = events.length > 0 && courses.length > 0 
-      ? FutureProjectionEngine.project(events, courses, tasks, performanceHistory, 14)
-      : null;
-
     const computedTravelEvents = TravelManager.generateTravelEvents(events, preferences);
     // Generate meal events for the current viewed month/week/day window (+/- some buffer)
     const viewStartDate = subDays(currentDate, 14);
@@ -142,22 +137,6 @@ export function Calendar() {
           end: new Date(s.endTime),
           color: course?.color ? course.color + 'aa' : '#c2e7ff', // slightly more opaque
           type: 'study',
-        });
-      }
-    }
-
-    if (futureProjection) {
-      for (const pt of futureProjection.phantomTasks) {
-        const course = courses.find(c => c.id === pt.courseId);
-        const startDate = new Date(pt.expectedAvailableAfter);
-        items.push({
-          id: `phantom-${pt.sourceEventId}-${pt.type}`,
-          title: `🔮 ${pt.title.replace('[Previsto] ', '')}`,
-          start: startDate,
-          end: startDate,
-          color: course?.color || '#999',
-          type: 'phantom',
-          isAllDay: true
         });
       }
     }
