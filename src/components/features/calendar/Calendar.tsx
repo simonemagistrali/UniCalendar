@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, subDays, addWeeks, subWeeks } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, ListTodo } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { TravelManager } from '../../../core/TravelManager';
 import { MealManager } from '../../../core/MealManager';
@@ -22,6 +22,10 @@ export function Calendar() {
     return (localStorage.getItem('calendarView') as ViewMode) || 'month';
   });
   
+  const [showTasks, setShowTasks] = useState(() => {
+    return localStorage.getItem('calendarShowTasks') !== 'false';
+  });
+  
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -33,7 +37,8 @@ export function Calendar() {
 
   useEffect(() => {
     localStorage.setItem('calendarView', viewMode);
-  }, [viewMode]);
+    localStorage.setItem('calendarShowTasks', showTasks.toString());
+  }, [viewMode, showTasks]);
 
   const events = useAppStore(s => s.events);
   const tasks = useAppStore(s => s.tasks);
@@ -103,46 +108,48 @@ export function Calendar() {
       });
     }
 
-    for (const t of tasks) {
-      if (t.deadline) {
-        const course = t.courseId ? courses.find(c => c.id === t.courseId) : undefined;
-        items.push({
-          id: `deadline-${t.id}`,
-          title: `Scadenza: ${t.title}`,
-          start: new Date(t.deadline),
-          end: new Date(new Date(t.deadline).getTime() + 30 * 60000), // 30 min duration for display
-          color: '#d93025', // Red color for deadline
-          type: 'deadline',
-        });
+    if (showTasks) {
+      for (const t of tasks) {
+        if (t.deadline) {
+          const course = t.courseId ? courses.find(c => c.id === t.courseId) : undefined;
+          items.push({
+            id: `deadline-${t.id}`,
+            title: `Scadenza: ${t.title}`,
+            start: new Date(t.deadline),
+            end: new Date(new Date(t.deadline).getTime() + 30 * 60000), // 30 min duration for display
+            color: '#d93025', // Red color for deadline
+            type: 'deadline',
+          });
+        }
       }
-    }
 
-    for (const s of studySessions) {
-      if (s.isBuffer) {
-        items.push({
-          id: s.id,
-          title: '☕ Pausa',
-          start: new Date(s.startTime),
-          end: new Date(s.endTime),
-          color: '#dadce0',
-          type: 'buffer',
-        });
-      } else {
-        const task = tasks.find(t => t.id === s.taskId);
-        const course = task?.courseId ? courses.find(c => c.id === task.courseId) : undefined;
-        items.push({
-          id: s.id,
-          title: task?.title || 'Studio',
-          start: new Date(s.startTime),
-          end: new Date(s.endTime),
-          color: course?.color ? course.color + 'aa' : '#c2e7ff', // slightly more opaque
-          type: 'study',
-        });
+      for (const s of studySessions) {
+        if (s.isBuffer) {
+          items.push({
+            id: s.id,
+            title: '☕ Pausa',
+            start: new Date(s.startTime),
+            end: new Date(s.endTime),
+            color: '#dadce0',
+            type: 'buffer',
+          });
+        } else {
+          const task = tasks.find(t => t.id === s.taskId);
+          const course = task?.courseId ? courses.find(c => c.id === task.courseId) : undefined;
+          items.push({
+            id: s.id,
+            title: task?.title || 'Studio',
+            start: new Date(s.startTime),
+            end: new Date(s.endTime),
+            color: course?.color ? course.color + 'aa' : '#c2e7ff', // slightly more opaque
+            type: 'study',
+          });
+        }
       }
     }
 
     return items;
-  }, [events, studySessions, tasks, courses, preferences, performanceHistory]);
+  }, [events, studySessions, tasks, courses, preferences, performanceHistory, showTasks]);
 
   const dateFormat = viewMode === 'month'
     ? "MMMM yyyy"
@@ -191,6 +198,15 @@ export function Calendar() {
           </div>
         </div>
         <div className="calendar-header-right" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button 
+            className={`calendar-sync-btn ${showTasks ? 'active' : ''}`}
+            onClick={() => setShowTasks(!showTasks)}
+            title="Mostra/Nascondi Attività e Studio"
+            style={{ backgroundColor: showTasks ? 'var(--accent-primary)' : 'transparent', color: showTasks ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border-color)' }}
+          >
+            <ListTodo size={14} />
+            {showTasks ? 'Attività Visibili' : 'Attività Nascoste'}
+          </button>
           <button 
             className="calendar-sync-btn"
             onClick={handleGoogleSync}
