@@ -105,33 +105,14 @@ export class SchedulerEngine {
       // If collision starts within 15 min, skip over it
       if (collision) {
         const collisionStart = new Date(collision.startTime);
-        const collisionEnd = new Date(collision.endTime);
         const gapMinutes = (collisionStart.getTime() - currentTime.getTime()) / 60000;
         if (gapMinutes < 15) {
-          currentTime = new Date(Math.max(collisionEnd.getTime(), currentTime.getTime() + 60000));
+          currentTime = new Date(collisionStart);
           continue;
         }
       }
 
-      // --- Future workload reservation check ---
-      // If we have a projection, check if we've already used too much time today
-      // (leaving room for future phantom tasks)
-      if (futureProjection) {
-        const todayKey = currentTime.toISOString().split('T')[0];
-        const reservedMinutes = FutureProjectionEngine.getReservedMinutesForDay(currentTime, futureProjection);
-        const totalDayMinutes = (endH * 60 + endM) - (startH * 60 + startM)
-          - (dayConfig.lunchBreak?.enabled
-            ? this.parseLunchBreakMinutes(dayConfig.lunchBreak.start, dayConfig.lunchBreak.end)
-            : 0);
-        const budgetForCurrentTasks = Math.max(30, totalDayMinutes - reservedMinutes);
-        const usedToday = minutesUsedPerDay[todayKey] || 0;
 
-        if (usedToday >= budgetForCurrentTasks) {
-          // Day budget exhausted for current tasks; move to next day
-          currentTime = this.nextDay(currentTime);
-          continue;
-        }
-      }
 
       // Schedule a study block
       // (task is already defined above)
