@@ -143,7 +143,8 @@ function deduplicateTasks(tasks: Task[]): Task[] {
 
 /* ─── Deduplicate Events Helper ─── */
 function isEventDuplicate(newEvent: CalendarEvent, existingEvents: CalendarEvent[]): boolean {
-  if (newEvent.sourceCalendarId && existingEvents.some(e => e.sourceCalendarId === newEvent.sourceCalendarId)) {
+  // Se l'ID è identico, è ovviamente un duplicato (stesso evento importato due volte)
+  if (existingEvents.some(e => e.id === newEvent.id)) {
     return true;
   }
   
