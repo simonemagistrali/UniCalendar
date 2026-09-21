@@ -141,6 +141,28 @@ function deduplicateTasks(tasks: Task[]): Task[] {
   return Array.from(uniqueMap.values());
 }
 
+/* ─── Deduplicate Events Helper ─── */
+function isEventDuplicate(newEvent: CalendarEvent, existingEvents: CalendarEvent[]): boolean {
+  if (newEvent.sourceCalendarId && existingEvents.some(e => e.sourceCalendarId === newEvent.sourceCalendarId)) {
+    return true;
+  }
+  
+  const nStart = new Date(newEvent.startTime).getTime();
+  const nEnd = new Date(newEvent.endTime).getTime();
+  const nTitle = newEvent.title.toLowerCase();
+  
+  return existingEvents.some(e => {
+    const eStart = new Date(e.startTime).getTime();
+    const eEnd = new Date(e.endTime).getTime();
+    const eTitle = e.title.toLowerCase();
+    
+    const sameTime = nStart === eStart && nEnd === eEnd;
+    const sameTitle = nTitle === eTitle || nTitle.includes(eTitle) || eTitle.includes(nTitle);
+    
+    return sameTime && sameTitle;
+  });
+}
+
 /* ─── Load initial state ─── */
 const saved = loadState();
 
@@ -216,8 +238,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addEvent: (event) => {
     get().saveSnapshot();
     set((s) => {
-      // Duplicate check by sourceCalendarId
-      if (event.sourceCalendarId && s.events.some(e => e.sourceCalendarId === event.sourceCalendarId)) {
+      if (isEventDuplicate(event, s.events)) {
         return s; // Skip duplicate
       }
       const next = { ...s, events: [...s.events, event] };
@@ -229,8 +250,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addEvents: (events) => {
     get().saveSnapshot();
     set((s) => {
-      const existingIds = new Set(s.events.map(e => e.sourceCalendarId).filter(Boolean));
-      const newEvents = events.filter(e => !e.sourceCalendarId || !existingIds.has(e.sourceCalendarId));
+      const newEvents = events.filter(e => !isEventDuplicate(e, s.events));
       if (newEvents.length === 0) return s;
       const next = { ...s, events: [...s.events, ...newEvents] };
       persist(next as AppState);
