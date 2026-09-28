@@ -7,11 +7,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { EventFormModal } from '../components/features/events/EventFormModal';
 import { ImportCalendarModal } from '../components/features/events/ImportCalendarModal';
-import { EfficiencyDashboard } from '../components/features/dashboard/EfficiencyDashboard';
 import { TaskPanel } from '../components/features/tasks/TaskPanel';
 import { CourseManager } from '../components/features/courses/CourseManager';
 import { CatchUpMini } from '../components/features/dashboard/CatchUpIndicator';
-import { CatchUpAnalysisPage } from '../components/features/dashboard/CatchUpAnalysisPage';
+import { StatisticsDashboard } from '../components/features/dashboard/StatisticsDashboard';
 import { AnkiDashboard } from '../pages/AnkiDashboard';
 import { authService } from '../core/mockBackend';
 
@@ -24,7 +23,7 @@ export function Home() {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'calendar' | 'tasks' | 'dashboard' | 'analysis' | 'anki'>('calendar');
+  const [activeTab, setActiveTab] = useState<'calendar' | 'tasks' | 'statistics' | 'anki'>('calendar');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -79,14 +78,11 @@ export function Home() {
           <button className={`sidebar-nav-item ${activeTab === 'tasks' ? 'active' : ''}`} onClick={() => { setActiveTab('tasks'); setSidebarOpen(false); }}>
             <HomeIcon size={20} /> Attività
           </button>
-          <button className={`sidebar-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}>
-            <Settings size={20} /> Dashboard
+          <button className={`sidebar-nav-item ${activeTab === 'statistics' ? 'active' : ''}`} onClick={() => { setActiveTab('statistics'); setSidebarOpen(false); }}>
+            <TrendingUp size={20} /> Statistiche
           </button>
           <button className={`sidebar-nav-item ${activeTab === 'anki' ? 'active' : ''}`} onClick={() => { setActiveTab('anki'); setSidebarOpen(false); }}>
             <img src="https://upload.wikimedia.org/wikipedia/commons/3/3d/Anki-icon.svg" alt="Anki" style={{ width: 20, height: 20, filter: 'grayscale(100%) brightness(200%)' }} /> Anki
-          </button>
-          <button className={`sidebar-nav-item ${activeTab === 'analysis' ? 'active' : ''}`} onClick={() => { setActiveTab('analysis'); setSidebarOpen(false); }}>
-            <TrendingUp size={20} /> Analisi Recupero
           </button>
         </nav>
 
@@ -134,7 +130,7 @@ export function Home() {
             <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>Annulla</span>
           </button>
           <h1 className="main-title" style={{ margin: 0 }}>
-            {activeTab === 'calendar' ? 'Calendario' : activeTab === 'tasks' ? 'Attività' : activeTab === 'dashboard' ? 'Dashboard Efficienza' : activeTab === 'anki' ? 'Studio Anki' : 'Analisi Recupero'}
+            {activeTab === 'calendar' ? 'Calendario' : activeTab === 'tasks' ? 'Attività' : activeTab === 'statistics' ? 'Statistiche' : 'Studio Anki'}
           </h1>
         </header>
 
@@ -157,15 +153,9 @@ export function Home() {
             </div>
           )}
 
-          {activeTab === 'dashboard' && (
-            <div className="dashboard-page">
-              <EfficiencyDashboard />
-            </div>
-          )}
-
-          {activeTab === 'analysis' && (
-            <div className="analysis-page">
-              <CatchUpAnalysisPage />
+          {activeTab === 'statistics' && (
+            <div className="statistics-page">
+              <StatisticsDashboard />
             </div>
           )}
 
