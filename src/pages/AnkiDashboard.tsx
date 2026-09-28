@@ -29,14 +29,12 @@ export function AnkiDashboard() {
             setIsConnected(connected);
 
             if (connected) {
-                const [due, review, newC, learn, studied, speed] = await Promise.all([
-                    ankiService.getDueCardsCount(),
-                    ankiService.getReviewCardsCount(),
-                    ankiService.getNewCardsCount(),
-                    ankiService.getLearnCardsCount(),
-                    ankiService.getStudiedTodayCount(),
-                    ankiService.getAverageTimeSeconds()
-                ]);
+                const due = await ankiService.getDueCardsCount();
+                const review = await ankiService.getReviewCardsCount();
+                const newC = await ankiService.getNewCardsCount();
+                const learn = await ankiService.getLearnCardsCount();
+                const studied = await ankiService.getStudiedTodayCount();
+                const speed = await ankiService.getAverageTimeSeconds();
 
                 setStats({
                     dueCards: due,
