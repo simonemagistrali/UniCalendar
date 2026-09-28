@@ -29,13 +29,10 @@ export function EfficiencyDashboard() {
     const doneTasks = tasks.filter(t => t.status === 'done' && t.actualDuration);
     const todoTasks = tasks.filter(t => t.status !== 'done');
 
-    // Efficiency score
-    let efficiency = 0;
-    if (doneTasks.length > 0) {
-      const totalEstimated = doneTasks.reduce((a, t) => a + t.estimatedDuration, 0);
-      const totalActual = doneTasks.reduce((a, t) => a + (t.actualDuration || t.estimatedDuration), 0);
-      efficiency = totalActual > 0 ? Math.min(100, Math.round((totalEstimated / totalActual) * 100)) : 0;
-    }
+    // Tasso Completamento
+    const completionRate = (doneTasks.length + todoTasks.length) > 0 
+      ? Math.round((doneTasks.length / (doneTasks.length + todoTasks.length)) * 100)
+      : 0;
 
     // Per-course comparison
     const courseStats = courses.map(c => {
@@ -45,27 +42,26 @@ export function EfficiencyDashboard() {
       return { name: c.name, estimated: Math.round(est / 60 * 10) / 10, actual: Math.round(act / 60 * 10) / 10, color: c.color };
     }).filter(c => c.estimated > 0 || c.actual > 0);
 
-    // Weekly trend (from performance history)
-    const weeklyEfficiency: number[] = [];
+    // Weekly hours (from performance history)
+    const weeklyHours: number[] = [];
     if (performanceHistory.length > 0) {
       const sorted = [...performanceHistory].sort((a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime());
       const chunkSize = Math.max(1, Math.ceil(sorted.length / 4));
       for (let i = 0; i < 4; i++) {
         const chunk = sorted.slice(i * chunkSize, (i + 1) * chunkSize);
-        if (chunk.length === 0) { weeklyEfficiency.push(0); continue; }
-        const est = chunk.reduce((a, h) => a + h.estimatedMinutes, 0);
+        if (chunk.length === 0) { weeklyHours.push(0); continue; }
         const act = chunk.reduce((a, h) => a + h.actualMinutes, 0);
-        weeklyEfficiency.push(act > 0 ? Math.min(100, Math.round((est / act) * 100)) : 0);
+        weeklyHours.push(Math.round((act / 60) * 10) / 10);
       }
     }
 
     // Trend
     let trend: 'up' | 'down' | 'flat' = 'flat';
-    if (weeklyEfficiency.length >= 2) {
-      const last = weeklyEfficiency[weeklyEfficiency.length - 1];
-      const prev = weeklyEfficiency[weeklyEfficiency.length - 2];
-      if (last > prev + 2) trend = 'up';
-      else if (last < prev - 2) trend = 'down';
+    if (weeklyHours.length >= 2) {
+      const last = weeklyHours[weeklyHours.length - 1];
+      const prev = weeklyHours[weeklyHours.length - 2];
+      if (last > prev) trend = 'up';
+      else if (last < prev) trend = 'down';
     }
 
     // Attendance rate
@@ -82,7 +78,7 @@ export function EfficiencyDashboard() {
       }
     }
 
-    return { efficiency, doneTasks: doneTasks.length, todoTasks: todoTasks.length, courseStats, weeklyEfficiency, trend, attendanceRate, attendedCount, recoveredCount };
+    return { completionRate, doneTasks: doneTasks.length, todoTasks: todoTasks.length, courseStats, weeklyHours, trend, attendanceRate, attendedCount, recoveredCount };
   }, [tasks, performanceHistory, courses]);
 
   const barData = {
@@ -107,8 +103,8 @@ export function EfficiencyDashboard() {
     labels: ['Periodo 1', 'Periodo 2', 'Periodo 3', 'Periodo 4'],
     datasets: [
       {
-        label: 'Efficienza (%)',
-        data: stats.weeklyEfficiency.length > 0 ? stats.weeklyEfficiency : [0, 0, 0, 0],
+        label: 'Ore Studiate (h)',
+        data: stats.weeklyHours.length > 0 ? stats.weeklyHours : [0, 0, 0, 0],
         borderColor: 'rgba(24, 128, 56, 1)',
         backgroundColor: 'rgba(24, 128, 56, 0.1)',
         tension: 0.4,
@@ -140,9 +136,9 @@ export function EfficiencyDashboard() {
       <GlassPanel>
         <div className="dashboard-score-header">
           <div>
-            <h3 className="dashboard-label">EFFICIENZA STUDIO</h3>
+            <h3 className="dashboard-label">TASSO DI COMPLETAMENTO</h3>
             <div className="dashboard-score-row">
-              <span className="dashboard-score">{stats.efficiency || '—'}%</span>
+              <span className="dashboard-score">{stats.completionRate || '0'}%</span>
               <span className="dashboard-trend" style={{ color: trendColor }}>
                 <TrendIcon size={16} />
               </span>
@@ -193,7 +189,7 @@ export function EfficiencyDashboard() {
 
       {/* Line Chart */}
       <GlassPanel className="dashboard-chart-panel">
-        <h3 className="dashboard-label">ANDAMENTO NEL TEMPO</h3>
+        <h3 className="dashboard-label">ORE STUDIATE NEL TEMPO</h3>
         <div className="dashboard-chart">
           <Line data={lineData} options={chartOptions} />
         </div>
