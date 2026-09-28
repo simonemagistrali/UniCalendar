@@ -111,7 +111,7 @@ function CourseCard({ status }: { status: CourseCatchUpStatus }) {
         {status.estimatedCatchUpDate && status.catchUpPercentage < 100 && (
           <div className="catchup-course-date">
             <Calendar size={12} />
-            <span>Completamento previsto: <strong>{formatDate(status.estimatedCatchUpDate)}</strong></span>
+            <span>Completamento previsto dei task attuali: <strong>{formatDate(status.estimatedCatchUpDate)}</strong></span>
           </div>
         )}
         {status.catchUpPercentage < 100 && (
@@ -154,7 +154,7 @@ export function CatchUpIndicator() {
           {summary.globalCatchUpDate && summary.globalPercentage < 100 && (
             <div className="catchup-global-date">
               <TrendingUp size={14} style={{ color: globalColor }} />
-              <span>Completamento previsto: <strong>{formatDate(summary.globalCatchUpDate)}</strong></span>
+              <span>Completamento previsto dei task attuali: <strong>{formatDate(summary.globalCatchUpDate)}</strong></span>
             </div>
           )}
           {summary.globalPercentage < 100 && (

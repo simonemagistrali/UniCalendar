@@ -121,6 +121,7 @@ interface ChartViewData {
   projectedCreated: (number | null)[];
   projectedCompleted: (number | null)[];
   intersectionIndex: number | null;
+  estimatedCatchUpLabel: string | null;
   lessonsEndIndex: number | null;
   lessonsEndLabel: string | null;
 }
@@ -341,6 +342,18 @@ export function WorkloadFlowChart() {
     shortProjCompleted[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
 
     let shortIntersection: number | null = null;
+    let shortCatchUpLabel: string | null = null;
+
+    if (currentBacklog > 0) {
+      if (regCompleted.m > regCreated.m) {
+        const xIntersection = (regCreated.b - regCompleted.b) / (regCompleted.m - regCreated.m);
+        const weeksToIntersect = Math.ceil(xIntersection - (numWeeks - 1));
+        if (weeksToIntersect > 0 && weeksToIntersect < 104) {
+          shortCatchUpLabel = formatLongDate(addWeeks(lastWeekStr, weeksToIntersect));
+          flowAnalysis.estimatedCatchUpWeek = shortCatchUpLabel;
+        }
+      }
+    }
 
     for (let i = 1; i <= shortMaxWeeks; i++) {
       const xVal = numWeeks - 1 + i;
@@ -355,7 +368,6 @@ export function WorkloadFlowChart() {
 
       if (shortIntersection === null && projCompleted >= projCreated && currentBacklog > 0) {
         shortIntersection = numWeeks - 1 + i;
-        flowAnalysis.estimatedCatchUpWeek = formatLongDate(futureWeekStr);
       }
     }
 
@@ -366,6 +378,7 @@ export function WorkloadFlowChart() {
       projectedCreated: shortProjCreated,
       projectedCompleted: shortProjCompleted,
       intersectionIndex: shortIntersection,
+      estimatedCatchUpLabel: shortCatchUpLabel,
       lessonsEndIndex: null,
       lessonsEndLabel: null,
     };
@@ -389,6 +402,7 @@ export function WorkloadFlowChart() {
       semProjCompleted[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
 
       let semIntersection: number | null = null;
+      let semCatchUpLabel: string | null = null;
       let lessonsEndIndex: number | null = null;
       let lessonsEndLabel: string | null = null;
       let runningCreatedTotal = cumulativeCreated[numWeeks - 1];
@@ -431,6 +445,7 @@ export function WorkloadFlowChart() {
         // Detect catch-up intersection (after all data is flat)
         if (semIntersection === null && projCompleted >= runningCreatedTotal && currentBacklog > 0) {
           semIntersection = numWeeks - 1 + i;
+          semCatchUpLabel = formatLongDate(futureWeekStr);
         }
 
         // If we've already caught up past the lesson end, stop extending
@@ -447,6 +462,7 @@ export function WorkloadFlowChart() {
         projectedCreated: semProjCreated,
         projectedCompleted: semProjCompleted,
         intersectionIndex: semIntersection,
+        estimatedCatchUpLabel: semCatchUpLabel,
         lessonsEndIndex,
         lessonsEndLabel,
       };
@@ -652,19 +668,6 @@ export function WorkloadFlowChart() {
     },
   };
 
-  // ─── Catch-up date for semester view ───
-  const semesterCatchUpDate = analysis.semesterView?.intersectionIndex !== null && analysis.semesterView
-    ? (() => {
-      const idx = analysis.semesterView.intersectionIndex!;
-      const numActual = analysis.semesterView.cumulativeCreated.length;
-      const projIdx = idx - numActual + 1;
-      if (projIdx >= 0 && projIdx < analysis.semesterView.allLabels.length) {
-        return analysis.semesterView.allLabels[idx];
-      }
-      return null;
-    })()
-    : null;
-
   return (
     <GlassPanel className="dashboard-chart-panel">
       {/* Header with view toggle */}
@@ -730,11 +733,11 @@ export function WorkloadFlowChart() {
             </span>
             <span className="workload-flow-metric-label">Velocità netta</span>
           </div>
-          {analysis.flowAnalysis.estimatedCatchUpWeek && viewMode === 'short' && (
+          {(activeView.estimatedCatchUpLabel || analysis.semesterView?.estimatedCatchUpLabel) && (
             <div className="workload-flow-metric-chip">
               <Crosshair size={14} style={{ color: 'rgba(124, 58, 237, 1)' }} />
               <span className="workload-flow-metric-label">
-                A pari: <strong>{analysis.flowAnalysis.estimatedCatchUpWeek}</strong>
+                A pari: <strong>{activeView.estimatedCatchUpLabel || analysis.semesterView?.estimatedCatchUpLabel}</strong>
               </span>
             </div>
           )}
@@ -750,7 +753,7 @@ export function WorkloadFlowChart() {
       </div>
 
       {/* Semester-specific info */}
-      {viewMode === 'semester' && activeView.lessonsEndLabel && (
+      {viewMode === 'semester' && analysis.lastLessonDate && (
         <div style={{
           padding: '10px 14px',
           marginBottom: '16px',
@@ -760,7 +763,7 @@ export function WorkloadFlowChart() {
           fontSize: '0.85rem',
           color: 'var(--text-secondary)',
         }}>
-          📚 Dopo <strong>{activeView.lessonsEndLabel}</strong> non verranno più aggiunte lezioni → la linea rossa diventa <strong>piatta</strong>.
+          📚 Dopo il <strong>{formatLongDate(analysis.lastLessonDate)}</strong> non verranno più aggiunte lezioni → la linea rossa diventa <strong>piatta</strong>.
           {activeView.intersectionIndex !== null
             ? <> La linea verde la raggiungerà — sarai a pari! 🎯</>
             : <> Continua a completare task per raggiungere la parità.</>
