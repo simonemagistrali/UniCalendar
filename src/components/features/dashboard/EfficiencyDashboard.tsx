@@ -16,7 +16,6 @@ import { GlassPanel } from '../../ui/GlassPanel';
 import { useAppStore } from '../../../store/useAppStore';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { CatchUpIndicator } from './CatchUpIndicator';
-import { AnkiWidget } from './AnkiWidget';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 

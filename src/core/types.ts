@@ -120,6 +120,7 @@ export interface UserPreferences {
   defaultHomeAddress?: string; // To detect travel needs
   defaultCommuteTimeMinutes?: number; // Estimated commute time in minutes
   isCommuteProductive?: boolean; // True if commute is by train/bus and can be used for study
+  ankiAverageTimeSeconds?: number; // Average time to review a single Anki card
 }
 
 /* ─── Phantom Task (Future Projection) ─── */

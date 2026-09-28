@@ -28,6 +28,7 @@ export function Settings() {
   const [homeAddress, setHomeAddress] = useState(preferences.defaultHomeAddress || '');
   const [commuteTime, setCommuteTime] = useState((preferences.defaultCommuteTimeMinutes || 45).toString());
   const [isCommuteProductive, setIsCommuteProductive] = useState(preferences.isCommuteProductive || false);
+  const [ankiAverageTime, setAnkiAverageTime] = useState((preferences.ankiAverageTimeSeconds || 15).toString());
   const [saved, setSaved] = useState(false);
 
   const handleToggleDay = (dayId: number) => {
@@ -82,6 +83,7 @@ export function Settings() {
       defaultHomeAddress: homeAddress || undefined,
       defaultCommuteTimeMinutes: parseInt(commuteTime) || 45,
       isCommuteProductive,
+      ankiAverageTimeSeconds: parseInt(ankiAverageTime) || 15,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -233,6 +235,26 @@ export function Settings() {
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Posso studiare o ripassare durante il tragitto (es. in treno)</span>
               </div>
             </label>
+          </GlassPanel>
+
+          {/* Anki Integration */}
+          <GlassPanel>
+            <h2 className="settings-section-title">Integrazione Anki</h2>
+            <p className="settings-section-desc">
+              Imposta il tempo medio in secondi per rispondere a una carta. Questo valore verrà usato per stimare il tempo totale di ripasso.
+            </p>
+            <div className="settings-inline-field">
+              <span className="settings-field-label" style={{ width: '120px' }}>Tempo per carta:</span>
+              <input
+                type="number"
+                min="1"
+                max="300"
+                value={ankiAverageTime}
+                onChange={e => setAnkiAverageTime(e.target.value)}
+                className="settings-number-input"
+              />
+              <span className="settings-field-label">secondi</span>
+            </div>
           </GlassPanel>
 
           {/* Save */}

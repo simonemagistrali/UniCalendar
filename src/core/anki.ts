@@ -45,5 +45,57 @@ export const ankiService = {
         } catch {
             return 0;
         }
+    },
+
+    async getNewCardsCount(): Promise<number> {
+        try {
+            const cards = await invoke('findCards', 6, { query: 'is:new' });
+            return cards.length;
+        } catch {
+            return 0;
+        }
+    },
+
+    async getLearnCardsCount(): Promise<number> {
+        try {
+            const cards = await invoke('findCards', 6, { query: 'is:learn' });
+            return cards.length;
+        } catch {
+            return 0;
+        }
+    },
+
+    async getReviewCardsCount(): Promise<number> {
+        try {
+            const cards = await invoke('findCards', 6, { query: 'is:review is:due' });
+            return cards.length;
+        } catch {
+            return 0;
+        }
+    },
+
+    async getAverageTimeSeconds(): Promise<number | null> {
+        try {
+            const html = await invoke('getCollectionStatsHTML', 6);
+            if (typeof html !== 'string') return null;
+            
+            // Rimuovi caratteri di formattazione bidirezionali nascosti inseriti da Anki
+            const cleanHtml = html.replace(/[\u2066-\u2069]/g, '');
+            
+            // Cerca "Average answer time:" o "Tempo medio di risposta:" seguito dal valore in secondi
+            const regex = /(?:Average answer time|Tempo medio di risposta)[\s\S]{0,100}?<b[^>]*>\s*([0-9]+[.,][0-9]+)\s*s/i;
+            const match = cleanHtml.match(regex);
+            
+            if (match && match[1]) {
+                const parsed = parseFloat(match[1].replace(',', '.'));
+                if (!isNaN(parsed) && parsed > 0) {
+                    return parsed;
+                }
+            }
+            return null;
+        } catch (e) {
+            console.error("Failed to parse Anki stats", e);
+            return null;
+        }
     }
 };

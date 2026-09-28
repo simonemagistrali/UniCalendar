@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react';
 import { ankiService } from '../../../core/anki';
-import { Brain, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Brain, RefreshCw, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { useAppStore } from '../../../store/useAppStore';
 import './AnkiWidget.css';
 
 export function AnkiWidget() {
     const [isConnected, setIsConnected] = useState<boolean | null>(null);
     const [dueCards, setDueCards] = useState<number>(0);
     const [studiedToday, setStudiedToday] = useState<number>(0);
+    const [fetchedSpeed, setFetchedSpeed] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    
+    const preferences = useAppStore(s => s.preferences);
+    const avgTimeSecs = fetchedSpeed || preferences.ankiAverageTimeSeconds || 15;
+    const estimatedTimeMinutes = Math.ceil((dueCards * avgTimeSecs) / 60);
 
     const fetchData = async () => {
         setIsLoading(true);
@@ -18,8 +24,10 @@ export function AnkiWidget() {
             if (connected) {
                 const due = await ankiService.getDueCardsCount();
                 const studied = await ankiService.getStudiedTodayCount();
+                const speed = await ankiService.getAverageTimeSeconds();
                 setDueCards(due);
                 setStudiedToday(studied);
+                setFetchedSpeed(speed);
             }
         } catch (e) {
             setIsConnected(false);
@@ -74,6 +82,12 @@ export function AnkiWidget() {
                         <div className="anki-stat-card primary">
                             <span className="anki-stat-value">{dueCards}</span>
                             <span className="anki-stat-label">Carte da Ripassare</span>
+                            {dueCards > 0 && (
+                                <div className="anki-stat-meta" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }} title={fetchedSpeed ? `Velocità reale rilevata da Anki: ${fetchedSpeed}s/carta` : `Velocità stimata manuale: ${avgTimeSecs}s/carta`}>
+                                    <Clock size={12} />
+                                    <span>~{estimatedTimeMinutes} min stimati {fetchedSpeed && '⚡'}</span>
+                                </div>
+                            )}
                         </div>
                         <div className="anki-stat-card secondary">
                             <div className="anki-stat-value-group">

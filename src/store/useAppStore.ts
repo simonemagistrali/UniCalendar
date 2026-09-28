@@ -27,6 +27,7 @@ const defaultPreferences: UserPreferences = {
   daysBeforeExamToIncreasePriority: 14,
   defaultCommuteTimeMinutes: 45,
   isCommuteProductive: false,
+  ankiAverageTimeSeconds: 15,
 };
 
 /**
@@ -52,6 +53,7 @@ function mergePreferences(saved: unknown): UserPreferences {
     defaultHomeAddress: p.defaultHomeAddress,
     defaultCommuteTimeMinutes: p.defaultCommuteTimeMinutes ?? 45,
     isCommuteProductive: p.isCommuteProductive ?? false,
+    ankiAverageTimeSeconds: p.ankiAverageTimeSeconds ?? 15,
   };
 }
 

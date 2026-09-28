@@ -1,0 +1,186 @@
+.anki-dashboard-container {
+    padding: 1rem 0;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.anki-header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.anki-title-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.anki-main-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #3b82f6, #60a5fa);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 16px rgba(59, 130, 246, 0.25);
+}
+
+.anki-title-group h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.anki-title-group p {
+    margin: 4px 0 0 0;
+    font-size: 0.95rem;
+}
+
+.anki-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.connection-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+}
+
+.connection-badge .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.connection-badge.online .dot { background: #10b981; box-shadow: 0 0 8px #10b981; }
+.connection-badge.offline .dot { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+
+.refresh-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.refresh-button:hover:not(:disabled) {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+.refresh-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.anki-state-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    border: 1px dashed var(--border);
+    text-align: center;
+}
+
+.anki-state-message.error h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+}
+
+.anki-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+}
+
+.stat-card {
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 150px;
+    height: 150px;
+    background: inherit;
+    filter: blur(50px);
+    opacity: 0.15;
+    border-radius: 50%;
+    transform: translate(30%, -30%);
+    pointer-events: none;
+}
+
+.stat-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.accent-blue .stat-icon-wrapper { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.accent-blue::before { background: #3b82f6; }
+
+.accent-purple .stat-icon-wrapper { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
+.accent-purple::before { background: #a855f7; }
+
+.accent-orange .stat-icon-wrapper { background: rgba(249, 115, 22, 0.15); color: #f97316; }
+.accent-orange::before { background: #f97316; }
+
+.accent-green .stat-icon-wrapper { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.accent-green::before { background: #10b981; }
+
+.stat-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.stat-sublabel {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
