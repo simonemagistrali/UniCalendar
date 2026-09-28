@@ -1171,6 +1171,71 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   height: 200px;
 }
 
+/* ─── Workload Flow Chart ─── */
+.workload-flow-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.workload-flow-status {
+  padding: 14px 16px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+.workload-flow-status-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.workload-flow-metrics {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.workload-flow-metric-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-primary);
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+}
+.workload-flow-metric-value {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+.workload-flow-metric-label {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+.workload-flow-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.workload-flow-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.workload-flow-legend-line {
+  display: inline-block;
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
 /* ─── Settings Page ─── */
 .settings-page {
   min-height: 100vh;
