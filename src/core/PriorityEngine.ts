@@ -189,8 +189,11 @@ export class PriorityEngine {
       };
     });
 
-    // Sort by score descending, but ALWAYS put lesson recoveries first
+    // Sort by score descending, but ALWAYS put in-progress first, then lesson recoveries
     scored.sort((a, b) => {
+      if (a.status === 'in_progress' && b.status !== 'in_progress') return -1;
+      if (a.status !== 'in_progress' && b.status === 'in_progress') return 1;
+
       const aIsRecovery = a.title.startsWith('Seguire/Recuperare lezione');
       const bIsRecovery = b.title.startsWith('Seguire/Recuperare lezione');
       

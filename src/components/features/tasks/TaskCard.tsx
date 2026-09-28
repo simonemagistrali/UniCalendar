@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Task } from '../../../core/types';
 import { useAppStore } from '../../../store/useAppStore';
-import { Clock, Check, ChevronRight, AlertTriangle, SkipForward, RotateCcw, Eye } from 'lucide-react';
+import { Clock, Check, ChevronRight, AlertTriangle, SkipForward, RotateCcw, Eye, Play, Pause } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
@@ -17,7 +17,16 @@ export function TaskCard({ task }: TaskCardProps) {
   const course = courses.find(c => c.id === task.courseId);
   const isUrgent = task.priorityScore >= 100;
   const isDone = task.status === 'done';
+  const isInProgress = task.status === 'in_progress';
   const isLessonTask = task.title.startsWith('Seguire/Recuperare lezione');
+
+  const getTotalAccumulated = () => {
+    let elapsed = 0;
+    if (task.startedAt) {
+      elapsed = (new Date().getTime() - new Date(task.startedAt).getTime()) / 60000;
+    }
+    return (task.accumulatedTime || 0) + elapsed;
+  };
 
   // ─── Phantom Task Rendering ───
   if (task.isPhantom) {
@@ -58,7 +67,29 @@ export function TaskCard({ task }: TaskCardProps) {
   // ─── Normal Task Rendering ───
   const handleComplete = () => {
     completeTask(task.id, parseInt(actualTime) || task.estimatedDuration, completeMode || 'normal');
+    updateTask(task.id, { startedAt: undefined, accumulatedTime: 0 }); // Clean up
     setCompleteMode(null);
+  };
+
+  const handleStart = () => {
+    updateTask(task.id, { status: 'in_progress', startedAt: new Date().toISOString() });
+  };
+
+  const handlePause = () => {
+    updateTask(task.id, { 
+      status: 'todo', 
+      accumulatedTime: getTotalAccumulated(),
+      startedAt: undefined 
+    });
+  };
+
+  const handleOpenComplete = (mode: 'attended' | 'recovered' | 'normal') => {
+    setCompleteMode(mode);
+    if (isInProgress || task.accumulatedTime) {
+      setActualTime(Math.max(1, Math.round(getTotalAccumulated())).toString());
+    } else {
+      setActualTime(task.estimatedDuration.toString());
+    }
   };
 
   const handlePostpone = () => {
@@ -84,7 +115,12 @@ export function TaskCard({ task }: TaskCardProps) {
           <span className={`task-title ${isDone ? 'line-through' : ''}`}>{task.title}</span>
         </div>
         <div className="task-card-badges">
-          {isUrgent && !isDone && (
+          {isInProgress && (
+            <span className="task-badge" style={{ backgroundColor: '#10b981', color: 'white' }}>
+              <Play size={10} /> IN CORSO
+            </span>
+          )}
+          {isUrgent && !isDone && !isInProgress && (
             <span className="task-badge task-badge-urgent">
               <AlertTriangle size={10} /> URGENTE
             </span>
@@ -133,18 +169,28 @@ export function TaskCard({ task }: TaskCardProps) {
         <div className="task-card-actions">
           {!completeMode ? (
             <>
+              {!isInProgress ? (
+                <button className="task-action-btn" onClick={handleStart} style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                  <Play size={14} /> Inizia
+                </button>
+              ) : (
+                <button className="task-action-btn" onClick={handlePause} style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                  <Pause size={14} /> Pausa
+                </button>
+              )}
+              
               {isLessonTask ? (
                 <>
-                  <button className="task-action-btn task-complete-btn" onClick={() => setCompleteMode('attended')}>
+                  <button className="task-action-btn task-complete-btn" onClick={() => handleOpenComplete('attended')}>
                     <Check size={14} /> Seguita
                   </button>
-                  <button className="task-action-btn task-complete-btn" onClick={() => setCompleteMode('recovered')} style={{ backgroundColor: '#f29900', color: 'white' }}>
+                  <button className="task-action-btn task-complete-btn" onClick={() => handleOpenComplete('recovered')} style={{ backgroundColor: '#f29900', color: 'white' }}>
                     <Check size={14} /> Recuperata
                   </button>
                 </>
               ) : (
-                <button className="task-action-btn task-complete-btn" onClick={() => setCompleteMode('normal')}>
-                  <Check size={14} /> Completa
+                <button className="task-action-btn task-complete-btn" onClick={() => handleOpenComplete('normal')}>
+                  <Check size={14} /> Concludi
                 </button>
               )}
               <button className="task-action-btn task-postpone-btn" onClick={handlePostpone}>

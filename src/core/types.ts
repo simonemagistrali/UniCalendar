@@ -71,6 +71,8 @@ export interface Task {
   estimatedDuration: number; // minutes
   actualDuration?: number; // minutes, filled when done
   createdAt: string; // ISO string
+  startedAt?: string; // ISO string when the task was started
+  accumulatedTime?: number; // minutes accumulated from previous sessions
   deadline?: string; // ISO string
   dependencies: string[]; // Task IDs (propedeuticità)
   completedAt?: string;

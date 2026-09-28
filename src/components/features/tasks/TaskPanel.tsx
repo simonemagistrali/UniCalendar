@@ -20,7 +20,7 @@ export function TaskPanel() {
   const setStudySessions = useAppStore(s => s.setStudySessions);
   const setTasks = useAppStore(s => s.setTasks);
 
-  const [filter, setFilter] = useState<'all' | 'todo' | 'done' | 'forecast'>('todo');
+  const [filter, setFilter] = useState<'all' | 'todo' | 'in_progress' | 'done' | 'forecast'>('todo');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [courseFilter, setCourseFilter] = useState<string>('ALL');
 
@@ -106,7 +106,8 @@ export function TaskPanel() {
     }
 
     const realTasks = sortedTasks.filter(t => {
-      if (filter === 'todo' && t.status === 'done') return false;
+      if (filter === 'todo' && t.status !== 'todo') return false;
+      if (filter === 'in_progress' && t.status !== 'in_progress') return false;
       if (filter === 'done' && t.status !== 'done') return false;
       if (typeFilter !== 'ALL' && getTaskType(t) !== typeFilter) return false;
       if (courseFilter !== 'ALL' && t.courseId !== courseFilter) return false;
@@ -126,7 +127,8 @@ export function TaskPanel() {
     return realTasks;
   }, [sortedTasks, phantomTasks, filter, typeFilter, courseFilter]);
 
-  const todoCount = tasks.filter(t => t.status !== 'done').length;
+  const todoCount = tasks.filter(t => t.status === 'todo').length;
+  const inProgressCount = tasks.filter(t => t.status === 'in_progress').length;
   const doneCount = tasks.filter(t => t.status === 'done').length;
   const phantomCount = phantomTasks.length;
 
@@ -139,6 +141,7 @@ export function TaskPanel() {
         </div>
         <div className="task-panel-counts">
           <span className="task-count-badge">{todoCount} da fare</span>
+          {inProgressCount > 0 && <span className="task-count-badge" style={{ backgroundColor: '#10b981', color: 'white' }}>{inProgressCount} in corso</span>}
           <span className="task-count-badge task-count-done">{doneCount} fatte</span>
           {phantomCount > 0 && (
             <span className="task-count-badge task-count-phantom">{phantomCount} previste</span>
@@ -147,13 +150,13 @@ export function TaskPanel() {
       </div>
 
       <div className="task-filter-bar">
-        {(['todo', 'all', 'done', 'forecast'] as const).map(f => (
+        {(['todo', 'in_progress', 'done', 'all', 'forecast'] as const).map(f => (
           <button
             key={f}
             className={`task-filter-btn ${filter === f ? 'active' : ''}`}
             onClick={() => setFilter(f)}
           >
-            {f === 'todo' ? 'Da fare' : f === 'done' ? 'Completate' : f === 'forecast' ? '🔮 Previste' : 'Tutte'}
+            {f === 'todo' ? 'Da fare' : f === 'in_progress' ? 'In corso' : f === 'done' ? 'Completate' : f === 'forecast' ? '🔮 Previste' : 'Tutte'}
           </button>
         ))}
       </div>
@@ -188,6 +191,8 @@ export function TaskPanel() {
             <p>
               {filter === 'done'
                 ? 'Nessuna attività completata ancora.'
+                : filter === 'in_progress'
+                ? 'Nessuna attività in corso. Inizia un task!'
                 : filter === 'forecast'
                 ? 'Nessuna attività prevista. Aggiungi lezioni future al calendario!'
                 : 'Nessuna attività. Importa il calendario o attendi la fine delle lezioni!'}
