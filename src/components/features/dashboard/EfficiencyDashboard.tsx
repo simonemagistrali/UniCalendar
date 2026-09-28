@@ -42,24 +42,46 @@ export function EfficiencyDashboard() {
       return { name: c.name, estimated: Math.round(est / 60 * 10) / 10, actual: Math.round(act / 60 * 10) / 10, color: c.color };
     }).filter(c => c.estimated > 0 || c.actual > 0);
 
-    // Weekly hours (from performance history)
-    const weeklyHours: number[] = [];
-    if (performanceHistory.length > 0) {
-      const sorted = [...performanceHistory].sort((a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime());
-      const chunkSize = Math.max(1, Math.ceil(sorted.length / 4));
-      for (let i = 0; i < 4; i++) {
-        const chunk = sorted.slice(i * chunkSize, (i + 1) * chunkSize);
-        if (chunk.length === 0) { weeklyHours.push(0); continue; }
-        const act = chunk.reduce((a, h) => a + h.actualMinutes, 0);
-        weeklyHours.push(Math.round((act / 60) * 10) / 10);
-      }
+    // Weekly Efficiency (Task Completion Rate) for the last 4 weeks
+    const weeklyEfficiency: number[] = [];
+    const now = new Date();
+    
+    for (let i = 3; i >= 0; i--) {
+      const startD = new Date(now);
+      startD.setDate(now.getDate() - (i + 1) * 7);
+      
+      const endD = new Date(now);
+      endD.setDate(now.getDate() - i * 7);
+      
+      const tasksTodo = tasks.filter(t => {
+        const created = new Date(t.createdAt);
+        if (created > endD) return false; 
+        
+        if (t.status !== 'done') return true;
+        if (t.completedAt) {
+          const completed = new Date(t.completedAt);
+          return completed >= startD;
+        }
+        return true;
+      });
+      
+      const tasksDone = tasks.filter(t => {
+        if (t.status === 'done' && t.completedAt) {
+          const completed = new Date(t.completedAt);
+          return completed >= startD && completed < endD;
+        }
+        return false;
+      });
+      
+      const rate = tasksTodo.length > 0 ? Math.round((tasksDone.length / tasksTodo.length) * 100) : 0;
+      weeklyEfficiency.push(rate);
     }
 
     // Trend
     let trend: 'up' | 'down' | 'flat' = 'flat';
-    if (weeklyHours.length >= 2) {
-      const last = weeklyHours[weeklyHours.length - 1];
-      const prev = weeklyHours[weeklyHours.length - 2];
+    if (weeklyEfficiency.length >= 2) {
+      const last = weeklyEfficiency[weeklyEfficiency.length - 1];
+      const prev = weeklyEfficiency[weeklyEfficiency.length - 2];
       if (last > prev) trend = 'up';
       else if (last < prev) trend = 'down';
     }
@@ -78,7 +100,7 @@ export function EfficiencyDashboard() {
       }
     }
 
-    return { completionRate, doneTasks: doneTasks.length, todoTasks: todoTasks.length, courseStats, weeklyHours, trend, attendanceRate, attendedCount, recoveredCount };
+    return { completionRate, doneTasks: doneTasks.length, todoTasks: todoTasks.length, courseStats, weeklyEfficiency, trend, attendanceRate, attendedCount, recoveredCount };
   }, [tasks, performanceHistory, courses]);
 
   const barData = {
@@ -100,11 +122,11 @@ export function EfficiencyDashboard() {
   };
 
   const lineData = {
-    labels: ['Periodo 1', 'Periodo 2', 'Periodo 3', 'Periodo 4'],
+    labels: ['3 Settimane fa', '2 Settimane fa', 'Settimana Scorsa', 'Questa Settimana'],
     datasets: [
       {
-        label: 'Ore Studiate (h)',
-        data: stats.weeklyHours.length > 0 ? stats.weeklyHours : [0, 0, 0, 0],
+        label: 'Tasso Completamento (%)',
+        data: stats.weeklyEfficiency.length > 0 ? stats.weeklyEfficiency : [0, 0, 0, 0],
         borderColor: 'rgba(24, 128, 56, 1)',
         backgroundColor: 'rgba(24, 128, 56, 0.1)',
         tension: 0.4,
@@ -189,7 +211,7 @@ export function EfficiencyDashboard() {
 
       {/* Line Chart */}
       <GlassPanel className="dashboard-chart-panel">
-        <h3 className="dashboard-label">ORE STUDIATE NEL TEMPO</h3>
+        <h3 className="dashboard-label">ANDAMENTO EFFICIENZA</h3>
         <div className="dashboard-chart">
           <Line data={lineData} options={chartOptions} />
         </div>
