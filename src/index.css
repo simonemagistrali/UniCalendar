@@ -1235,6 +1235,37 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   border-radius: 2px;
   flex-shrink: 0;
 }
+.workload-flow-view-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.workload-flow-view-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+.workload-flow-view-btn:hover {
+  background: var(--bg-tertiary);
+}
+.workload-flow-view-btn.active {
+  background: var(--accent-primary);
+  color: white;
+  font-weight: 600;
+}
+.workload-flow-view-btn:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
 
 /* ─── Settings Page ─── */
 .settings-page {

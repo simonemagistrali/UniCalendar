@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,7 +14,7 @@ import annotationPlugin from 'chartjs-plugin-annotation';
 import { Line } from 'react-chartjs-2';
 import { GlassPanel } from '../../ui/GlassPanel';
 import { useAppStore } from '../../../store/useAppStore';
-import { Activity, TrendingUp, TrendingDown, Equal, Crosshair } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, Equal, Crosshair, ZoomIn, ZoomOut, Calendar } from 'lucide-react';
 
 ChartJS.register(
   CategoryScale,
@@ -30,48 +30,57 @@ ChartJS.register(
 
 /* ─── Helpers ─── */
 
-/**
- * Get the Monday of the week for a given date (ISO week).
- * Uses pure string arithmetic to avoid any timezone issues.
- */
+/** Get the Monday of the week for a given date (ISO week), timezone-safe. */
 function getWeekStart(date: Date): string {
-  // Work entirely in UTC to avoid timezone shifts
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const day = d.getUTCDay(); // 0=Sunday, 1=Monday, ...
-  const diff = day === 0 ? -6 : 1 - day; // Shift to Monday
+  const day = d.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
   d.setUTCDate(d.getUTCDate() + diff);
-  // Return YYYY-MM-DD from UTC
+  return toDateStr(d);
+}
+
+/** Format a YYYY-MM-DD to UTC Date */
+function parseUTC(dateStr: string): Date {
+  const parts = dateStr.split('-');
+  return new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2]));
+}
+
+/** UTC Date → YYYY-MM-DD */
+function toDateStr(d: Date): string {
   const yyyy = d.getUTCFullYear();
   const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(d.getUTCDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
 
-/** Format a YYYY-MM-DD week start date to a readable label */
+/** Format YYYY-MM-DD to readable Italian label */
 function formatWeekLabel(weekStart: string): string {
-  // Parse as UTC to avoid shifts
-  const parts = weekStart.split('-');
-  const d = new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2]));
+  const d = parseUTC(weekStart);
   return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
 
-/**
- * Add N weeks to a YYYY-MM-DD string, returns YYYY-MM-DD.
- * Timezone-safe.
- */
+/** Add N weeks to a YYYY-MM-DD string */
 function addWeeks(dateStr: string, weeks: number): string {
-  const parts = dateStr.split('-');
-  const d = new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2]));
+  const d = parseUTC(dateStr);
   d.setUTCDate(d.getUTCDate() + weeks * 7);
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  return toDateStr(d);
+}
+
+/** Weeks between two YYYY-MM-DD dates */
+function weeksBetween(a: string, b: string): number {
+  const da = parseUTC(a).getTime();
+  const db = parseUTC(b).getTime();
+  return Math.round((db - da) / (7 * 86400000));
+}
+
+/** Format a YYYY-MM-DD to a long Italian date */
+function formatLongDate(dateStr: string): string {
+  const d = parseUTC(dateStr);
+  return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
 /**
  * Simple linear regression: y = mx + b
- * Returns slope m and intercept b
  */
 function linearRegression(points: { x: number; y: number }[]): { m: number; b: number } {
   const n = points.length;
@@ -102,18 +111,25 @@ interface FlowAnalysis {
   currentBacklog: number;
   avgCreatedPerWeek: number;
   avgCompletedPerWeek: number;
-  netVelocity: number; // positive = catching up
+  netVelocity: number;
 }
 
+interface ChartViewData {
+  allLabels: string[];
+  cumulativeCreated: number[];
+  cumulativeCompleted: number[];
+  projectedCreated: (number | null)[];
+  projectedCompleted: (number | null)[];
+  intersectionIndex: number | null;
+  lessonsEndIndex: number | null;
+  lessonsEndLabel: string | null;
+}
+
+type ViewMode = 'short' | 'semester';
+
 const NO_DATA_RESULT = {
-  weekLabels: [] as string[],
-  cumulativeCreated: [] as number[],
-  cumulativeCompleted: [] as number[],
-  projectedCreated: [] as (number | null)[],
-  projectedCompleted: [] as (number | null)[],
-  allLabels: [] as string[],
   flowAnalysis: {
-    status: 'no_data',
+    status: 'no_data' as const,
     message: 'Nessun dato disponibile',
     detail: 'Aggiungi e completa task per iniziare a vedere le statistiche.',
     estimatedCatchUpWeek: null,
@@ -121,17 +137,22 @@ const NO_DATA_RESULT = {
     avgCreatedPerWeek: 0,
     avgCompletedPerWeek: 0,
     netVelocity: 0,
-  } as FlowAnalysis,
-  intersectionIndex: null as number | null,
+  },
+  shortView: null as ChartViewData | null,
+  semesterView: null as ChartViewData | null,
+  lastLessonDate: null as string | null,
+  futureTasksPerWeek: 0,
 };
 
 export function WorkloadFlowChart() {
   const tasks = useAppStore(s => s.tasks);
+  const events = useAppStore(s => s.events);
+  const courses = useAppStore(s => s.courses);
+  const [viewMode, setViewMode] = useState<ViewMode>('short');
 
   const analysis = useMemo(() => {
-    // Collect all tasks with createdAt timestamp (exclude phantom/predicted tasks)
+    // Collect all real tasks (exclude phantom/predicted)
     const allTasks = tasks.filter(t => t.createdAt && !t.isPhantom);
-
     if (allTasks.length === 0) return NO_DATA_RESULT;
 
     // ─── Build per-week created/completed counts ───
@@ -149,15 +170,13 @@ export function WorkloadFlowChart() {
       }
     }
 
-    // Sort weeks chronologically
     const sortedWeeks = Array.from(weekMap.keys()).sort();
     if (sortedWeeks.length === 0) return NO_DATA_RESULT;
 
-    // Fill in any missing weeks between first and last (timezone-safe)
+    // Fill gaps
     const filledWeeks: string[] = [];
     const firstWeekStr = sortedWeeks[0];
     const lastWeekStr = sortedWeeks[sortedWeeks.length - 1];
-
     let cursorStr = firstWeekStr;
     while (cursorStr <= lastWeekStr) {
       filledWeeks.push(cursorStr);
@@ -165,7 +184,7 @@ export function WorkloadFlowChart() {
       cursorStr = addWeeks(cursorStr, 1);
     }
 
-    // ─── Compute cumulative sums ───
+    // ─── Cumulative sums ───
     const cumulativeCreated: number[] = [];
     const cumulativeCompleted: number[] = [];
     let totalCreated = 0;
@@ -180,13 +199,10 @@ export function WorkloadFlowChart() {
     }
 
     const weekLabels = filledWeeks.map(w => formatWeekLabel(w));
-
-    // ─── Analysis ───
     const currentBacklog = totalCreated - totalCompleted;
     const numWeeks = filledWeeks.length;
 
-    // Calculate average rates (use last 4 data-bearing weeks if available)
-    // FIX: ensure lookback index never goes negative
+    // ─── Recent averages ───
     const recentWindow = Math.min(4, numWeeks - 1);
     const lookbackIndex = Math.max(0, numWeeks - 1 - recentWindow);
     const recentCreated = recentWindow > 0
@@ -195,65 +211,77 @@ export function WorkloadFlowChart() {
     const recentCompleted = recentWindow > 0
       ? (cumulativeCompleted[numWeeks - 1] - cumulativeCompleted[lookbackIndex]) / recentWindow
       : totalCompleted;
+    const netVelocity = recentCompleted - recentCreated;
 
-    const netVelocity = recentCompleted - recentCreated; // positive = reducing backlog
-
-    // ─── Linear Regression for Projection ───
+    // ─── Linear regression ───
     const regressionWindow = Math.min(6, numWeeks);
     const regressionStart = numWeeks - regressionWindow;
-
     const createdPoints = [];
     const completedPoints = [];
     for (let i = regressionStart; i < numWeeks; i++) {
       createdPoints.push({ x: i, y: cumulativeCreated[i] });
       completedPoints.push({ x: i, y: cumulativeCompleted[i] });
     }
-
     const regCreated = linearRegression(createdPoints);
     const regCompleted = linearRegression(completedPoints);
 
-    // Project forward up to 8 weeks
-    const maxProjectionWeeks = 8;
-    const projectedCreated: (number | null)[] = new Array(numWeeks).fill(null);
-    const projectedCompleted: (number | null)[] = new Array(numWeeks).fill(null);
-    const projectedLabels: string[] = [];
+    // ─── Detect last lesson and future task rate ───
+    const now = new Date();
+    const nowWeek = getWeekStart(now);
+    const futureLessons = events.filter(e => {
+      if (e.type !== 'lesson') return false;
+      return new Date(e.endTime).getTime() > now.getTime();
+    });
 
-    // Bridge: connect projection to last actual data point
-    projectedCreated[numWeeks - 1] = cumulativeCreated[numWeeks - 1];
-    projectedCompleted[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
-
-    let intersectionIndex: number | null = null;
-    let estimatedCatchUpWeek: string | null = null;
-
-    for (let i = 1; i <= maxProjectionWeeks; i++) {
-      const xVal = numWeeks - 1 + i;
-      const projCreated = Math.max(regCreated.m * xVal + regCreated.b, cumulativeCreated[numWeeks - 1]);
-      const projCompleted = Math.max(regCompleted.m * xVal + regCompleted.b, cumulativeCompleted[numWeeks - 1]);
-
-      projectedCreated.push(projCreated);
-      projectedCompleted.push(projCompleted);
-
-      // Generate future week label (timezone-safe)
-      const futureWeekStr = addWeeks(lastWeekStr, i);
-      projectedLabels.push(formatWeekLabel(futureWeekStr));
-
-      // Detect intersection (completed catches up to created)
-      if (intersectionIndex === null && projCompleted >= projCreated && currentBacklog > 0) {
-        intersectionIndex = numWeeks - 1 + i;
-        const parts = futureWeekStr.split('-');
-        const d = new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2]));
-        estimatedCatchUpWeek = d.toLocaleDateString('it-IT', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-          timeZone: 'UTC',
-        });
-      }
+    // Find the last lesson date
+    let lastLessonDate: string | null = null;
+    let lastLessonWeek: string | null = null;
+    if (futureLessons.length > 0) {
+      const sortedFuture = futureLessons.sort((a, b) =>
+        new Date(b.endTime).getTime() - new Date(a.endTime).getTime()
+      );
+      lastLessonDate = toDateStr(new Date(
+        Date.UTC(
+          new Date(sortedFuture[0].endTime).getFullYear(),
+          new Date(sortedFuture[0].endTime).getMonth(),
+          new Date(sortedFuture[0].endTime).getDate()
+        )
+      ));
+      lastLessonWeek = getWeekStart(new Date(sortedFuture[0].endTime));
     }
 
-    const allLabels = [...weekLabels, ...projectedLabels];
+    // Estimate how many tasks each future lesson generates
+    // Based on course preferences (same logic as TaskManager)
+    let estimatedFutureTasksPerLesson = 0;
+    const courseSet = new Set(futureLessons.map(e => e.courseId).filter(Boolean));
+    for (const courseId of courseSet) {
+      const course = courses.find(c => c.id === courseId);
+      if (!course) continue;
+      let tasksPerLesson = 1; // Always at least the follow/recover task
+      if (course.defaultStudyPreferences.requiresNotesRevision) tasksPerLesson++;
+      if (course.defaultStudyPreferences.requiresExercises) tasksPerLesson++;
+      estimatedFutureTasksPerLesson += tasksPerLesson;
+    }
 
-    // ─── Determine status ───
+    // Group future lessons by week to get tasks per future week
+    const futureWeekLessonCount = new Map<string, number>();
+    for (const lesson of futureLessons) {
+      const week = getWeekStart(new Date(lesson.endTime));
+      const course = courses.find(c => c.id === lesson.courseId);
+      if (!course) continue;
+      let count = 1;
+      if (course.defaultStudyPreferences.requiresNotesRevision) count++;
+      if (course.defaultStudyPreferences.requiresExercises) count++;
+      futureWeekLessonCount.set(week, (futureWeekLessonCount.get(week) || 0) + count);
+    }
+
+    // Average tasks per week from future lessons (for the short view regression fallback)
+    const futureWeeks = Array.from(futureWeekLessonCount.values());
+    const avgFutureTasksPerWeek = futureWeeks.length > 0
+      ? futureWeeks.reduce((a, b) => a + b, 0) / futureWeeks.length
+      : recentCreated; // fallback to historical rate
+
+    // ─── Determine analysis status ───
     let flowAnalysis: FlowAnalysis;
     if (currentBacklog <= 0) {
       flowAnalysis = {
@@ -271,7 +299,7 @@ export function WorkloadFlowChart() {
         status: 'catching_up',
         message: 'Stai recuperando! 📈',
         detail: `Le linee convergono: completi più task di quanti ne arrivano. Backlog attuale: ${currentBacklog} task.`,
-        estimatedCatchUpWeek,
+        estimatedCatchUpWeek: null, // Will be set per-view
         currentBacklog,
         avgCreatedPerWeek: Math.round(recentCreated * 10) / 10,
         avgCompletedPerWeek: Math.round(recentCompleted * 10) / 10,
@@ -301,18 +329,139 @@ export function WorkloadFlowChart() {
       };
     }
 
-    return {
-      weekLabels,
+    // ═══════════════════════════════════════════════════
+    // ─── SHORT VIEW (current: 8-week regression) ───
+    // ═══════════════════════════════════════════════════
+    const shortMaxWeeks = 8;
+    const shortProjCreated: (number | null)[] = new Array(numWeeks).fill(null);
+    const shortProjCompleted: (number | null)[] = new Array(numWeeks).fill(null);
+    const shortProjLabels: string[] = [];
+
+    shortProjCreated[numWeeks - 1] = cumulativeCreated[numWeeks - 1];
+    shortProjCompleted[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
+
+    let shortIntersection: number | null = null;
+
+    for (let i = 1; i <= shortMaxWeeks; i++) {
+      const xVal = numWeeks - 1 + i;
+      const projCreated = Math.max(regCreated.m * xVal + regCreated.b, cumulativeCreated[numWeeks - 1]);
+      const projCompleted = Math.max(regCompleted.m * xVal + regCompleted.b, cumulativeCompleted[numWeeks - 1]);
+
+      shortProjCreated.push(projCreated);
+      shortProjCompleted.push(projCompleted);
+
+      const futureWeekStr = addWeeks(lastWeekStr, i);
+      shortProjLabels.push(formatWeekLabel(futureWeekStr));
+
+      if (shortIntersection === null && projCompleted >= projCreated && currentBacklog > 0) {
+        shortIntersection = numWeeks - 1 + i;
+        flowAnalysis.estimatedCatchUpWeek = formatLongDate(futureWeekStr);
+      }
+    }
+
+    const shortView: ChartViewData = {
+      allLabels: [...weekLabels, ...shortProjLabels],
       cumulativeCreated,
       cumulativeCompleted,
-      projectedCreated,
-      projectedCompleted,
-      allLabels,
-      flowAnalysis,
-      intersectionIndex,
+      projectedCreated: shortProjCreated,
+      projectedCompleted: shortProjCompleted,
+      intersectionIndex: shortIntersection,
+      lessonsEndIndex: null,
+      lessonsEndLabel: null,
     };
-  }, [tasks]);
 
+    // ═══════════════════════════════════════════════════════════════
+    // ─── SEMESTER VIEW (full: until lessons end + catch-up) ───
+    // ═══════════════════════════════════════════════════════════════
+    let semesterView: ChartViewData | null = null;
+
+    if (lastLessonWeek) {
+      // How many weeks from now until last lesson?
+      const weeksUntilEnd = Math.max(1, weeksBetween(lastWeekStr, lastLessonWeek));
+      // After lessons end, extend further until catch-up or max 20 extra weeks
+      const maxPostLessonWeeks = 30;
+
+      const semProjCreated: (number | null)[] = new Array(numWeeks).fill(null);
+      const semProjCompleted: (number | null)[] = new Array(numWeeks).fill(null);
+      const semProjLabels: string[] = [];
+
+      semProjCreated[numWeeks - 1] = cumulativeCreated[numWeeks - 1];
+      semProjCompleted[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
+
+      let semIntersection: number | null = null;
+      let lessonsEndIndex: number | null = null;
+      let lessonsEndLabel: string | null = null;
+      let runningCreatedTotal = cumulativeCreated[numWeeks - 1];
+
+      // Total projection = until lessons end + post-lesson buffer
+      const totalProjectWeeks = weeksUntilEnd + maxPostLessonWeeks;
+
+      for (let i = 1; i <= totalProjectWeeks; i++) {
+        const futureWeekStr = addWeeks(lastWeekStr, i);
+
+        // ─── CREATED LINE ───
+        // Before lessons end: add estimated tasks from scheduled future lessons
+        // After lessons end: line goes flat (no new tasks)
+        if (i <= weeksUntilEnd) {
+          // Use actual future lesson data for this specific week
+          const tasksThisWeek = futureWeekLessonCount.get(futureWeekStr) || 0;
+          runningCreatedTotal += tasksThisWeek;
+        }
+        // After weeksUntilEnd: runningCreatedTotal stays flat
+
+        semProjCreated.push(runningCreatedTotal);
+
+        // ─── COMPLETED LINE ───
+        // Keep using regression slope (study pace continues)
+        const xVal = numWeeks - 1 + i;
+        const projCompleted = Math.max(
+          regCompleted.m * xVal + regCompleted.b,
+          cumulativeCompleted[numWeeks - 1]
+        );
+        semProjCompleted.push(projCompleted);
+
+        semProjLabels.push(formatWeekLabel(futureWeekStr));
+
+        // Mark where lessons end
+        if (lessonsEndIndex === null && i >= weeksUntilEnd) {
+          lessonsEndIndex = numWeeks - 1 + i;
+          lessonsEndLabel = formatLongDate(futureWeekStr);
+        }
+
+        // Detect catch-up intersection (after all data is flat)
+        if (semIntersection === null && projCompleted >= runningCreatedTotal && currentBacklog > 0) {
+          semIntersection = numWeeks - 1 + i;
+        }
+
+        // If we've already caught up past the lesson end, stop extending
+        if (i > weeksUntilEnd && semIntersection !== null) {
+          // Add a few more weeks for visual context
+          if (i > weeksUntilEnd + 3) break;
+        }
+      }
+
+      semesterView = {
+        allLabels: [...weekLabels, ...semProjLabels],
+        cumulativeCreated,
+        cumulativeCompleted,
+        projectedCreated: semProjCreated,
+        projectedCompleted: semProjCompleted,
+        intersectionIndex: semIntersection,
+        lessonsEndIndex,
+        lessonsEndLabel,
+      };
+    }
+
+    return {
+      flowAnalysis,
+      shortView,
+      semesterView,
+      lastLessonDate,
+      futureTasksPerWeek: Math.round(avgFutureTasksPerWeek * 10) / 10,
+    };
+  }, [tasks, events, courses]);
+
+  // ─── No data state ───
   if (analysis.flowAnalysis.status === 'no_data') {
     return (
       <GlassPanel className="dashboard-chart-panel">
@@ -327,6 +476,14 @@ export function WorkloadFlowChart() {
     );
   }
 
+  // ─── Select active view data ───
+  const activeView = viewMode === 'semester' && analysis.semesterView
+    ? analysis.semesterView
+    : analysis.shortView!;
+
+  const hasSemesterView = analysis.semesterView !== null;
+
+  // ─── Status colors ───
   const statusColor =
     analysis.flowAnalysis.status === 'caught_up' ? 'rgba(16, 185, 129, 1)' :
     analysis.flowAnalysis.status === 'catching_up' ? 'rgba(16, 185, 129, 1)' :
@@ -344,18 +501,17 @@ export function WorkloadFlowChart() {
     analysis.flowAnalysis.status === 'falling_behind' ? TrendingDown :
     Equal;
 
-  // ─── Chart Data ───
-  const totalPoints = analysis.allLabels.length;
+  // ─── Build chart data from active view ───
+  const totalPoints = activeView.allLabels.length;
 
   const chartData = {
-    labels: analysis.allLabels,
+    labels: activeView.allLabels,
     datasets: [
-      // Actual Created (solid red)
       {
         label: 'Carico cumulato (task aggiunti)',
         data: [
-          ...analysis.cumulativeCreated,
-          ...new Array(totalPoints - analysis.cumulativeCreated.length).fill(null),
+          ...activeView.cumulativeCreated,
+          ...new Array(totalPoints - activeView.cumulativeCreated.length).fill(null),
         ],
         borderColor: 'rgba(239, 68, 68, 1)',
         backgroundColor: 'rgba(239, 68, 68, 0.08)',
@@ -368,12 +524,11 @@ export function WorkloadFlowChart() {
         pointBorderWidth: 1.5,
         pointHoverRadius: 6,
       },
-      // Actual Completed (solid green)
       {
         label: 'Studio cumulato (task completati)',
         data: [
-          ...analysis.cumulativeCompleted,
-          ...new Array(totalPoints - analysis.cumulativeCompleted.length).fill(null),
+          ...activeView.cumulativeCompleted,
+          ...new Array(totalPoints - activeView.cumulativeCompleted.length).fill(null),
         ],
         borderColor: 'rgba(16, 185, 129, 1)',
         backgroundColor: 'rgba(16, 185, 129, 0.08)',
@@ -386,11 +541,10 @@ export function WorkloadFlowChart() {
         pointBorderWidth: 1.5,
         pointHoverRadius: 6,
       },
-      // Projected Created (dashed red)
       {
-        label: 'Proiezione carico',
-        data: analysis.projectedCreated,
-        borderColor: 'rgba(239, 68, 68, 0.4)',
+        label: viewMode === 'semester' ? 'Carico previsto (da lezioni)' : 'Proiezione carico',
+        data: activeView.projectedCreated,
+        borderColor: 'rgba(239, 68, 68, 0.5)',
         borderWidth: 2,
         borderDash: [6, 4],
         tension: 0.1,
@@ -398,11 +552,10 @@ export function WorkloadFlowChart() {
         pointRadius: 0,
         pointHoverRadius: 3,
       },
-      // Projected Completed (dashed green)
       {
         label: 'Proiezione studio',
-        data: analysis.projectedCompleted,
-        borderColor: 'rgba(16, 185, 129, 0.4)',
+        data: activeView.projectedCompleted,
+        borderColor: 'rgba(16, 185, 129, 0.5)',
         borderWidth: 2,
         borderDash: [6, 4],
         tension: 0.1,
@@ -413,13 +566,15 @@ export function WorkloadFlowChart() {
     ],
   };
 
-  // Build annotation for intersection point
+  // ─── Annotations ───
   const annotations: Record<string, any> = {};
-  if (analysis.intersectionIndex !== null) {
+
+  // Catch-up intersection
+  if (activeView.intersectionIndex !== null) {
     annotations['intersectionLine'] = {
       type: 'line',
-      xMin: analysis.intersectionIndex,
-      xMax: analysis.intersectionIndex,
+      xMin: activeView.intersectionIndex,
+      xMax: activeView.intersectionIndex,
       borderColor: 'rgba(124, 58, 237, 0.6)',
       borderWidth: 2,
       borderDash: [4, 4],
@@ -436,26 +591,44 @@ export function WorkloadFlowChart() {
     };
   }
 
+  // Lessons end marker (semester view only)
+  if (viewMode === 'semester' && activeView.lessonsEndIndex !== null) {
+    annotations['lessonsEnd'] = {
+      type: 'line',
+      xMin: activeView.lessonsEndIndex,
+      xMax: activeView.lessonsEndIndex,
+      borderColor: 'rgba(245, 158, 11, 0.6)',
+      borderWidth: 2,
+      borderDash: [8, 4],
+      label: {
+        display: true,
+        content: '📚 Fine lezioni',
+        position: 'end',
+        backgroundColor: 'rgba(245, 158, 11, 0.85)',
+        color: '#fff',
+        font: { size: 11, weight: 'bold' as const },
+        padding: 6,
+        borderRadius: 6,
+      },
+    };
+  }
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    interaction: {
-      mode: 'index' as const,
-      intersect: false,
-    },
+    interaction: { mode: 'index' as const, intersect: false },
     plugins: {
       legend: {
         position: 'top' as const,
-        labels: {
-          font: { size: 11 },
-          usePointStyle: true,
-        },
+        labels: { font: { size: 11 }, usePointStyle: true },
       },
       tooltip: {
         callbacks: {
           afterBody: (tooltipItems: any[]) => {
-            const created = tooltipItems.find((i: any) => i.dataset.label?.includes('Carico'));
-            const completed = tooltipItems.find((i: any) => i.dataset.label?.includes('Studio'));
+            const created = tooltipItems.find((i: any) =>
+              i.dataset.label?.includes('Carico'));
+            const completed = tooltipItems.find((i: any) =>
+              i.dataset.label?.includes('Studio'));
             if (created && completed && created.parsed.y != null && completed.parsed.y != null) {
               const backlog = Math.round(created.parsed.y - completed.parsed.y);
               return `\n📊 Backlog: ${backlog} task`;
@@ -464,46 +637,69 @@ export function WorkloadFlowChart() {
           },
         },
       },
-      annotation: {
-        annotations,
-      },
+      annotation: { annotations },
     },
     scales: {
       y: {
         beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Task cumulativi',
-          font: { size: 11 },
-        },
+        title: { display: true, text: 'Task cumulativi', font: { size: 11 } },
         grid: { color: 'rgba(0,0,0,0.05)' },
       },
       x: {
-        title: {
-          display: true,
-          text: 'Settimana (inizio)',
-          font: { size: 11 },
-        },
+        title: { display: true, text: 'Settimana (inizio)', font: { size: 11 } },
         grid: { display: false },
       },
     },
   };
 
+  // ─── Catch-up date for semester view ───
+  const semesterCatchUpDate = analysis.semesterView?.intersectionIndex !== null && analysis.semesterView
+    ? (() => {
+      const idx = analysis.semesterView.intersectionIndex!;
+      const numActual = analysis.semesterView.cumulativeCreated.length;
+      const projIdx = idx - numActual + 1;
+      if (projIdx >= 0 && projIdx < analysis.semesterView.allLabels.length) {
+        return analysis.semesterView.allLabels[idx];
+      }
+      return null;
+    })()
+    : null;
+
   return (
     <GlassPanel className="dashboard-chart-panel">
-      {/* Header */}
-      <div className="workload-flow-header">
-        <Activity size={20} />
-        <h3 className="dashboard-label">FLUSSO CARICO vs STUDIO</h3>
+      {/* Header with view toggle */}
+      <div className="workload-flow-header" style={{ justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Activity size={20} />
+          <h3 className="dashboard-label" style={{ margin: 0 }}>FLUSSO CARICO vs STUDIO</h3>
+        </div>
+
+        {hasSemesterView && (
+          <div className="workload-flow-view-toggle">
+            <button
+              className={`workload-flow-view-btn ${viewMode === 'short' ? 'active' : ''}`}
+              onClick={() => setViewMode('short')}
+              title="Vista breve: proiezione a 8 settimane"
+            >
+              <ZoomIn size={14} />
+              Breve
+            </button>
+            <button
+              className={`workload-flow-view-btn ${viewMode === 'semester' ? 'active' : ''}`}
+              onClick={() => setViewMode('semester')}
+              title="Vista semestre: fino a fine lezioni e catch-up"
+            >
+              <ZoomOut size={14} />
+              Semestre
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Status Banner */}
       <div
         className="workload-flow-status"
-        style={{
-          borderLeft: `4px solid ${statusColor}`,
-          background: statusBg,
-        }}
+        style={{ borderLeft: `4px solid ${statusColor}`, background: statusBg }}
       >
         <div className="workload-flow-status-main">
           <StatusIcon size={20} style={{ color: statusColor, flexShrink: 0 }} />
@@ -515,7 +711,6 @@ export function WorkloadFlowChart() {
           </div>
         </div>
 
-        {/* Metrics chips */}
         <div className="workload-flow-metrics">
           <div className="workload-flow-metric-chip">
             <span className="workload-flow-metric-value" style={{ color: 'rgba(239, 68, 68, 1)' }}>
@@ -535,7 +730,7 @@ export function WorkloadFlowChart() {
             </span>
             <span className="workload-flow-metric-label">Velocità netta</span>
           </div>
-          {analysis.flowAnalysis.estimatedCatchUpWeek && (
+          {analysis.flowAnalysis.estimatedCatchUpWeek && viewMode === 'short' && (
             <div className="workload-flow-metric-chip">
               <Crosshair size={14} style={{ color: 'rgba(124, 58, 237, 1)' }} />
               <span className="workload-flow-metric-label">
@@ -543,31 +738,63 @@ export function WorkloadFlowChart() {
               </span>
             </div>
           )}
+          {analysis.lastLessonDate && (
+            <div className="workload-flow-metric-chip">
+              <Calendar size={14} style={{ color: 'rgba(245, 158, 11, 1)' }} />
+              <span className="workload-flow-metric-label">
+                Fine lezioni: <strong>{formatLongDate(analysis.lastLessonDate)}</strong>
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Semester-specific info */}
+      {viewMode === 'semester' && activeView.lessonsEndLabel && (
+        <div style={{
+          padding: '10px 14px',
+          marginBottom: '16px',
+          borderRadius: '8px',
+          background: 'rgba(245, 158, 11, 0.06)',
+          border: '1px solid rgba(245, 158, 11, 0.2)',
+          fontSize: '0.85rem',
+          color: 'var(--text-secondary)',
+        }}>
+          📚 Dopo <strong>{activeView.lessonsEndLabel}</strong> non verranno più aggiunte lezioni → la linea rossa diventa <strong>piatta</strong>.
+          {activeView.intersectionIndex !== null
+            ? <> La linea verde la raggiungerà — sarai a pari! 🎯</>
+            : <> Continua a completare task per raggiungere la parità.</>
+          }
+        </div>
+      )}
+
       {/* Chart */}
-      <div className="dashboard-chart" style={{ height: '320px' }}>
+      <div className="dashboard-chart" style={{ height: viewMode === 'semester' ? '380px' : '320px' }}>
         <Line data={chartData} options={chartOptions} />
       </div>
 
-      {/* Legend explanation */}
+      {/* Legend */}
       <div className="workload-flow-legend">
         <div className="workload-flow-legend-item">
           <span className="workload-flow-legend-line" style={{ backgroundColor: 'rgba(239, 68, 68, 1)' }} />
-          <span><strong>Linea rossa</strong> — Carico cumulato: quanti task sono stati <em>aggiunti</em> nel tempo</span>
+          <span><strong>Linea rossa</strong> — Task aggiunti cumulativi{viewMode === 'semester' ? ' (piatta dopo fine lezioni)' : ''}</span>
         </div>
         <div className="workload-flow-legend-item">
           <span className="workload-flow-legend-line" style={{ backgroundColor: 'rgba(16, 185, 129, 1)' }} />
-          <span><strong>Linea verde</strong> — Studio cumulato: quanti task sono stati <em>completati</em> nel tempo</span>
+          <span><strong>Linea verde</strong> — Task completati cumulativi</span>
         </div>
         <div className="workload-flow-legend-item">
           <span className="workload-flow-legend-line" style={{ backgroundColor: 'rgba(0,0,0,0.15)', height: '2px', borderTop: '2px dashed rgba(0,0,0,0.3)' }} />
-          <span><strong>Linee tratteggiate</strong> — Proiezione futura basata sulla regressione lineare</span>
+          <span><strong>Tratteggiate</strong> — Proiezione futura{viewMode === 'semester' ? ' (basata su lezioni reali nel calendario)' : ' (regressione lineare)'}</span>
         </div>
+        {viewMode === 'semester' && (
+          <div className="workload-flow-legend-item">
+            <span className="workload-flow-legend-line" style={{ backgroundColor: 'rgba(245, 158, 11, 0.7)' }} />
+            <span><strong>Linea arancione</strong> — Fine lezioni: da qui la linea rossa diventa piatta</span>
+          </div>
+        )}
         <div className="workload-flow-legend-item" style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem', marginTop: '4px' }}>
-          La distanza verticale tra le due linee rappresenta il <strong>backlog</strong> (task arretrati).
-          Quando le linee si incrociano = hai raggiunto la parità.
+          La distanza verticale = <strong>backlog</strong>. Incrocio = parità raggiunta.
         </div>
       </div>
     </GlassPanel>
