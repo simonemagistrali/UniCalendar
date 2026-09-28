@@ -30,20 +30,43 @@ ChartJS.register(
 
 /* ─── Helpers ─── */
 
-/** Get the Monday of the week for a given date (ISO week) */
+/**
+ * Get the Monday of the week for a given date (ISO week).
+ * Uses pure string arithmetic to avoid any timezone issues.
+ */
 function getWeekStart(date: Date): string {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString().split('T')[0];
+  // Work entirely in UTC to avoid timezone shifts
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay(); // 0=Sunday, 1=Monday, ...
+  const diff = day === 0 ? -6 : 1 - day; // Shift to Monday
+  d.setUTCDate(d.getUTCDate() + diff);
+  // Return YYYY-MM-DD from UTC
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
-/** Format a week start date to a readable label */
+/** Format a YYYY-MM-DD week start date to a readable label */
 function formatWeekLabel(weekStart: string): string {
-  const d = new Date(weekStart + 'T00:00:00');
-  return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+  // Parse as UTC to avoid shifts
+  const parts = weekStart.split('-');
+  const d = new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2]));
+  return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+/**
+ * Add N weeks to a YYYY-MM-DD string, returns YYYY-MM-DD.
+ * Timezone-safe.
+ */
+function addWeeks(dateStr: string, weeks: number): string {
+  const parts = dateStr.split('-');
+  const d = new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2]));
+  d.setUTCDate(d.getUTCDate() + weeks * 7);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 /**
@@ -52,7 +75,7 @@ function formatWeekLabel(weekStart: string): string {
  */
 function linearRegression(points: { x: number; y: number }[]): { m: number; b: number } {
   const n = points.length;
-  if (n < 2) return { m: 0, b: 0 };
+  if (n < 2) return { m: 0, b: points.length === 1 ? points[0].y : 0 };
 
   let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
   for (const p of points) {
@@ -82,36 +105,36 @@ interface FlowAnalysis {
   netVelocity: number; // positive = catching up
 }
 
+const NO_DATA_RESULT = {
+  weekLabels: [] as string[],
+  cumulativeCreated: [] as number[],
+  cumulativeCompleted: [] as number[],
+  projectedCreated: [] as (number | null)[],
+  projectedCompleted: [] as (number | null)[],
+  allLabels: [] as string[],
+  flowAnalysis: {
+    status: 'no_data',
+    message: 'Nessun dato disponibile',
+    detail: 'Aggiungi e completa task per iniziare a vedere le statistiche.',
+    estimatedCatchUpWeek: null,
+    currentBacklog: 0,
+    avgCreatedPerWeek: 0,
+    avgCompletedPerWeek: 0,
+    netVelocity: 0,
+  } as FlowAnalysis,
+  intersectionIndex: null as number | null,
+};
+
 export function WorkloadFlowChart() {
   const tasks = useAppStore(s => s.tasks);
 
   const analysis = useMemo(() => {
-    // Collect all tasks with createdAt timestamp
-    const allTasks = tasks.filter(t => t.createdAt);
+    // Collect all tasks with createdAt timestamp (exclude phantom/predicted tasks)
+    const allTasks = tasks.filter(t => t.createdAt && !t.isPhantom);
 
-    if (allTasks.length === 0) {
-      return {
-        weekLabels: [] as string[],
-        cumulativeCreated: [] as number[],
-        cumulativeCompleted: [] as number[],
-        projectedCreated: [] as (number | null)[],
-        projectedCompleted: [] as (number | null)[],
-        allLabels: [] as string[],
-        flowAnalysis: {
-          status: 'no_data',
-          message: 'Nessun dato disponibile',
-          detail: 'Aggiungi e completa task per iniziare a vedere le statistiche.',
-          estimatedCatchUpWeek: null,
-          currentBacklog: 0,
-          avgCreatedPerWeek: 0,
-          avgCompletedPerWeek: 0,
-          netVelocity: 0,
-        } as FlowAnalysis,
-        intersectionIndex: null as number | null,
-      };
-    }
+    if (allTasks.length === 0) return NO_DATA_RESULT;
 
-    // Build per-week created/completed counts
+    // ─── Build per-week created/completed counts ───
     const weekMap = new Map<string, { created: number; completed: number }>();
 
     for (const t of allTasks) {
@@ -126,43 +149,23 @@ export function WorkloadFlowChart() {
       }
     }
 
-    // Sort weeks chronologically and fill gaps
+    // Sort weeks chronologically
     const sortedWeeks = Array.from(weekMap.keys()).sort();
-    if (sortedWeeks.length === 0) {
-      return {
-        weekLabels: [],
-        cumulativeCreated: [],
-        cumulativeCompleted: [],
-        projectedCreated: [] as (number | null)[],
-        projectedCompleted: [] as (number | null)[],
-        allLabels: [],
-        flowAnalysis: {
-          status: 'no_data',
-          message: 'Nessun dato disponibile',
-          detail: 'Aggiungi e completa task per iniziare a vedere le statistiche.',
-          estimatedCatchUpWeek: null,
-          currentBacklog: 0,
-          avgCreatedPerWeek: 0,
-          avgCompletedPerWeek: 0,
-          netVelocity: 0,
-        } as FlowAnalysis,
-        intersectionIndex: null,
-      };
-    }
+    if (sortedWeeks.length === 0) return NO_DATA_RESULT;
 
-    // Fill in any missing weeks between first and last
+    // Fill in any missing weeks between first and last (timezone-safe)
     const filledWeeks: string[] = [];
-    const firstWeek = new Date(sortedWeeks[0] + 'T00:00:00');
-    const lastWeek = new Date(sortedWeeks[sortedWeeks.length - 1] + 'T00:00:00');
-    const cursor = new Date(firstWeek);
-    while (cursor <= lastWeek) {
-      const weekKey = cursor.toISOString().split('T')[0];
-      filledWeeks.push(weekKey);
-      if (!weekMap.has(weekKey)) weekMap.set(weekKey, { created: 0, completed: 0 });
-      cursor.setDate(cursor.getDate() + 7);
+    const firstWeekStr = sortedWeeks[0];
+    const lastWeekStr = sortedWeeks[sortedWeeks.length - 1];
+
+    let cursorStr = firstWeekStr;
+    while (cursorStr <= lastWeekStr) {
+      filledWeeks.push(cursorStr);
+      if (!weekMap.has(cursorStr)) weekMap.set(cursorStr, { created: 0, completed: 0 });
+      cursorStr = addWeeks(cursorStr, 1);
     }
 
-    // Compute cumulative sums
+    // ─── Compute cumulative sums ───
     const cumulativeCreated: number[] = [];
     const cumulativeCompleted: number[] = [];
     let totalCreated = 0;
@@ -182,19 +185,20 @@ export function WorkloadFlowChart() {
     const currentBacklog = totalCreated - totalCompleted;
     const numWeeks = filledWeeks.length;
 
-    // Calculate average rates (use last 4 weeks if available for recent trend)
-    const recentWindow = Math.min(4, numWeeks);
-    const recentCreated = numWeeks >= 2
-      ? (cumulativeCreated[numWeeks - 1] - cumulativeCreated[numWeeks - 1 - recentWindow]) / recentWindow
-      : totalCreated / Math.max(1, numWeeks);
-    const recentCompleted = numWeeks >= 2
-      ? (cumulativeCompleted[numWeeks - 1] - cumulativeCompleted[numWeeks - 1 - recentWindow]) / recentWindow
-      : totalCompleted / Math.max(1, numWeeks);
+    // Calculate average rates (use last 4 data-bearing weeks if available)
+    // FIX: ensure lookback index never goes negative
+    const recentWindow = Math.min(4, numWeeks - 1);
+    const lookbackIndex = Math.max(0, numWeeks - 1 - recentWindow);
+    const recentCreated = recentWindow > 0
+      ? (cumulativeCreated[numWeeks - 1] - cumulativeCreated[lookbackIndex]) / recentWindow
+      : totalCreated;
+    const recentCompleted = recentWindow > 0
+      ? (cumulativeCompleted[numWeeks - 1] - cumulativeCompleted[lookbackIndex]) / recentWindow
+      : totalCompleted;
 
     const netVelocity = recentCompleted - recentCreated; // positive = reducing backlog
 
     // ─── Linear Regression for Projection ───
-    // Use last 6 weeks (or all available) for regression
     const regressionWindow = Math.min(6, numWeeks);
     const regressionStart = numWeeks - regressionWindow;
 
@@ -214,7 +218,7 @@ export function WorkloadFlowChart() {
     const projectedCompleted: (number | null)[] = new Array(numWeeks).fill(null);
     const projectedLabels: string[] = [];
 
-    // Start projection from last data point
+    // Bridge: connect projection to last actual data point
     projectedCreated[numWeeks - 1] = cumulativeCreated[numWeeks - 1];
     projectedCompleted[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
 
@@ -229,27 +233,27 @@ export function WorkloadFlowChart() {
       projectedCreated.push(projCreated);
       projectedCompleted.push(projCompleted);
 
-      // Generate future week label
-      const futureDate = new Date(lastWeek);
-      futureDate.setDate(futureDate.getDate() + i * 7);
-      projectedLabels.push(formatWeekLabel(futureDate.toISOString().split('T')[0]));
+      // Generate future week label (timezone-safe)
+      const futureWeekStr = addWeeks(lastWeekStr, i);
+      projectedLabels.push(formatWeekLabel(futureWeekStr));
 
-      // Detect intersection
+      // Detect intersection (completed catches up to created)
       if (intersectionIndex === null && projCompleted >= projCreated && currentBacklog > 0) {
         intersectionIndex = numWeeks - 1 + i;
-        const futureWeekDate = new Date(lastWeek);
-        futureWeekDate.setDate(futureWeekDate.getDate() + i * 7);
-        estimatedCatchUpWeek = futureWeekDate.toLocaleDateString('it-IT', {
+        const parts = futureWeekStr.split('-');
+        const d = new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2]));
+        estimatedCatchUpWeek = d.toLocaleDateString('it-IT', {
           day: 'numeric',
           month: 'long',
           year: 'numeric',
+          timeZone: 'UTC',
         });
       }
     }
 
     const allLabels = [...weekLabels, ...projectedLabels];
 
-    // Determine status
+    // ─── Determine status ───
     let flowAnalysis: FlowAnalysis;
     if (currentBacklog <= 0) {
       flowAnalysis = {
@@ -324,10 +328,16 @@ export function WorkloadFlowChart() {
   }
 
   const statusColor =
-    analysis.flowAnalysis.status === 'caught_up' ? 'var(--accent-success)' :
+    analysis.flowAnalysis.status === 'caught_up' ? 'rgba(16, 185, 129, 1)' :
     analysis.flowAnalysis.status === 'catching_up' ? 'rgba(16, 185, 129, 1)' :
-    analysis.flowAnalysis.status === 'falling_behind' ? 'var(--accent-danger)' :
-    'var(--accent-warning)';
+    analysis.flowAnalysis.status === 'falling_behind' ? 'rgba(220, 53, 69, 1)' :
+    'rgba(245, 158, 11, 1)';
+
+  const statusBg =
+    analysis.flowAnalysis.status === 'caught_up' ? 'rgba(16, 185, 129, 0.08)' :
+    analysis.flowAnalysis.status === 'catching_up' ? 'rgba(16, 185, 129, 0.08)' :
+    analysis.flowAnalysis.status === 'falling_behind' ? 'rgba(220, 53, 69, 0.08)' :
+    'rgba(245, 158, 11, 0.08)';
 
   const StatusIcon =
     analysis.flowAnalysis.status === 'catching_up' || analysis.flowAnalysis.status === 'caught_up' ? TrendingUp :
@@ -335,15 +345,17 @@ export function WorkloadFlowChart() {
     Equal;
 
   // ─── Chart Data ───
+  const totalPoints = analysis.allLabels.length;
+
   const chartData = {
     labels: analysis.allLabels,
     datasets: [
-      // Actual Created (solid)
+      // Actual Created (solid red)
       {
         label: 'Carico cumulato (task aggiunti)',
         data: [
           ...analysis.cumulativeCreated,
-          ...new Array(analysis.allLabels.length - analysis.cumulativeCreated.length).fill(null),
+          ...new Array(totalPoints - analysis.cumulativeCreated.length).fill(null),
         ],
         borderColor: 'rgba(239, 68, 68, 1)',
         backgroundColor: 'rgba(239, 68, 68, 0.08)',
@@ -356,12 +368,12 @@ export function WorkloadFlowChart() {
         pointBorderWidth: 1.5,
         pointHoverRadius: 6,
       },
-      // Actual Completed (solid)
+      // Actual Completed (solid green)
       {
         label: 'Studio cumulato (task completati)',
         data: [
           ...analysis.cumulativeCompleted,
-          ...new Array(analysis.allLabels.length - analysis.cumulativeCompleted.length).fill(null),
+          ...new Array(totalPoints - analysis.cumulativeCompleted.length).fill(null),
         ],
         borderColor: 'rgba(16, 185, 129, 1)',
         backgroundColor: 'rgba(16, 185, 129, 0.08)',
@@ -374,7 +386,7 @@ export function WorkloadFlowChart() {
         pointBorderWidth: 1.5,
         pointHoverRadius: 6,
       },
-      // Projected Created (dashed)
+      // Projected Created (dashed red)
       {
         label: 'Proiezione carico',
         data: analysis.projectedCreated,
@@ -386,7 +398,7 @@ export function WorkloadFlowChart() {
         pointRadius: 0,
         pointHoverRadius: 3,
       },
-      // Projected Completed (dashed)
+      // Projected Completed (dashed green)
       {
         label: 'Proiezione studio',
         data: analysis.projectedCompleted,
@@ -424,31 +436,6 @@ export function WorkloadFlowChart() {
     };
   }
 
-  // Add a shaded area between the two actual lines (backlog area)
-  const chartDataWithFill = {
-    ...chartData,
-    datasets: [
-      ...chartData.datasets,
-      // Backlog fill area (between created and completed)
-      {
-        label: 'Backlog (differenza)',
-        data: analysis.cumulativeCreated.map((val, i) => val),
-        borderColor: 'transparent',
-        backgroundColor: 'rgba(239, 68, 68, 0.06)',
-        borderWidth: 0,
-        tension: 0.3,
-        fill: {
-          target: '+1', // won't work perfectly but we handle it via tooltip
-          above: 'rgba(239, 68, 68, 0.06)',
-        },
-        pointRadius: 0,
-        pointHoverRadius: 0,
-        // Hide from legend
-        hidden: true,
-      } as any,
-    ],
-  };
-
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -462,14 +449,13 @@ export function WorkloadFlowChart() {
         labels: {
           font: { size: 11 },
           usePointStyle: true,
-          filter: (item: any) => !item.text.includes('Backlog'),
         },
       },
       tooltip: {
         callbacks: {
           afterBody: (tooltipItems: any[]) => {
-            const created = tooltipItems.find(i => i.dataset.label?.includes('Carico'));
-            const completed = tooltipItems.find(i => i.dataset.label?.includes('Studio'));
+            const created = tooltipItems.find((i: any) => i.dataset.label?.includes('Carico'));
+            const completed = tooltipItems.find((i: any) => i.dataset.label?.includes('Studio'));
             if (created && completed && created.parsed.y != null && completed.parsed.y != null) {
               const backlog = Math.round(created.parsed.y - completed.parsed.y);
               return `\n📊 Backlog: ${backlog} task`;
@@ -516,7 +502,7 @@ export function WorkloadFlowChart() {
         className="workload-flow-status"
         style={{
           borderLeft: `4px solid ${statusColor}`,
-          background: `${statusColor}10`,
+          background: statusBg,
         }}
       >
         <div className="workload-flow-status-main">
@@ -551,7 +537,7 @@ export function WorkloadFlowChart() {
           </div>
           {analysis.flowAnalysis.estimatedCatchUpWeek && (
             <div className="workload-flow-metric-chip">
-              <Crosshair size={14} style={{ color: 'var(--accent-primary)' }} />
+              <Crosshair size={14} style={{ color: 'rgba(124, 58, 237, 1)' }} />
               <span className="workload-flow-metric-label">
                 A pari: <strong>{analysis.flowAnalysis.estimatedCatchUpWeek}</strong>
               </span>
@@ -562,7 +548,7 @@ export function WorkloadFlowChart() {
 
       {/* Chart */}
       <div className="dashboard-chart" style={{ height: '320px' }}>
-        <Line data={chartDataWithFill} options={chartOptions} />
+        <Line data={chartData} options={chartOptions} />
       </div>
 
       {/* Legend explanation */}
