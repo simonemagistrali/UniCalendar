@@ -19,7 +19,10 @@ const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6:00 - 21:00
 export function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    return (localStorage.getItem('calendarView') as ViewMode) || 'month';
+    const saved = localStorage.getItem('calendarView') as ViewMode;
+    if (saved) return saved;
+    // Default to 'week' on mobile for better usability
+    return window.innerWidth <= 768 ? 'week' : 'month';
   });
   
   const [showTasks, setShowTasks] = useState(() => {

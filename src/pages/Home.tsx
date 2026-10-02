@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2, TrendingUp } from "lucide-react";
+import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2, TrendingUp, MoreHorizontal, CheckSquare, BarChart3 } from "lucide-react";
 
 import { Calendar } from '../components/features/calendar/Calendar';
 
@@ -166,6 +166,54 @@ export function Home() {
           )}
         </div>
       </main>
+
+      {/* ═══ Mobile Bottom Navigation Bar ═══ */}
+      <nav className="mobile-bottom-nav">
+        <button
+          className={`mobile-nav-item ${activeTab === 'calendar' ? 'active' : ''}`}
+          onClick={() => setActiveTab('calendar')}
+        >
+          <span className="mobile-nav-icon"><CalendarIcon size={22} /></span>
+          <span>Calendario</span>
+        </button>
+        <button
+          className={`mobile-nav-item ${activeTab === 'tasks' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tasks')}
+        >
+          <span className="mobile-nav-icon"><CheckSquare size={22} /></span>
+          <span>Attività</span>
+        </button>
+        <button
+          className={`mobile-nav-item ${activeTab === 'statistics' ? 'active' : ''}`}
+          onClick={() => setActiveTab('statistics')}
+        >
+          <span className="mobile-nav-icon"><BarChart3 size={22} /></span>
+          <span>Statistiche</span>
+        </button>
+        <button
+          className={`mobile-nav-item ${activeTab === 'anki' ? 'active' : ''}`}
+          onClick={() => setActiveTab('anki')}
+        >
+          <span className="mobile-nav-icon"><TrendingUp size={22} /></span>
+          <span>Anki</span>
+        </button>
+        <button
+          className="mobile-nav-item"
+          onClick={() => setSidebarOpen(true)}
+        >
+          <span className="mobile-nav-icon"><MoreHorizontal size={22} /></span>
+          <span>Altro</span>
+        </button>
+      </nav>
+
+      {/* ═══ Mobile FAB (Floating Action Button) ═══ */}
+      <button
+        className="mobile-fab"
+        onClick={() => setIsEventModalOpen(true)}
+        aria-label="Crea Evento"
+      >
+        <Plus size={28} />
+      </button>
 
       {/* Modals */}
       <EventFormModal isOpen={isEventModalOpen} onClose={() => setIsEventModalOpen(false)} />

@@ -424,10 +424,288 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   }
   .main-content {
     padding-top: 72px !important;
+    padding-bottom: 80px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
   }
   .calendar-sidebar {
     display: none;
   }
+
+  /* ─── Bottom Navigation Bar ─── */
+  .mobile-bottom-nav {
+    display: flex !important;
+  }
+
+  /* ─── FAB ─── */
+  .mobile-fab {
+    display: flex !important;
+  }
+
+  /* ─── Modal Full-Screen on Mobile ─── */
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modal-container {
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    height: 100vh;
+    border-radius: 0 !important;
+    padding: 16px !important;
+    animation: modal-slide-up 0.3s ease !important;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-header {
+    position: sticky;
+    top: 0;
+    background: var(--bg-surface);
+    z-index: 5;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+  }
+  .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 24px;
+  }
+
+  /* ─── Touch Targets ─── */
+  .btn {
+    min-height: 44px;
+    padding: 0 20px;
+    font-size: 0.95rem;
+  }
+  .sidebar-nav-item {
+    min-height: 48px;
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+  .task-action-btn {
+    min-height: 44px;
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  .task-filter-btn {
+    min-height: 40px;
+    padding: 8px 14px;
+  }
+  .form-field input,
+  .form-field select {
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
+  .form-checkbox {
+    min-height: 44px;
+    padding: 4px 0;
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  .form-row-3 {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* ─── Settings Mobile ─── */
+  .settings-page {
+    padding: 16px 12px;
+    padding-bottom: 80px;
+  }
+  .settings-title {
+    font-size: 22px;
+  }
+  .settings-day-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+  }
+  .settings-day-toggle {
+    width: 100%;
+    text-align: center;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .settings-day-times {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  .settings-time-input {
+    min-height: 44px;
+    padding: 8px 12px !important;
+    font-size: 16px !important;
+    flex: 1;
+  }
+  .settings-number-input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .settings-text-input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .settings-inline-field {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .settings-save-row {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-primary);
+    padding: 12px 0;
+    border-top: 1px solid var(--border-color);
+    z-index: 5;
+  }
+  .settings-save-btn {
+    width: 100% !important;
+  }
+
+  /* ─── Task Panel Mobile ─── */
+  .task-list {
+    max-height: calc(100vh - 280px);
+  }
+  .task-card {
+    padding: 14px 16px;
+  }
+  .task-title {
+    font-size: 14px;
+  }
+  .task-card-meta {
+    font-size: 12px;
+  }
+
+  /* ─── Stats / Dashboard Mobile ─── */
+  .dashboard-quick-stats {
+    flex-wrap: wrap;
+  }
+  .catchup-courses-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ─── Course Manager Mobile ─── */
+  .course-form-row {
+    flex-direction: column;
+  }
+  .course-form-field input,
+  .course-form-field select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  /* ─── Import Modal Mobile ─── */
+  .import-url-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .import-url-btn {
+    width: 100%;
+  }
+
+  /* ─── Main Header Mobile ─── */
+  .main-header {
+    flex-wrap: wrap;
+  }
+  .main-title {
+    font-size: 18px;
+  }
+}
+
+/* ─── Bottom Navigation Bar (hidden by default, shown on mobile) ─── */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
+  z-index: 25;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 8px;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  font-family: var(--font-display);
+  transition: color 0.2s;
+  border-radius: 8px;
+  min-width: 56px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-nav-item.active {
+  color: var(--accent-primary);
+}
+
+.mobile-nav-item.active .mobile-nav-icon {
+  background: var(--accent-secondary);
+  border-radius: 16px;
+  padding: 4px 16px;
+}
+
+.mobile-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 16px;
+  border-radius: 16px;
+  transition: all 0.25s ease;
+}
+
+/* ─── FAB (hidden by default, shown on mobile) ─── */
+.mobile-fab {
+  display: none;
+  position: fixed;
+  bottom: 84px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--accent-primary);
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  z-index: 26;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-fab:active {
+  transform: scale(0.92);
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.3);
+}
+
+/* ─── Modal slide-up animation for mobile ─── */
+@keyframes modal-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
 
 /* ─── Main Content ─── */
