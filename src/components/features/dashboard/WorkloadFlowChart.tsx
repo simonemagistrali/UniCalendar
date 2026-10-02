@@ -143,6 +143,7 @@ const NO_DATA_RESULT = {
   semesterView: null as ChartViewData | null,
   lastLessonDate: null as string | null,
   futureTasksPerWeek: 0,
+  daysUntilLastLesson: null as number | null,
 };
 
 export function WorkloadFlowChart() {
@@ -237,6 +238,7 @@ export function WorkloadFlowChart() {
     // Find the last lesson date
     let lastLessonDate: string | null = null;
     let lastLessonWeek: string | null = null;
+    let daysUntilLastLesson: number | null = null;
     if (futureLessons.length > 0) {
       const sortedFuture = futureLessons.sort((a, b) =>
         new Date(b.endTime).getTime() - new Date(a.endTime).getTime()
@@ -249,6 +251,7 @@ export function WorkloadFlowChart() {
         )
       ));
       lastLessonWeek = getWeekStart(new Date(sortedFuture[0].endTime));
+      daysUntilLastLesson = Math.max(1, Math.ceil((new Date(sortedFuture[0].endTime).getTime() - now.getTime()) / 86400000));
     }
 
     // Estimate how many tasks each future lesson generates
@@ -474,6 +477,7 @@ export function WorkloadFlowChart() {
       semesterView,
       lastLessonDate,
       futureTasksPerWeek: Math.round(avgFutureTasksPerWeek * 10) / 10,
+      daysUntilLastLesson,
     };
   }, [tasks, events, courses]);
 
@@ -768,6 +772,30 @@ export function WorkloadFlowChart() {
             ? <> La linea verde la raggiungerà — sarai a pari! 🎯</>
             : <> Continua a completare task per raggiungere la parità.</>
           }
+        </div>
+      )}
+
+      {/* Obiettivi Giornalieri */}
+      {analysis.flowAnalysis.status !== 'no_data' && (
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px'
+        }}>
+          <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(16, 185, 129, 1)' }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Stare al passo (rette parallele)</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{Math.max(0, Math.ceil(analysis.flowAnalysis.avgCreatedPerWeek / 7))} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span></div>
+          </div>
+          
+          <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(245, 158, 11, 1)' }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Recuperare entro 7 giorni</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{Math.max(0, Math.ceil((analysis.flowAnalysis.avgCreatedPerWeek / 7) + (analysis.flowAnalysis.currentBacklog / 7)))} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span></div>
+          </div>
+          
+          {analysis.daysUntilLastLesson && analysis.daysUntilLastLesson > 0 && (
+            <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(124, 58, 237, 1)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Essere in pari a fine corsi</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{Math.max(0, Math.ceil((analysis.futureTasksPerWeek / 7) + (analysis.flowAnalysis.currentBacklog / analysis.daysUntilLastLesson)))} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span></div>
+            </div>
+          )}
         </div>
       )}
 

@@ -15,6 +15,7 @@ Le funzionalità principali includono:
 - **🔄 Sincronizzazione con Google Calendar:** Collega il tuo account Google per avere tutti i tuoi impegni (personali e universitari) sincronizzati in un unico posto bidirezionalmente.
 - **🚶‍♂️ Ottimizzazione dei Tempi di Spostamento:** Calcola automaticamente e tiene conto dei tempi di viaggio tra diverse sedi o aule, assicurandoti di non arrivare mai in ritardo e pianificando pause realistiche.
 - **📚 Pianificazione Intelligente dello Studio:** Gestisci i task e assegnali direttamente agli slot vuoti del calendario. L'app ti aiuta a trovare il tempo migliore per studiare.
+- **📊 Analisi Avanzata del Carico di Lavoro:** Monitora il flusso di studio e scopri quanti task al giorno devi completare per restare al passo, recuperare il backlog o metterti in pari entro la fine dei corsi.
 - **🔁 Gestione Recupero Lezioni:** Se salti una lezione o un professore sposta un corso, puoi gestire facilmente la riprogrammazione come "task" specifico da recuperare.
 - **🏖️ Focus Fine Settimana:** Una vista dedicata per gestire e visualizzare in modo chiaro i task e gli impegni del weekend, separandoli dal flusso feriale.
 
