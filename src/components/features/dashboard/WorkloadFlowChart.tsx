@@ -14,7 +14,7 @@ import annotationPlugin from 'chartjs-plugin-annotation';
 import { Line } from 'react-chartjs-2';
 import { GlassPanel } from '../../ui/GlassPanel';
 import { useAppStore } from '../../../store/useAppStore';
-import { Activity, TrendingUp, TrendingDown, Equal, Crosshair, ZoomIn, ZoomOut, Calendar, Info } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, Equal, Crosshair, ZoomIn, ZoomOut, Calendar, Info, Eye, EyeOff } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 
 ChartJS.register(
@@ -121,6 +121,9 @@ interface ChartViewData {
   cumulativeCompleted: number[];
   projectedCreated: (number | null)[];
   projectedCompleted: (number | null)[];
+  simPace: (number | null)[];
+  sim7Days: (number | null)[];
+  simEnd: (number | null)[];
   intersectionIndex: number | null;
   estimatedCatchUpLabel: string | null;
   lessonsEndIndex: number | null;
@@ -154,6 +157,9 @@ export function WorkloadFlowChart() {
   const courses = useAppStore(s => s.courses);
   const [viewMode, setViewMode] = useState<ViewMode>('short');
   const [infoPopup, setInfoPopup] = useState<{ title: string; formula: string; calc: string } | null>(null);
+  const [showSimPace, setShowSimPace] = useState(false);
+  const [showSim7Days, setShowSim7Days] = useState(false);
+  const [showSimEnd, setShowSimEnd] = useState(false);
 
   const analysis = useMemo(() => {
     // Collect all real tasks (exclude phantom/predicted)
@@ -337,16 +343,30 @@ export function WorkloadFlowChart() {
       };
     }
 
+    // ─── RATES FOR SIMULATION ───
+    const avgCreatedPerWeek = Math.round(recentCreated * 10) / 10;
+    const ratePace = Math.max(0, Math.ceil(avgCreatedPerWeek / 7));
+    const rate7Days = Math.max(0, Math.ceil((avgCreatedPerWeek / 7) + (currentBacklog / 7)));
+    const rateEnd = daysUntilLastLesson && daysUntilLastLesson > 0 
+      ? Math.max(0, Math.ceil((totalFutureTasks + currentBacklog) / daysUntilLastLesson))
+      : 0;
+
     // ═══════════════════════════════════════════════════
     // ─── SHORT VIEW (current: 8-week regression) ───
     // ═══════════════════════════════════════════════════
     const shortMaxWeeks = 8;
     const shortProjCreated: (number | null)[] = new Array(numWeeks).fill(null);
     const shortProjCompleted: (number | null)[] = new Array(numWeeks).fill(null);
+    const shortSimPace: (number | null)[] = new Array(numWeeks).fill(null);
+    const shortSim7Days: (number | null)[] = new Array(numWeeks).fill(null);
+    const shortSimEnd: (number | null)[] = new Array(numWeeks).fill(null);
     const shortProjLabels: string[] = [];
 
     shortProjCreated[numWeeks - 1] = cumulativeCreated[numWeeks - 1];
     shortProjCompleted[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
+    shortSimPace[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
+    shortSim7Days[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
+    shortSimEnd[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
 
     let shortIntersection: number | null = null;
     let shortCatchUpLabel: string | null = null;
@@ -369,6 +389,9 @@ export function WorkloadFlowChart() {
 
       shortProjCreated.push(projCreated);
       shortProjCompleted.push(projCompleted);
+      shortSimPace.push(cumulativeCompleted[numWeeks - 1] + i * ratePace * 7);
+      shortSim7Days.push(cumulativeCompleted[numWeeks - 1] + i * rate7Days * 7);
+      shortSimEnd.push(cumulativeCompleted[numWeeks - 1] + i * rateEnd * 7);
 
       const futureWeekStr = addWeeks(lastWeekStr, i);
       shortProjLabels.push(formatWeekLabel(futureWeekStr));
@@ -384,6 +407,9 @@ export function WorkloadFlowChart() {
       cumulativeCompleted,
       projectedCreated: shortProjCreated,
       projectedCompleted: shortProjCompleted,
+      simPace: shortSimPace,
+      sim7Days: shortSim7Days,
+      simEnd: shortSimEnd,
       intersectionIndex: shortIntersection,
       estimatedCatchUpLabel: shortCatchUpLabel,
       lessonsEndIndex: null,
@@ -403,10 +429,16 @@ export function WorkloadFlowChart() {
 
       const semProjCreated: (number | null)[] = new Array(numWeeks).fill(null);
       const semProjCompleted: (number | null)[] = new Array(numWeeks).fill(null);
+      const semSimPace: (number | null)[] = new Array(numWeeks).fill(null);
+      const semSim7Days: (number | null)[] = new Array(numWeeks).fill(null);
+      const semSimEnd: (number | null)[] = new Array(numWeeks).fill(null);
       const semProjLabels: string[] = [];
 
       semProjCreated[numWeeks - 1] = cumulativeCreated[numWeeks - 1];
       semProjCompleted[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
+      semSimPace[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
+      semSim7Days[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
+      semSimEnd[numWeeks - 1] = cumulativeCompleted[numWeeks - 1];
 
       let semIntersection: number | null = null;
       let semCatchUpLabel: string | null = null;
@@ -440,6 +472,9 @@ export function WorkloadFlowChart() {
           cumulativeCompleted[numWeeks - 1]
         );
         semProjCompleted.push(projCompleted);
+        semSimPace.push(cumulativeCompleted[numWeeks - 1] + i * ratePace * 7);
+        semSim7Days.push(cumulativeCompleted[numWeeks - 1] + i * rate7Days * 7);
+        semSimEnd.push(cumulativeCompleted[numWeeks - 1] + i * rateEnd * 7);
 
         semProjLabels.push(formatWeekLabel(futureWeekStr));
 
@@ -468,6 +503,9 @@ export function WorkloadFlowChart() {
         cumulativeCompleted,
         projectedCreated: semProjCreated,
         projectedCompleted: semProjCompleted,
+        simPace: semSimPace,
+        sim7Days: semSim7Days,
+        simEnd: semSimEnd,
         intersectionIndex: semIntersection,
         estimatedCatchUpLabel: semCatchUpLabel,
         lessonsEndIndex,
@@ -588,6 +626,39 @@ export function WorkloadFlowChart() {
         pointRadius: 0,
         pointHoverRadius: 3,
       },
+      ...(showSimPace ? [{
+        label: 'Simulazione: Stare al passo',
+        data: activeView.simPace,
+        borderColor: 'rgba(16, 185, 129, 0.8)',
+        borderWidth: 2,
+        borderDash: [2, 2],
+        tension: 0.1,
+        fill: false,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+      }] : []),
+      ...(showSim7Days ? [{
+        label: 'Simulazione: Recupero 7gg',
+        data: activeView.sim7Days,
+        borderColor: 'rgba(245, 158, 11, 0.8)',
+        borderWidth: 2,
+        borderDash: [2, 2],
+        tension: 0.1,
+        fill: false,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+      }] : []),
+      ...(showSimEnd ? [{
+        label: 'Simulazione: In pari a fine corsi',
+        data: activeView.simEnd,
+        borderColor: 'rgba(124, 58, 237, 0.8)',
+        borderWidth: 2,
+        borderDash: [2, 2],
+        tension: 0.1,
+        fill: false,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+      }] : []),
     ],
   };
 
@@ -789,6 +860,13 @@ export function WorkloadFlowChart() {
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               Stare al passo (rette parallele)
               <button 
+                onClick={() => setShowSimPace(!showSimPace)}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: showSimPace ? 'rgba(16, 185, 129, 1)' : 'inherit', display: 'flex', opacity: showSimPace ? 1 : 0.7 }}
+                title="Mostra simulazione nel grafico"
+              >
+                {showSimPace ? <Eye size={14} /> : <EyeOff size={14} />}
+              </button>
+              <button 
                 onClick={() => setInfoPopup({
                   title: 'Stare al passo',
                   formula: 'Math.ceil(Media task aggiunti a settimana / 7 giorni)',
@@ -806,6 +884,13 @@ export function WorkloadFlowChart() {
           <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(245, 158, 11, 1)' }}>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               Recuperare entro 7 giorni
+              <button 
+                onClick={() => setShowSim7Days(!showSim7Days)}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: showSim7Days ? 'rgba(245, 158, 11, 1)' : 'inherit', display: 'flex', opacity: showSim7Days ? 1 : 0.7 }}
+                title="Mostra simulazione nel grafico"
+              >
+                {showSim7Days ? <Eye size={14} /> : <EyeOff size={14} />}
+              </button>
               <button 
                 onClick={() => setInfoPopup({
                   title: 'Recuperare entro 7 giorni',
@@ -825,6 +910,13 @@ export function WorkloadFlowChart() {
             <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(124, 58, 237, 1)' }}>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 Essere in pari a fine corsi
+                <button 
+                  onClick={() => setShowSimEnd(!showSimEnd)}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: showSimEnd ? 'rgba(124, 58, 237, 1)' : 'inherit', display: 'flex', opacity: showSimEnd ? 1 : 0.7 }}
+                  title="Mostra simulazione nel grafico"
+                >
+                  {showSimEnd ? <Eye size={14} /> : <EyeOff size={14} />}
+                </button>
                 <button 
                   onClick={() => setInfoPopup({
                     title: 'Essere in pari a fine corsi',
