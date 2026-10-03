@@ -665,6 +665,12 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
     grid-template-columns: 1fr !important;
     gap: 12px !important;
   }
+  .insights-action-box {
+    padding-left: 0 !important;
+    border-left: none !important;
+    padding-top: 16px !important;
+    border-top: 1px solid var(--border-color) !important;
+  }
 
   /* ─── Course Manager Mobile ─── */
   .course-list {
@@ -1203,6 +1209,7 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 
 .task-card-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
   padding-top: 10px;
@@ -2092,3 +2099,17 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   50% { opacity: 1; }
 }
 
+/* ─── Dashboard Insights Panel ─── */
+.insights-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: center;
+  background: linear-gradient(145deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
+}
+.insights-action-box {
+  flex: 1;
+  min-width: 240px;
+  padding-left: 24px;
+  border-left: 1px solid var(--border-light);
+}

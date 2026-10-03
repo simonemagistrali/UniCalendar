@@ -209,7 +209,7 @@ export function CatchUpAnalysisPage() {
     <div className="analysis-page-layout" style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: '16px' }}>
       
       {/* SEZIONE 1: IL METEO DELLO STUDIO (INSIGHTS) */}
-      <GlassPanel style={{ display: 'flex', gap: '24px', alignItems: 'center', background: 'linear-gradient(145deg, var(--bg-panel) 0%, var(--bg-secondary) 100%)' }}>
+      <GlassPanel className="insights-panel">
         <div style={{ flexShrink: 0, padding: '16px', background: 'var(--bg-primary)', borderRadius: '50%', boxShadow: '0 8px 16px rgba(0,0,0,0.05)' }}>
           {insights.weatherIcon}
         </div>
@@ -219,7 +219,7 @@ export function CatchUpAnalysisPage() {
         </div>
         
         {insights.worstCourse && insights.worstCourse.catchUpPercentage < 80 && (
-          <div style={{ flex: 1, paddingLeft: '24px', borderLeft: '1px solid var(--border-light)' }}>
+          <div className="insights-action-box">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-warning)', fontWeight: 600, marginBottom: '4px' }}>
               <Target size={16} />
               Azione Consigliata
