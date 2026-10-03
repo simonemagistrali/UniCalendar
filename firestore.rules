@@ -13,6 +13,11 @@ service cloud.firestore {
                    && (!request.resource.data.keys().hasAny(['isAdmin', 'role', 'admin']));
     }
 
+    // Regola per le chiavi crittografiche (Offuscamento)
+    match /user_keys/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
     // Blocca tutto il resto — nessun altro documento è accessibile
     match /{document=**} {
       allow read, write: if false;

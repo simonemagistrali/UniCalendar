@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import { loadState, saveState } from "./persistence";
+import { encryptData, decryptData } from "./crypto";
 import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord } from "./types";
 
 export interface UserSyncData {
@@ -68,8 +69,14 @@ export async function syncToCloud(userId: string, data: UserSyncData) {
     // Usiamo stringify/parse per rimuovere ricorsivamente tutte le chiavi undefined
     const sanitizedData = JSON.parse(JSON.stringify(validated));
     
+    // Obfuscate the data before saving
+    const encryptedPayload: any = {};
+    for (const [key, value] of Object.entries(sanitizedData)) {
+      encryptedPayload[key] = encryptData(value);
+    }
+    
     await setDoc(userDocRef, {
-      ...sanitizedData,
+      ...encryptedPayload,
       updatedAt: serverTimestamp()
     }, { merge: true });
     console.log("[Sync] Data saved to cloud successfully.");
@@ -87,7 +94,14 @@ export async function loadFromCloud(userId: string): Promise<UserSyncData | null
     const docSnap = await getDoc(userDocRef);
     if (docSnap.exists()) {
       console.log("[Sync] Data loaded from cloud successfully.");
-      return docSnap.data() as UserSyncData;
+      const rawData = docSnap.data();
+      const decryptedData: any = {};
+      for (const [key, value] of Object.entries(rawData)) {
+        if (key !== 'updatedAt') {
+          decryptedData[key] = decryptData(value as any);
+        }
+      }
+      return decryptedData as UserSyncData;
     }
   } catch (error) {
     console.error("[Sync] Error loading from cloud:", error);
@@ -144,8 +158,14 @@ export function subscribeToCloud(userId: string, onDataUpdate: (data: UserSyncDa
       // a meno che non vogliamo essere super sicuri. 'hasPendingWrites' è true per scritture locali non ancora confermate.
       if (!docSnap.metadata.hasPendingWrites) {
         console.log("[Sync] Dati aggiornati dal cloud (Real-time).");
-        const data = docSnap.data() as UserSyncData;
-        onDataUpdate(data);
+        const rawData = docSnap.data();
+        const decryptedData: any = {};
+        for (const [key, value] of Object.entries(rawData)) {
+          if (key !== 'updatedAt') {
+            decryptedData[key] = decryptData(value as any);
+          }
+        }
+        onDataUpdate(decryptedData as UserSyncData);
       }
     }
   }, (error) => {

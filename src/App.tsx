@@ -6,6 +6,7 @@ import { Settings } from './pages/Settings';
 import { useAppStore } from './store/useAppStore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './core/firebase';
+import { initializeUserCryptoKey, clearCryptoKey } from './core/crypto';
 import type { ReactNode } from 'react';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -19,8 +20,13 @@ function App() {
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        try {
+          await initializeUserCryptoKey(firebaseUser.uid);
+        } catch (e) {
+          console.error("Failed to initialize crypto key", e);
+        }
         useAppStore.getState().initializeUser({
           id: firebaseUser.uid,
           name: firebaseUser.displayName || 'Utente Universitario',
@@ -30,6 +36,7 @@ function App() {
           setIsInitializing(false);
         });
       } else {
+        clearCryptoKey();
         useAppStore.getState().setUser(null);
         setIsInitializing(false);
       }
