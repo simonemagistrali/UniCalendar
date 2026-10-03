@@ -606,28 +606,78 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   }
 
   /* ─── Task Panel Mobile ─── */
+  .task-panel {
+    border: none !important;
+    background: transparent !important;
+    padding: 4px 0 !important;
+  }
   .task-list {
     max-height: calc(100vh - 280px);
+    gap: 12px;
   }
   .task-card {
-    padding: 14px 16px;
+    padding: 16px;
+    border: none !important;
+    border-radius: 16px !important;
+    background: #ffffff !important;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.04) !important;
   }
   .task-title {
-    font-size: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 4px;
   }
   .task-card-meta {
     font-size: 12px;
+    gap: 8px;
+  }
+  .task-badge-normal, .task-deps-note {
+    display: none !important;
+  }
+  .task-card-actions {
+    border-top: none !important;
+    padding-top: 8px !important;
+    margin-top: 8px !important;
   }
 
   /* ─── Stats / Dashboard Mobile ─── */
+  .glass-panel {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 8px 0 !important;
+  }
   .dashboard-quick-stats {
     flex-wrap: wrap;
+    gap: 12px !important;
+  }
+  .dashboard-stat {
+    background: #ffffff !important;
+    padding: 16px !important;
+    border-radius: 16px !important;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.04) !important;
+    flex: 1 1 calc(50% - 6px);
+  }
+  .dashboard-stat-num {
+    font-size: 24px !important;
   }
   .catchup-courses-grid {
     grid-template-columns: 1fr !important;
+    gap: 12px !important;
   }
 
   /* ─── Course Manager Mobile ─── */
+  .course-item {
+    border: none !important;
+    background: #ffffff !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04) !important;
+    border-radius: 16px !important;
+    padding: 16px !important;
+  }
+  .course-list {
+    gap: 12px !important;
+  }
   .course-form-row {
     flex-direction: column;
   }
