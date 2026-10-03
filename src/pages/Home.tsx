@@ -53,7 +53,7 @@ export function Home() {
       {/* Mobile Top Bar */}
       <div className="mobile-topbar" style={{ justifyContent: 'center' }}>
         <div className="mobile-logo">
-          <img src="/icon.jpg" alt="UniCalendar Logo" style={{ width: 24, height: 24, borderRadius: 6 }} />
+          <img src="/icon.jpg" alt="UniCalendar Logo" style={{ width: 24, height: 24, objectFit: 'contain', mixBlendMode: 'multiply' }} />
           <span style={{ fontSize: '18px', fontWeight: 700 }}>UniCalendar</span>
         </div>
       </div>
@@ -62,7 +62,7 @@ export function Home() {
       <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src="/icon.jpg" alt="UniCalendar Logo" style={{ width: 28, height: 28, borderRadius: 6 }} />
+            <img src="/icon.jpg" alt="UniCalendar Logo" style={{ width: 28, height: 28, objectFit: 'contain', mixBlendMode: 'multiply' }} />
           </div>
           <span className="sidebar-logo-text">UniCalendar</span>
         </div>
@@ -198,7 +198,7 @@ export function Home() {
           onClick={() => setSidebarOpen(true)}
         >
           <span className="mobile-nav-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '24px' }}>
-            <img src="/icon.jpg" alt="Menu" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
+            <img src="/icon.jpg" alt="Menu" style={{ width: 32, height: 32, objectFit: 'contain', mixBlendMode: 'multiply' }} />
           </span>
           <span>Altro</span>
         </button>
