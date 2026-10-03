@@ -116,7 +116,9 @@ export class CatchUpEngine {
       const estimatedCatchUpDate = this.estimateCatchUpDate(
         course.id,
         tasks,
-        studySessions
+        studySessions,
+        events,
+        courses
       );
 
       // Check planning caught up
@@ -214,22 +216,22 @@ export class CatchUpEngine {
   private static estimateCatchUpDate(
     courseId: string,
     tasks: Task[],
-    studySessions: StudySession[]
+    studySessions: StudySession[],
+    events: CalendarEvent[],
+    courses: Course[]
   ): string | null {
     // Find all pending tasks for this course
-    const pendingTaskIds = new Set(
-      tasks
-        .filter(t => t.courseId === courseId && t.status !== 'done' && !t.isPhantom)
-        .map(t => t.id)
-    );
+    const pendingTasks = tasks.filter(t => t.courseId === courseId && t.status !== 'done' && !t.isPhantom);
+    if (pendingTasks.length === 0) return null; // Already caught up
 
-    if (pendingTaskIds.size === 0) return null; // Already caught up
-
-    // Find the last scheduled session for any of these tasks
+    // Check if ALL pending tasks are already fully scheduled in the calendar
+    const pendingTaskIds = new Set(pendingTasks.map(t => t.id));
+    const scheduledTaskIds = new Set<string>();
     let latestEnd: number = 0;
 
     for (const session of studySessions) {
       if (pendingTaskIds.has(session.taskId)) {
+        scheduledTaskIds.add(session.taskId);
         const sessionEnd = new Date(session.endTime).getTime();
         if (sessionEnd > latestEnd) {
           latestEnd = sessionEnd;
@@ -237,18 +239,58 @@ export class CatchUpEngine {
       }
     }
 
-    if (latestEnd === 0) {
-      // No sessions scheduled for these tasks — estimate based on pending minutes
-      const pendingMinutes = tasks
-        .filter(t => t.courseId === courseId && t.status !== 'done' && !t.isPhantom)
-        .reduce((sum, t) => sum + t.estimatedDuration, 0);
-
-      // Rough estimate: ~3 hours of study per day
-      const daysNeeded = Math.ceil(pendingMinutes / 180);
-      const estimatedDate = new Date(Date.now() + daysNeeded * 86400000);
-      return estimatedDate.toISOString();
+    if (scheduledTaskIds.size === pendingTaskIds.size && latestEnd > 0) {
+      return new Date(latestEnd).toISOString();
     }
 
-    return new Date(latestEnd).toISOString();
+    // Otherwise, simulate based on historical velocity and future incoming load
+    const pendingMinutes = pendingTasks.reduce((sum, t) => sum + t.estimatedDuration, 0);
+
+    // 1. Calculate actual historical velocity (minutes completed per day over last 14 days)
+    const now = Date.now();
+    const twoWeeksAgo = now - 14 * 86400000;
+    const recentlyCompletedTasks = tasks.filter(t => 
+      t.courseId === courseId && 
+      t.status === 'done' && 
+      t.completedAt && 
+      new Date(t.completedAt).getTime() > twoWeeksAgo
+    );
+    const completedMinutes = recentlyCompletedTasks.reduce((sum, t) => sum + (t.actualDuration || t.estimatedDuration), 0);
+    // If no historical data, fallback to a conservative 60 minutes/day for this specific course
+    let dailyVelocityMinutes = completedMinutes > 0 ? (completedMinutes / 14) : 60; 
+
+    // 2. Estimate average incoming load (minutes added per day from future lessons)
+    const futureLessons = events.filter(e => 
+      e.courseId === courseId && 
+      e.type === 'lesson' && 
+      new Date(e.endTime).getTime() > now
+    );
+    
+    let dailyIncomingMinutes = 0;
+    if (futureLessons.length > 0) {
+      const course = courses.find(c => c.id === courseId);
+      let tasksPerLesson = 1;
+      if (course) {
+        if (course.defaultStudyPreferences.requiresNotesRevision) tasksPerLesson++;
+        if (course.defaultStudyPreferences.requiresExercises) tasksPerLesson++;
+      }
+      const lastLesson = futureLessons.sort((a,b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime())[0];
+      const daysUntilLastLesson = Math.max(1, (new Date(lastLesson.endTime).getTime() - now) / 86400000);
+      const totalFutureMinutes = futureLessons.length * tasksPerLesson * 60; // rough 60 min per task
+      dailyIncomingMinutes = totalFutureMinutes / daysUntilLastLesson;
+    }
+
+    // Net daily progress = Velocity - Incoming load
+    const netDailyProgress = dailyVelocityMinutes - dailyIncomingMinutes;
+
+    if (netDailyProgress <= 0) {
+       // Cannot catch up! You are accumulating more tasks than you complete.
+       // Cap at 180 days to indicate it's very far/impossible without changing pace
+       return new Date(now + 180 * 86400000).toISOString();
+    }
+
+    const daysNeeded = Math.ceil(pendingMinutes / netDailyProgress);
+    const finalDaysNeeded = Math.min(180, daysNeeded);
+    return new Date(now + finalDaysNeeded * 86400000).toISOString();
   }
 }

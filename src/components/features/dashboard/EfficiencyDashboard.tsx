@@ -188,7 +188,7 @@ export function EfficiencyDashboard() {
         </div>
         {stats.attendanceRate !== null && stats.attendanceRate < 50 && (
           <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: 'rgba(220, 53, 69, 0.1)', color: 'var(--accent-danger)', borderRadius: '8px', fontSize: '0.85rem' }}>
-            <strong>Attenzione:</strong> Stai saltando molte lezioni (tasso di recupero: {100 - stats.attendanceRate}%). Questo potrebbe rallentare la tua preparazione!
+            <strong>Attenzione:</strong> Stai saltando molte lezioni (tasso di assenza: {100 - stats.attendanceRate}%). Questo potrebbe rallentare la tua preparazione!
           </div>
         )}
         {stats.doneTasks === 0 && (

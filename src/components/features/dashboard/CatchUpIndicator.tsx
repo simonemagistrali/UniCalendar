@@ -209,8 +209,15 @@ export function CatchUpMini() {
       <div className="catchup-mini-list">
         {coursesWithLessons.map(cs => (
           <div key={cs.courseId} className="catchup-mini-item">
-            <span className="task-course-dot" style={{ backgroundColor: cs.courseColor }} />
-            <span className="catchup-mini-name">{cs.courseName}</span>
+            <div className="catchup-mini-item-header">
+              <span className="task-course-dot" style={{ backgroundColor: cs.courseColor }} />
+              <span className="catchup-mini-name" title={cs.courseName}>
+                {cs.courseName.replace(/^Lezione:\s*/i, '')}
+              </span>
+              <span className="catchup-mini-pct" style={{ color: getStatusColor(cs.catchUpPercentage) }}>
+                {cs.catchUpPercentage}%
+              </span>
+            </div>
             <div className="catchup-mini-bar-container">
               <div
                 className="catchup-mini-bar"
@@ -220,9 +227,6 @@ export function CatchUpMini() {
                 }}
               />
             </div>
-            <span className="catchup-mini-pct" style={{ color: getStatusColor(cs.catchUpPercentage) }}>
-              {cs.catchUpPercentage}%
-            </span>
           </div>
         ))}
       </div>

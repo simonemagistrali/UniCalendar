@@ -117,7 +117,7 @@ export function Home() {
             style={{ 
               display: 'flex', alignItems: 'center', gap: '8px', 
               padding: '8px 12px', borderRadius: '6px', 
-              border: '1px solid var(--border)', 
+              border: '1px solid var(--border-color)', 
               background: 'var(--bg-secondary)', 
               cursor: pastStates.length > 0 ? 'pointer' : 'not-allowed',
               opacity: pastStates.length > 0 ? 1 : 0.5
