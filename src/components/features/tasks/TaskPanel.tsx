@@ -20,6 +20,8 @@ export function TaskPanel() {
   const setStudySessions = useAppStore(s => s.setStudySessions);
   const setTasks = useAppStore(s => s.setTasks);
 
+  const selectedDailyGoalValue = useAppStore(s => s.selectedDailyGoalValue);
+
   const [filter, setFilter] = useState<'all' | 'todo' | 'in_progress' | 'done' | 'forecast'>('todo');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [courseFilter, setCourseFilter] = useState<string>('ALL');
@@ -219,10 +221,21 @@ export function TaskPanel() {
           </div>
         ) : (
           <>
-            {/* Separator before phantom tasks in 'todo' view */}
-            {filter === 'todo' && phantomTasks.length > 0 && (
+            {/* Normal rendering for other views */}
+            {filter !== 'todo' && (
+              filteredTasks.map(task => (
+                <TaskCard key={task.id} task={task} />
+              ))
+            )}
+            
+            {/* Render for 'todo' view where we highlight the daily goal */}
+            {filter === 'todo' && (
               filteredTasks.map((task, idx) => {
                 const isFirstPhantom = task.isPhantom && (idx === 0 || !filteredTasks[idx - 1]?.isPhantom);
+                
+                // Determine if it is part of today's goal
+                const isTodayGoal = selectedDailyGoalValue !== null && idx < selectedDailyGoalValue && !task.isPhantom;
+
                 return (
                   <div key={task.id}>
                     {isFirstPhantom && (
@@ -231,16 +244,37 @@ export function TaskPanel() {
                         <span>Previste in futuro</span>
                       </div>
                     )}
-                    <TaskCard task={task} />
+                    
+                    <div style={isTodayGoal ? { 
+                      padding: '4px', 
+                      border: '2px solid var(--accent-color, #10b981)', 
+                      borderRadius: '16px', 
+                      marginBottom: '8px',
+                      background: 'rgba(16, 185, 129, 0.05)',
+                      position: 'relative'
+                    } : {}}>
+                      {isTodayGoal && (
+                        <div style={{ 
+                          position: 'absolute', 
+                          top: '-10px', 
+                          right: '16px', 
+                          background: 'var(--accent-color, #10b981)', 
+                          color: 'white', 
+                          fontSize: '0.65rem', 
+                          fontWeight: 'bold', 
+                          padding: '2px 8px', 
+                          borderRadius: '12px',
+                          zIndex: 2,
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}>
+                          OBIETTIVO DI OGGI {idx + 1}/{selectedDailyGoalValue}
+                        </div>
+                      )}
+                      <TaskCard task={task} />
+                    </div>
                   </div>
                 );
               })
-            )}
-            {/* Normal rendering for other views */}
-            {filter !== 'todo' && (
-              filteredTasks.map(task => (
-                <TaskCard key={task.id} task={task} />
-              ))
             )}
           </>
         )}

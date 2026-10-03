@@ -72,6 +72,11 @@ interface AppState {
   setUser: (user: AppUser | null) => void;
   initializeUser: (user: AppUser) => Promise<void>;
   
+  // Daily Goal
+  selectedDailyGoalType: 'PACE' | '7DAYS' | 'END' | null;
+  selectedDailyGoalValue: number | null;
+  setDailyGoal: (type: 'PACE' | '7DAYS' | 'END' | null, value: number | null) => void;
+  
   
   // Events
   addEvent: (event: CalendarEvent) => void;
@@ -188,6 +193,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   studySessions: (saved?.studySessions as StudySession[]) || [],
   performanceHistory: (saved?.performanceHistory as PerformanceRecord[]) || [],
   pastStates: [],
+
+  selectedDailyGoalType: null,
+  selectedDailyGoalValue: null,
+  setDailyGoal: (type, value) => set({ selectedDailyGoalType: type, selectedDailyGoalValue: value }),
 
   setUser: (user) => {
     set({ user });

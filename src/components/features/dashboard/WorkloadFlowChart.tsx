@@ -14,7 +14,7 @@ import annotationPlugin from 'chartjs-plugin-annotation';
 import { Line } from 'react-chartjs-2';
 import { GlassPanel } from '../../ui/GlassPanel';
 import { useAppStore } from '../../../store/useAppStore';
-import { Activity, TrendingUp, TrendingDown, Equal, Crosshair, ZoomIn, ZoomOut, Calendar, Info, Eye, EyeOff } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, Equal, Crosshair, ZoomIn, ZoomOut, Calendar, Info, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 
 ChartJS.register(
@@ -149,6 +149,9 @@ const NO_DATA_RESULT = {
   totalFutureTasks: 0,
   futureTasksPerWeek: 0,
   daysUntilLastLesson: null as number | null,
+  ratePace: 0,
+  rate7Days: 0,
+  rateEnd: 0,
 };
 
 export function WorkloadFlowChart() {
@@ -160,6 +163,9 @@ export function WorkloadFlowChart() {
   const [showSimPace, setShowSimPace] = useState(false);
   const [showSim7Days, setShowSim7Days] = useState(false);
   const [showSimEnd, setShowSimEnd] = useState(false);
+
+  const setDailyGoal = useAppStore(s => s.setDailyGoal);
+  const selectedDailyGoalType = useAppStore(s => s.selectedDailyGoalType);
 
   const analysis = useMemo(() => {
     // Collect all real tasks (exclude phantom/predicted)
@@ -521,6 +527,9 @@ export function WorkloadFlowChart() {
       totalFutureTasks,
       futureTasksPerWeek: Math.round(avgFutureTasksPerWeek * 10) / 10,
       daysUntilLastLesson,
+      ratePace,
+      rate7Days,
+      rateEnd,
     };
   }, [tasks, events, courses]);
 
@@ -858,7 +867,14 @@ export function WorkloadFlowChart() {
         }}>
           <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(16, 185, 129, 1)' }}>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              Stare al passo (rette parallele)
+              Stare al passo
+              <button 
+                onClick={() => setDailyGoal(selectedDailyGoalType === 'PACE' ? null : 'PACE', analysis.ratePace)}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: selectedDailyGoalType === 'PACE' ? 'rgba(16, 185, 129, 1)' : 'inherit', display: 'flex', opacity: selectedDailyGoalType === 'PACE' ? 1 : 0.7 }}
+                title="Imposta come obiettivo di oggi"
+              >
+                <CheckCircle size={14} />
+              </button>
               <button 
                 onClick={() => setShowSimPace(!showSimPace)}
                 style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: showSimPace ? 'rgba(16, 185, 129, 1)' : 'inherit', display: 'flex', opacity: showSimPace ? 1 : 0.7 }}
@@ -883,7 +899,14 @@ export function WorkloadFlowChart() {
           
           <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(245, 158, 11, 1)' }}>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              Recuperare entro 7 giorni
+              Recuperare (7 gg)
+              <button 
+                onClick={() => setDailyGoal(selectedDailyGoalType === '7DAYS' ? null : '7DAYS', analysis.rate7Days)}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: selectedDailyGoalType === '7DAYS' ? 'rgba(245, 158, 11, 1)' : 'inherit', display: 'flex', opacity: selectedDailyGoalType === '7DAYS' ? 1 : 0.7 }}
+                title="Imposta come obiettivo di oggi"
+              >
+                <CheckCircle size={14} />
+              </button>
               <button 
                 onClick={() => setShowSim7Days(!showSim7Days)}
                 style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: showSim7Days ? 'rgba(245, 158, 11, 1)' : 'inherit', display: 'flex', opacity: showSim7Days ? 1 : 0.7 }}
@@ -910,6 +933,13 @@ export function WorkloadFlowChart() {
             <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(124, 58, 237, 1)' }}>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 Essere in pari a fine corsi
+                <button 
+                  onClick={() => setDailyGoal(selectedDailyGoalType === 'END' ? null : 'END', analysis.rateEnd)}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: selectedDailyGoalType === 'END' ? 'rgba(124, 58, 237, 1)' : 'inherit', display: 'flex', opacity: selectedDailyGoalType === 'END' ? 1 : 0.7 }}
+                  title="Imposta come obiettivo di oggi"
+                >
+                  <CheckCircle size={14} />
+                </button>
                 <button 
                   onClick={() => setShowSimEnd(!showSimEnd)}
                   style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: showSimEnd ? 'rgba(124, 58, 237, 1)' : 'inherit', display: 'flex', opacity: showSimEnd ? 1 : 0.7 }}
