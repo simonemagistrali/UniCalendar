@@ -210,7 +210,7 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
   padding: 16px 24px;
   margin-bottom: 8px;
 }
