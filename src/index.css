@@ -216,10 +216,8 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 }
 .sidebar-logo-icon {
   width: 40px; height: 40px;
-  background: var(--accent-primary);
-  border-radius: 12px;
+  background: transparent;
   display: flex; align-items: center; justify-content: center;
-  color: #fff;
   flex-shrink: 0;
 }
 .sidebar-logo-text {
