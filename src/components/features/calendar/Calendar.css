@@ -519,12 +519,13 @@
   }
   .timeline-event-title {
     white-space: normal !important;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
+    display: block;
     word-break: break-word;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
+    line-height: 1.15;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   .timeline-day-num {
     font-size: 18px;
@@ -536,6 +537,9 @@
   }
   .timeline-day-header {
     padding: 6px 2px;
+  }
+  .timeline-body {
+    padding-bottom: 80px; /* Previene che gli eventi finiscano sotto la barra di navigazione sfocata */
   }
 
   /* Day view — taller for scrollability */
