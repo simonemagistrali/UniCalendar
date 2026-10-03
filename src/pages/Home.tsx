@@ -197,8 +197,8 @@ export function Home() {
           className="mobile-nav-item"
           onClick={() => setSidebarOpen(true)}
         >
-          <span className="mobile-nav-icon">
-            <img src="/icon.jpg" alt="Menu" style={{ width: 22, height: 22, borderRadius: 4 }} />
+          <span className="mobile-nav-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '24px' }}>
+            <img src="/icon.jpg" alt="Menu" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
           </span>
           <span>Altro</span>
         </button>
