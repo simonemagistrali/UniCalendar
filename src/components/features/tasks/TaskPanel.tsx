@@ -34,6 +34,7 @@ export function TaskPanel() {
   const [filter, setFilter] = useState<'all' | 'todo' | 'in_progress' | 'done' | 'forecast'>('todo');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [courseFilter, setCourseFilter] = useState<string>('ALL');
+  const [sortDoneBy, setSortDoneBy] = useState<'completedAt' | 'createdAt'>('completedAt');
 
   const TASK_TYPES = {
     ALL: 'Tutte le tipologie',
@@ -135,7 +136,7 @@ export function TaskPanel() {
       });
     }
 
-    const realTasks = displaySortedTasks.filter(t => {
+    let realTasks = displaySortedTasks.filter(t => {
       if (filter === 'todo' && t.status !== 'todo') return false;
       if (filter === 'in_progress' && t.status !== 'in_progress') return false;
       if (filter === 'done' && t.status !== 'done') return false;
@@ -143,6 +144,20 @@ export function TaskPanel() {
       if (courseFilter !== 'ALL' && t.courseId !== courseFilter) return false;
       return true;
     });
+
+    if (filter === 'done') {
+      realTasks = [...realTasks].sort((a, b) => {
+        if (sortDoneBy === 'completedAt') {
+          const timeA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+          const timeB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+          return timeB - timeA; // most recently completed first
+        } else {
+          const timeA = new Date(a.createdAt).getTime();
+          const timeB = new Date(b.createdAt).getTime();
+          return timeB - timeA; // newest tasks first
+        }
+      });
+    }
 
     // In 'todo' view, append phantom tasks at the end
     if (filter === 'todo' && phantomTasks.length > 0) {
@@ -155,7 +170,7 @@ export function TaskPanel() {
     }
 
     return realTasks;
-  }, [sortedTasks, phantomTasks, filter, typeFilter, courseFilter]);
+  }, [displaySortedTasks, phantomTasks, filter, typeFilter, courseFilter, sortDoneBy]);
 
   const todoCount = tasks.filter(t => t.status === 'todo').length;
   const inProgressCount = tasks.filter(t => t.status === 'in_progress').length;
@@ -212,6 +227,17 @@ export function TaskPanel() {
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
+
+        {filter === 'done' && (
+          <button 
+            className="task-action-btn" 
+            onClick={() => setSortDoneBy(s => s === 'completedAt' ? 'createdAt' : 'completedAt')}
+            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', padding: '4px 12px' }}
+          >
+            <Clock size={14} />
+            {sortDoneBy === 'completedAt' ? 'Ordina: Data Completamento' : 'Ordina: Data Creazione'}
+          </button>
+        )}
       </div>
 
       <div className="task-list">

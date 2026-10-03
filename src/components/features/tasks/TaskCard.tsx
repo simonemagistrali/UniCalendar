@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Task } from '../../../core/types';
 import { useAppStore } from '../../../store/useAppStore';
-import { Clock, Check, ChevronRight, AlertTriangle, SkipForward, RotateCcw, Eye, Play, Pause } from 'lucide-react';
+import { Clock, Check, ChevronRight, AlertTriangle, SkipForward, RotateCcw, Eye, Play, Pause, Calendar } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
@@ -147,6 +147,12 @@ export function TaskCard({ task }: TaskCardProps) {
           <div className="task-meta-item">
             <Check size={12} />
             <span>Reale: {task.actualDuration} min</span>
+          </div>
+        )}
+        {isDone && task.completedAt && (
+          <div className="task-meta-item">
+            <Calendar size={12} />
+            <span>Completata: {new Date(task.completedAt).toLocaleDateString('it-IT')}</span>
           </div>
         )}
         {task.postponedCount > 0 && !isDone && (
