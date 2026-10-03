@@ -361,13 +361,27 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   top: 0;
   left: 0;
   right: 0;
-  height: 56px;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-color);
+  height: calc(56px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   z-index: 30;
   align-items: center;
-  padding: 0 16px;
+  padding-left: 16px;
+  padding-right: 16px;
   gap: 12px;
+}
+/* Nasconde globalmente le scrollbar su mobile per un feel da app nativa */
+@media (max-width: 900px) {
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 .mobile-menu-btn {
   background: none;
@@ -413,9 +427,11 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
     left: 0;
     bottom: 0;
     transform: translateX(-100%);
-    transition: transform 0.25s ease;
-    box-shadow: var(--shadow-md);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.15);
     z-index: 40;
+    border-radius: 0 24px 24px 0;
+    padding-top: env(safe-area-inset-top, 0px);
   }
   .sidebar.sidebar-open {
     transform: translateX(0);
@@ -443,21 +459,36 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
     display: flex !important;
   }
 
-  /* ─── Modal Full-Screen on Mobile ─── */
+  /* ─── Bottom Sheet Modal on Mobile ─── */
   .modal-overlay {
     padding: 0;
     align-items: flex-end;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
   }
   .modal-container {
     max-width: 100% !important;
-    max-height: 100vh !important;
-    height: 100vh;
-    border-radius: 0 !important;
-    padding: 16px !important;
-    animation: modal-slide-up 0.3s ease !important;
+    max-height: 92vh !important;
+    height: auto;
+    border-radius: 24px 24px 0 0 !important;
+    padding: 24px 16px 16px !important;
+    animation: modal-slide-up 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.1) !important;
     display: flex;
     flex-direction: column;
     overflow: hidden !important;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+  }
+  .modal-container::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 5px;
+    background: #d4d4d4;
+    border-radius: 3px;
   }
   .modal-header {
     position: sticky;
@@ -628,15 +659,17 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   bottom: 0;
   left: 0;
   right: 0;
-  height: 64px;
-  background: var(--bg-primary);
-  border-top: 1px solid var(--border-color);
+  height: 72px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
   z-index: 25;
   align-items: center;
   justify-content: space-around;
-  padding: 0 8px;
-  padding-bottom: env(safe-area-inset-bottom, 0);
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+  padding: 4px 8px;
+  padding-bottom: env(safe-area-inset-bottom, 8px);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
 }
 
 .mobile-nav-item {
@@ -644,19 +677,22 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: 6px 12px;
+  gap: 4px;
+  padding: 6px 8px;
   border: none;
   background: none;
   cursor: pointer;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   font-family: var(--font-display);
-  transition: color 0.2s;
-  border-radius: 8px;
-  min-width: 56px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 12px;
+  min-width: 60px;
   -webkit-tap-highlight-color: transparent;
+}
+.mobile-nav-item:active {
+  transform: scale(0.92);
 }
 
 .mobile-nav-item.active {
@@ -664,44 +700,46 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 }
 
 .mobile-nav-item.active .mobile-nav-icon {
-  background: var(--accent-secondary);
-  border-radius: 16px;
-  padding: 4px 16px;
+  background: var(--accent-primary);
+  color: #fff;
+  border-radius: 20px;
+  padding: 6px 20px;
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.35);
 }
 
 .mobile-nav-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 16px;
-  border-radius: 16px;
-  transition: all 0.25s ease;
+  padding: 6px 16px;
+  border-radius: 20px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 /* ─── FAB (hidden by default, shown on mobile) ─── */
 .mobile-fab {
   display: none;
   position: fixed;
-  bottom: 84px;
+  bottom: calc(90px + env(safe-area-inset-bottom, 0px));
   right: 20px;
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: var(--accent-primary);
+  width: 60px;
+  height: 60px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--accent-primary), #4285f4);
   color: #fff;
   border: none;
-  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px rgba(26, 115, 232, 0.4), 0 4px 8px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   z-index: 26;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s;
   -webkit-tap-highlight-color: transparent;
 }
 
 .mobile-fab:active {
   transform: scale(0.92);
-  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.3);
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3);
 }
 
 /* ─── Modal slide-up animation for mobile ─── */
