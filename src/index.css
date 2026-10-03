@@ -422,7 +422,7 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
     display: none !important;
   }
   .mobile-topbar {
-    display: flex;
+    display: none !important;
   }
   .sidebar {
     position: fixed;
@@ -443,7 +443,7 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
     display: block;
   }
   .main-content {
-    padding-top: 72px !important;
+    padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
     padding-bottom: 80px !important;
     padding-left: 12px !important;
     padding-right: 12px !important;
