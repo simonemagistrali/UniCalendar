@@ -204,13 +204,15 @@ export function Home() {
       </nav>
 
       {/* ═══ Mobile FAB (Floating Action Button) ═══ */}
-      <button
-        className="mobile-fab"
-        onClick={() => setIsEventModalOpen(true)}
-        aria-label="Crea Evento"
-      >
-        <Plus size={28} />
-      </button>
+      {activeTab !== 'statistics' && (
+        <button
+          className="mobile-fab"
+          onClick={() => setIsEventModalOpen(true)}
+          aria-label="Crea Evento"
+        >
+          <Plus size={28} />
+        </button>
+      )}
 
       {/* Modals */}
       <EventFormModal isOpen={isEventModalOpen} onClose={() => setIsEventModalOpen(false)} />
