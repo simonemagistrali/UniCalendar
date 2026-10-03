@@ -1004,9 +1004,12 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
 }
 .line-through { text-decoration: line-through; }
 
