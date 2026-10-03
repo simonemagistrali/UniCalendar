@@ -698,10 +698,7 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 
   /* ─── Main Header Mobile ─── */
   .main-header {
-    flex-wrap: wrap;
-  }
-  .main-title {
-    font-size: 18px;
+    display: none !important;
   }
 }
 
