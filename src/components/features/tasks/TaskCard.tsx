@@ -20,6 +20,11 @@ export function TaskCard({ task }: TaskCardProps) {
   const isInProgress = task.status === 'in_progress';
   const isLessonTask = task.title.startsWith('Seguire/Recuperare lezione');
 
+  const displayTitle = task.title
+    .replace('[Previsto] ', '')
+    .replace('Sistemare appunti: Lezione: ', 'Appunti: ')
+    .replace('Seguire/Recuperare lezione: ', 'Seguire: ');
+
   const getTotalAccumulated = () => {
     let elapsed = 0;
     if (task.startedAt) {
@@ -37,7 +42,7 @@ export function TaskCard({ task }: TaskCardProps) {
             {course && (
               <span className="task-course-dot" style={{ backgroundColor: course.color, opacity: 0.5 }} />
             )}
-            <span className="task-title" title={task.title}>{task.title.replace('[Previsto] ', '')}</span>
+            <span className="task-title" title={task.title}>{displayTitle}</span>
           </div>
           <div className="task-card-badges">
             <span className="task-badge task-badge-phantom">
@@ -112,7 +117,7 @@ export function TaskCard({ task }: TaskCardProps) {
           {course && (
             <span className="task-course-dot" style={{ backgroundColor: course.color }} />
           )}
-          <span className={`task-title ${isDone ? 'line-through' : ''}`} title={task.title}>{task.title}</span>
+          <span className={`task-title ${isDone ? 'line-through' : ''}`} title={task.title}>{displayTitle}</span>
         </div>
         <div className="task-card-badges">
           {isInProgress && (
