@@ -35,13 +35,10 @@ export function Home() {
     <div className="layout-wrapper">
 
       {/* Mobile Top Bar */}
-      <div className="mobile-topbar">
-        <button className="mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
-          {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+      <div className="mobile-topbar" style={{ justifyContent: 'center' }}>
         <div className="mobile-logo">
-          <img src="/icon.jpg" alt="UniCalendar Logo" style={{ width: 20, height: 20, borderRadius: 4 }} />
-          <span>UniCalendar</span>
+          <img src="/icon.jpg" alt="UniCalendar Logo" style={{ width: 24, height: 24, borderRadius: 6 }} />
+          <span style={{ fontSize: '18px', fontWeight: 700 }}>UniCalendar</span>
         </div>
       </div>
 
