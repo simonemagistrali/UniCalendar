@@ -109,23 +109,6 @@ export function Home() {
       {/* Main Content */}
       <main className="main-content">
         <header className="main-header" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button 
-            className="sidebar-action-btn" 
-            style={{ 
-              display: 'flex', alignItems: 'center', gap: '8px', 
-              padding: '8px 12px', borderRadius: '6px', 
-              border: '1px solid var(--border-color)', 
-              background: 'var(--bg-secondary)', 
-              cursor: pastStates.length > 0 ? 'pointer' : 'not-allowed',
-              opacity: pastStates.length > 0 ? 1 : 0.5
-            }}
-            onClick={undo}
-            disabled={pastStates.length === 0}
-            title="Annulla l'ultima modifica (Torna indietro)"
-          >
-            <Undo2 size={16} />
-            <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>Annulla</span>
-          </button>
           <h1 className="main-title" style={{ margin: 0 }}>
             {activeTab === 'calendar' ? 'Calendario' : activeTab === 'tasks' ? 'Attività' : activeTab === 'statistics' ? 'Statistiche' : 'Studio Anki'}
           </h1>
@@ -211,6 +194,18 @@ export function Home() {
           aria-label="Crea Evento"
         >
           <Plus size={28} />
+        </button>
+      )}
+
+      {/* ═══ Floating Undo Pill (Modern) ═══ */}
+      {pastStates.length > 0 && (
+        <button 
+          className="floating-undo-btn"
+          onClick={undo}
+          aria-label="Annulla l'ultima azione"
+        >
+          <Undo2 size={18} />
+          <span>Annulla azione</span>
         </button>
       )}
 
