@@ -197,16 +197,14 @@ export function Home() {
         </button>
       )}
 
-      {/* ═══ Floating Undo Pill (Modern) ═══ */}
+      {/* ═══ Modern Snackbar (Undo) ═══ */}
       {pastStates.length > 0 && (
-        <button 
-          className="floating-undo-btn"
-          onClick={undo}
-          aria-label="Annulla l'ultima azione"
-        >
-          <Undo2 size={18} />
-          <span>Annulla azione</span>
-        </button>
+        <div className="modern-snackbar">
+          <span className="snackbar-message">Modifica applicata</span>
+          <button className="snackbar-action" onClick={undo}>
+            Annulla
+          </button>
+        </div>
       )}
 
       {/* Modals */}
