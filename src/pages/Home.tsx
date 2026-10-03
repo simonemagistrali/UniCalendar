@@ -197,7 +197,9 @@ export function Home() {
           className="mobile-nav-item"
           onClick={() => setSidebarOpen(true)}
         >
-          <span className="mobile-nav-icon"><MoreHorizontal size={22} /></span>
+          <span className="mobile-nav-icon">
+            <img src="/icon.jpg" alt="Menu" style={{ width: 22, height: 22, borderRadius: 4 }} />
+          </span>
           <span>Altro</span>
         </button>
       </nav>
