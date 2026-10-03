@@ -798,7 +798,7 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 /* ─── Floating Undo Pill ─── */
 .floating-undo-btn {
   position: fixed;
-  bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  top: calc(24px + env(safe-area-inset-top, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 50;
@@ -814,7 +814,7 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   font-weight: 600;
   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   cursor: pointer;
-  animation: slide-up-fade 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: slide-down-fade 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .floating-undo-btn:hover {
   transform: translateX(-50%) scale(1.05);
@@ -824,11 +824,11 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 }
 @media (min-width: 901px) {
   .floating-undo-btn {
-    bottom: 40px;
+    top: 32px;
   }
 }
-@keyframes slide-up-fade {
-  from { opacity: 0; transform: translate(-50%, 20px); }
+@keyframes slide-down-fade {
+  from { opacity: 0; transform: translate(-50%, -20px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
