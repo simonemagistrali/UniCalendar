@@ -13,6 +13,7 @@ import { CatchUpMini } from '../components/features/dashboard/CatchUpIndicator';
 import { StatisticsDashboard } from '../components/features/dashboard/StatisticsDashboard';
 import { AnkiDashboard } from '../pages/AnkiDashboard';
 import { authService } from '../core/mockBackend';
+import { Tutorial } from '../components/ui/Tutorial';
 
 export function Home() {
   const navigate = useNavigate();
@@ -229,6 +230,8 @@ export function Home() {
       <EventFormModal isOpen={isEventModalOpen} onClose={() => setIsEventModalOpen(false)} />
       <ImportCalendarModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} />
       <CourseManager isOpen={isCourseModalOpen} onClose={() => setIsCourseModalOpen(false)} />
+      
+      <Tutorial />
     </div>
   );
 }
