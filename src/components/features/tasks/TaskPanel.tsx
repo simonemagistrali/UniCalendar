@@ -22,6 +22,15 @@ export function TaskPanel() {
 
   const selectedDailyGoalValue = useAppStore(s => s.selectedDailyGoalValue);
 
+  const completedTodayCount = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return tasks.filter(t => t.status === 'done' && t.completedAt && new Date(t.completedAt).toDateString() === todayStr).length;
+  }, [tasks]);
+
+  const tasksLeftForToday = selectedDailyGoalValue !== null 
+    ? Math.max(0, selectedDailyGoalValue - completedTodayCount) 
+    : null;
+
   const [filter, setFilter] = useState<'all' | 'todo' | 'in_progress' | 'done' | 'forecast'>('todo');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [courseFilter, setCourseFilter] = useState<string>('ALL');
@@ -234,7 +243,7 @@ export function TaskPanel() {
                 const isFirstPhantom = task.isPhantom && (idx === 0 || !filteredTasks[idx - 1]?.isPhantom);
                 
                 // Determine if it is part of today's goal
-                const isTodayGoal = selectedDailyGoalValue !== null && idx < selectedDailyGoalValue && !task.isPhantom;
+                const isTodayGoal = tasksLeftForToday !== null && idx < tasksLeftForToday && !task.isPhantom;
 
                 return (
                   <div key={task.id}>
@@ -267,7 +276,7 @@ export function TaskPanel() {
                           zIndex: 2,
                           boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                         }}>
-                          OBIETTIVO DI OGGI {idx + 1}/{selectedDailyGoalValue}
+                          OBIETTIVO DI OGGI {completedTodayCount + idx + 1}/{selectedDailyGoalValue}
                         </div>
                       )}
                       <TaskCard task={task} />
