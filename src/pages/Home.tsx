@@ -142,7 +142,7 @@ export function Home() {
               </div>
               <div className="calendar-sidebar">
                 <CatchUpMini />
-                <TaskPanel />
+                <TaskPanel dailyGoalOnly={true} />
               </div>
             </div>
           )}

@@ -9,7 +9,7 @@ import { FutureProjectionEngine } from '../../../core/FutureProjectionEngine';
 import { TaskCard } from './TaskCard';
 
 
-export function TaskPanel() {
+export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }) {
   const events = useAppStore(s => s.events);
   const tasks = useAppStore(s => s.tasks);
   const courses = useAppStore(s => s.courses);
@@ -127,6 +127,12 @@ export function TaskPanel() {
   }, [sortedTasks]);
 
   const filteredTasks = useMemo(() => {
+    if (dailyGoalOnly) {
+      const realTasks = displaySortedTasks.filter(t => t.status === 'todo' && !t.isPhantom);
+      const limit = selectedDailyGoalValue !== null ? (tasksLeftForToday || 0) : 3;
+      return realTasks.slice(0, limit);
+    }
+
     if (filter === 'forecast') {
       // Show only phantom tasks
       return phantomTasks.filter(t => {
@@ -170,7 +176,7 @@ export function TaskPanel() {
     }
 
     return realTasks;
-  }, [displaySortedTasks, phantomTasks, filter, typeFilter, courseFilter, sortDoneBy]);
+  }, [displaySortedTasks, phantomTasks, filter, typeFilter, courseFilter, sortDoneBy, dailyGoalOnly, selectedDailyGoalValue, tasksLeftForToday]);
 
   const todoCount = tasks.filter(t => t.status === 'todo').length;
   const inProgressCount = tasks.filter(t => t.status === 'in_progress').length;
@@ -182,70 +188,80 @@ export function TaskPanel() {
       <div className="task-panel-header">
         <div className="task-panel-title">
           <BookOpen size={18} />
-          <span>COSE DA FARE</span>
+          <span>{dailyGoalOnly ? 'ATTIVITÀ DI OGGI' : 'COSE DA FARE'}</span>
         </div>
-        <div className="task-panel-counts">
-          <span className="task-count-badge">{todoCount} da fare</span>
-          {inProgressCount > 0 && <span className="task-count-badge" style={{ backgroundColor: '#10b981', color: 'white' }}>{inProgressCount} in corso</span>}
-          <span className="task-count-badge task-count-done">{doneCount} fatte</span>
-          {phantomCount > 0 && (
-            <span className="task-count-badge task-count-phantom">{phantomCount} previste</span>
-          )}
-        </div>
-      </div>
-
-      <div className="task-filter-bar">
-        {(['todo', 'in_progress', 'done', 'all', 'forecast'] as const).map(f => (
-          <button
-            key={f}
-            className={`task-filter-btn ${filter === f ? 'active' : ''}`}
-            onClick={() => setFilter(f)}
-          >
-            {f === 'todo' ? 'Da fare' : f === 'in_progress' ? 'In corso' : f === 'done' ? 'Completate' : f === 'forecast' ? '🔮 Previste' : 'Tutte'}
-          </button>
-        ))}
-      </div>
-
-      <div className="task-type-filter-bar" style={{ display: 'flex', gap: '8px' }}>
-        <select 
-          className="task-type-select" 
-          value={typeFilter} 
-          onChange={(e) => setTypeFilter(e.target.value)}
-        >
-          {Object.entries(TASK_TYPES).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
-          ))}
-        </select>
-
-        <select 
-          className="task-type-select" 
-          value={courseFilter} 
-          onChange={(e) => setCourseFilter(e.target.value)}
-        >
-          <option value="ALL">Tutte le materie</option>
-          {courses.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-
-        {filter === 'done' && (
-          <button 
-            className="task-action-btn" 
-            onClick={() => setSortDoneBy(s => s === 'completedAt' ? 'createdAt' : 'completedAt')}
-            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', padding: '4px 12px' }}
-          >
-            <Clock size={14} />
-            {sortDoneBy === 'completedAt' ? 'Ordina: Data Completamento' : 'Ordina: Data Creazione'}
-          </button>
+        {!dailyGoalOnly && (
+          <div className="task-panel-counts">
+            <span className="task-count-badge">{todoCount} da fare</span>
+            {inProgressCount > 0 && <span className="task-count-badge" style={{ backgroundColor: '#10b981', color: 'white' }}>{inProgressCount} in corso</span>}
+            <span className="task-count-badge task-count-done">{doneCount} fatte</span>
+            {phantomCount > 0 && (
+              <span className="task-count-badge task-count-phantom">{phantomCount} previste</span>
+            )}
+          </div>
         )}
       </div>
+
+      {!dailyGoalOnly && (
+        <>
+          <div className="task-filter-bar">
+            {(['todo', 'in_progress', 'done', 'all', 'forecast'] as const).map(f => (
+              <button
+                key={f}
+                className={`task-filter-btn ${filter === f ? 'active' : ''}`}
+                onClick={() => setFilter(f)}
+              >
+                {f === 'todo' ? 'Da fare' : f === 'in_progress' ? 'In corso' : f === 'done' ? 'Completate' : f === 'forecast' ? '🔮 Previste' : 'Tutte'}
+              </button>
+            ))}
+          </div>
+
+          <div className="task-type-filter-bar" style={{ display: 'flex', gap: '8px' }}>
+            <select 
+              className="task-type-select" 
+              value={typeFilter} 
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
+              {Object.entries(TASK_TYPES).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+
+            <select 
+              className="task-type-select" 
+              value={courseFilter} 
+              onChange={(e) => setCourseFilter(e.target.value)}
+            >
+              <option value="ALL">Tutte le materie</option>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+
+            {filter === 'done' && (
+              <button 
+                className="task-action-btn" 
+                onClick={() => setSortDoneBy(s => s === 'completedAt' ? 'createdAt' : 'completedAt')}
+                style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', padding: '4px 12px' }}
+              >
+                <Clock size={14} />
+                {sortDoneBy === 'completedAt' ? 'Ordina: Data Completamento' : 'Ordina: Data Creazione'}
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
       <div className="task-list">
         {filteredTasks.length === 0 ? (
           <div className="task-empty">
             <Zap size={32} className="task-empty-icon" />
             <p>
-              {filter === 'done'
+              {dailyGoalOnly
+                ? (selectedDailyGoalValue !== null && tasksLeftForToday === 0 
+                    ? 'Hai completato l\'obiettivo di oggi! 🎉 Ottimo lavoro.' 
+                    : 'Nessuna attività proposta per oggi.')
+                : filter === 'done'
                 ? 'Nessuna attività completata ancora.'
                 : filter === 'in_progress'
                 ? 'Nessuna attività in corso. Inizia un task!'
@@ -257,19 +273,19 @@ export function TaskPanel() {
         ) : (
           <>
             {/* Normal rendering for other views */}
-            {filter !== 'todo' && (
+            {!dailyGoalOnly && filter !== 'todo' && (
               filteredTasks.map(task => (
                 <TaskCard key={task.id} task={task} />
               ))
             )}
             
             {/* Render for 'todo' view where we highlight the daily goal */}
-            {filter === 'todo' && (
+            {(filter === 'todo' || dailyGoalOnly) && (
               filteredTasks.map((task, idx) => {
-                const isFirstPhantom = task.isPhantom && (idx === 0 || !filteredTasks[idx - 1]?.isPhantom);
+                const isFirstPhantom = !dailyGoalOnly && task.isPhantom && (idx === 0 || !filteredTasks[idx - 1]?.isPhantom);
                 
                 // Determine if it is part of today's goal
-                const isTodayGoal = tasksLeftForToday !== null && idx < tasksLeftForToday && !task.isPhantom;
+                const isTodayGoal = dailyGoalOnly || (tasksLeftForToday !== null && idx < tasksLeftForToday && !task.isPhantom);
 
                 return (
                   <div key={task.id}>
@@ -288,7 +304,7 @@ export function TaskPanel() {
                       background: 'rgba(16, 185, 129, 0.05)',
                       position: 'relative'
                     } : {}}>
-                      {isTodayGoal && (
+                      {isTodayGoal && (selectedDailyGoalValue !== null) && (
                         <div style={{ 
                           position: 'absolute', 
                           top: '-10px', 
