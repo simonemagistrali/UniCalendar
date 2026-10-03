@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2, TrendingUp, MoreHorizontal, CheckSquare, BarChart3 } from "lucide-react";
+import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2, TrendingUp, MoreHorizontal, CheckSquare, BarChart3, Brain } from "lucide-react";
 
 import { Calendar } from '../components/features/calendar/Calendar';
 
@@ -194,7 +194,7 @@ export function Home() {
           className={`mobile-nav-item ${activeTab === 'anki' ? 'active' : ''}`}
           onClick={() => setActiveTab('anki')}
         >
-          <span className="mobile-nav-icon"><TrendingUp size={22} /></span>
+          <span className="mobile-nav-icon"><Brain size={22} /></span>
           <span>Anki</span>
         </button>
         <button
