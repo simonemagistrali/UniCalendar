@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
 import { Settings } from './pages/Settings';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { useAppStore } from './store/useAppStore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './core/firebase';
@@ -59,6 +60,7 @@ function App() {
         <Route path="/login" element={user ? <Navigate to="/home" replace /> : <Login />} />
         <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="*" element={<Navigate to={user ? "/home" : "/login"} replace />} />
       </Routes>
     </BrowserRouter>

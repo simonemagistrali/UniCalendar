@@ -260,6 +260,23 @@ export function Settings() {
             </div>
           </GlassPanel>
 
+          {/* Privacy and Account */}
+          <GlassPanel>
+            <h2 className="settings-section-title">Privacy e Sicurezza</h2>
+            <p className="settings-section-desc">
+              Gestisci i tuoi dati e consulta i termini legali del servizio.
+            </p>
+            <div style={{ marginTop: '1rem' }}>
+              <Button 
+                variant="secondary" 
+                onClick={() => navigate('/privacy')}
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                Leggi la Privacy Policy
+              </Button>
+            </div>
+          </GlassPanel>
+
           {/* Save */}
           <div className="settings-save-row">
             {saved && <span className="settings-saved-msg">✓ Salvato!</span>}

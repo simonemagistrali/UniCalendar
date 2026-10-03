@@ -109,7 +109,12 @@ export function Login() {
         </div>
 
         <p className="login-footer">
-          I tuoi dati vengono sincronizzati in modo sicuro su cloud per il backup e l'accesso multi-dispositivo.
+          I tuoi dati vengono sincronizzati in modo sicuro su cloud con crittografia.
+          <br />
+          Continuando accetti la nostra{' '}
+          <a href="#" onClick={(e) => { e.preventDefault(); navigate('/privacy'); }} style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}>
+            Privacy Policy
+          </a>.
         </p>
       </GlassPanel>
     </div>
