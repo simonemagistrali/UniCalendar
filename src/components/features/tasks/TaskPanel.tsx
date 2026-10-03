@@ -95,6 +95,25 @@ export function TaskPanel() {
     }
   }, [sortedTasks]); // eslint-disable-line
 
+  // Visual display sorting (Urgent > Date, Non-urgent > Date)
+  const displaySortedTasks = useMemo(() => {
+    return [...sortedTasks].sort((a, b) => {
+      if (a.status === 'in_progress' && b.status !== 'in_progress') return -1;
+      if (a.status !== 'in_progress' && b.status === 'in_progress') return 1;
+
+      const aUrgent = a.priorityScore >= 100 ? 1 : 0;
+      const bUrgent = b.priorityScore >= 100 ? 1 : 0;
+
+      if (aUrgent !== bUrgent) {
+        return bUrgent - aUrgent;
+      }
+
+      const aTime = new Date(a.createdAt).getTime();
+      const bTime = new Date(b.createdAt).getTime();
+      return aTime - bTime;
+    });
+  }, [sortedTasks]);
+
   const filteredTasks = useMemo(() => {
     if (filter === 'forecast') {
       // Show only phantom tasks
@@ -105,7 +124,7 @@ export function TaskPanel() {
       });
     }
 
-    const realTasks = sortedTasks.filter(t => {
+    const realTasks = displaySortedTasks.filter(t => {
       if (filter === 'todo' && t.status !== 'todo') return false;
       if (filter === 'in_progress' && t.status !== 'in_progress') return false;
       if (filter === 'done' && t.status !== 'done') return false;
