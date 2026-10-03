@@ -503,9 +503,15 @@
   .timeline-gutter {
     width: 38px;
   }
+  .timeline-hour-label, .timeline-cell {
+    height: 45px !important;
+  }
   .timeline-hour-label {
     font-size: 9px;
     padding: 0 3px;
+  }
+  .timeline-event-time {
+    display: none !important;
   }
   .timeline-event {
     font-size: 10px;

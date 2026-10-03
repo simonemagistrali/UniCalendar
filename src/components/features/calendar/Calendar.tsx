@@ -517,10 +517,14 @@ function CurrentTimeIndicator({ date }: { date: Date }) {
   );
 }
 
+function getPixelsPerHour() {
+  return typeof window !== 'undefined' && window.innerWidth <= 900 ? 45 : 60;
+}
+
 /** Convert a Date to pixel position in the timeline (6:00 = 0px) */
 function getTimePosition(date: Date): number {
   const hours = date.getHours() + date.getMinutes() / 60;
-  return Math.max(0, (hours - 6) * 60); // 60px per hour, starting at 6:00
+  return Math.max(0, (hours - 6) * getPixelsPerHour()); // 45px or 60px per hour, starting at 6:00
 }
 
 /** Calculates left and width for events to avoid overlapping visually */
