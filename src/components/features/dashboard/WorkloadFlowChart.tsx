@@ -14,7 +14,8 @@ import annotationPlugin from 'chartjs-plugin-annotation';
 import { Line } from 'react-chartjs-2';
 import { GlassPanel } from '../../ui/GlassPanel';
 import { useAppStore } from '../../../store/useAppStore';
-import { Activity, TrendingUp, TrendingDown, Equal, Crosshair, ZoomIn, ZoomOut, Calendar } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, Equal, Crosshair, ZoomIn, ZoomOut, Calendar, Info } from 'lucide-react';
+import { Modal } from '../../ui/Modal';
 
 ChartJS.register(
   CategoryScale,
@@ -151,6 +152,7 @@ export function WorkloadFlowChart() {
   const events = useAppStore(s => s.events);
   const courses = useAppStore(s => s.courses);
   const [viewMode, setViewMode] = useState<ViewMode>('short');
+  const [infoPopup, setInfoPopup] = useState<{ title: string; formula: string; calc: string } | null>(null);
 
   const analysis = useMemo(() => {
     // Collect all real tasks (exclude phantom/predicted)
@@ -781,23 +783,84 @@ export function WorkloadFlowChart() {
           display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px'
         }}>
           <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(16, 185, 129, 1)' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Stare al passo (rette parallele)</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Stare al passo (rette parallele)
+              <button 
+                onClick={() => setInfoPopup({
+                  title: 'Stare al passo',
+                  formula: 'Math.ceil(Media task aggiunti a settimana / 7 giorni)',
+                  calc: `Math.ceil(${analysis.flowAnalysis.avgCreatedPerWeek} / 7) = ${Math.max(0, Math.ceil(analysis.flowAnalysis.avgCreatedPerWeek / 7))}`
+                })}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'flex', opacity: 0.7 }}
+                title="Vedi calcolo"
+              >
+                <Info size={14} />
+              </button>
+            </div>
             <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{Math.max(0, Math.ceil(analysis.flowAnalysis.avgCreatedPerWeek / 7))} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span></div>
           </div>
           
           <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(245, 158, 11, 1)' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Recuperare entro 7 giorni</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Recuperare entro 7 giorni
+              <button 
+                onClick={() => setInfoPopup({
+                  title: 'Recuperare entro 7 giorni',
+                  formula: 'Math.ceil((Media task aggiunti a settimana / 7) + (Backlog attuale / 7))',
+                  calc: `Math.ceil((${analysis.flowAnalysis.avgCreatedPerWeek} / 7) + (${analysis.flowAnalysis.currentBacklog} / 7)) = ${Math.max(0, Math.ceil((analysis.flowAnalysis.avgCreatedPerWeek / 7) + (analysis.flowAnalysis.currentBacklog / 7)))}`
+                })}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'flex', opacity: 0.7 }}
+                title="Vedi calcolo"
+              >
+                <Info size={14} />
+              </button>
+            </div>
             <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{Math.max(0, Math.ceil((analysis.flowAnalysis.avgCreatedPerWeek / 7) + (analysis.flowAnalysis.currentBacklog / 7)))} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span></div>
           </div>
           
           {analysis.daysUntilLastLesson && analysis.daysUntilLastLesson > 0 && (
             <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(124, 58, 237, 1)' }}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Essere in pari a fine corsi</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                Essere in pari a fine corsi
+                <button 
+                  onClick={() => setInfoPopup({
+                    title: 'Essere in pari a fine corsi',
+                    formula: 'Math.ceil((Media task futuri stimati a settimana / 7) + (Backlog attuale / Giorni alla fine delle lezioni))',
+                    calc: `Math.ceil((${analysis.futureTasksPerWeek} / 7) + (${analysis.flowAnalysis.currentBacklog} / ${analysis.daysUntilLastLesson})) = ${Math.max(0, Math.ceil((analysis.futureTasksPerWeek / 7) + (analysis.flowAnalysis.currentBacklog / analysis.daysUntilLastLesson)))}`
+                  })}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'flex', opacity: 0.7 }}
+                  title="Vedi calcolo"
+                >
+                  <Info size={14} />
+                </button>
+              </div>
               <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{Math.max(0, Math.ceil((analysis.futureTasksPerWeek / 7) + (analysis.flowAnalysis.currentBacklog / analysis.daysUntilLastLesson)))} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span></div>
             </div>
           )}
         </div>
       )}
+
+      {/* Modal formula */}
+      <Modal 
+        isOpen={infoPopup !== null} 
+        onClose={() => setInfoPopup(null)} 
+        title={infoPopup?.title || 'Dettaglio calcolo'}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Formula:</h4>
+            <code style={{ display: 'block', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '6px', fontSize: '0.85rem' }}>
+              {infoPopup?.formula}
+            </code>
+          </div>
+          <div>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Calcolo con valori attuali:</h4>
+            <code style={{ display: 'block', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--accent-color, #10b981)' }}>
+              {infoPopup?.calc}
+            </code>
+          </div>
+        </div>
+      </Modal>
 
       {/* Chart */}
       <div className="dashboard-chart" style={{ height: viewMode === 'semester' ? '380px' : '320px' }}>
