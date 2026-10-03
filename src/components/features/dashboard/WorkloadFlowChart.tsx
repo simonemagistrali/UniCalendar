@@ -143,6 +143,7 @@ const NO_DATA_RESULT = {
   shortView: null as ChartViewData | null,
   semesterView: null as ChartViewData | null,
   lastLessonDate: null as string | null,
+  totalFutureTasks: 0,
   futureTasksPerWeek: 0,
   daysUntilLastLesson: null as number | null,
 };
@@ -283,8 +284,9 @@ export function WorkloadFlowChart() {
 
     // Average tasks per week from future lessons (for the short view regression fallback)
     const futureWeeks = Array.from(futureWeekLessonCount.values());
+    const totalFutureTasks = futureWeeks.reduce((a, b) => a + b, 0);
     const avgFutureTasksPerWeek = futureWeeks.length > 0
-      ? futureWeeks.reduce((a, b) => a + b, 0) / futureWeeks.length
+      ? totalFutureTasks / futureWeeks.length
       : recentCreated; // fallback to historical rate
 
     // ─── Determine analysis status ───
@@ -478,6 +480,7 @@ export function WorkloadFlowChart() {
       shortView,
       semesterView,
       lastLessonDate,
+      totalFutureTasks,
       futureTasksPerWeek: Math.round(avgFutureTasksPerWeek * 10) / 10,
       daysUntilLastLesson,
     };
@@ -825,8 +828,8 @@ export function WorkloadFlowChart() {
                 <button 
                   onClick={() => setInfoPopup({
                     title: 'Essere in pari a fine corsi',
-                    formula: 'Math.ceil((Media task futuri stimati a settimana / 7) + (Backlog attuale / Giorni alla fine delle lezioni))',
-                    calc: `Math.ceil((${analysis.futureTasksPerWeek} / 7) + (${analysis.flowAnalysis.currentBacklog} / ${analysis.daysUntilLastLesson})) = ${Math.max(0, Math.ceil((analysis.futureTasksPerWeek / 7) + (analysis.flowAnalysis.currentBacklog / analysis.daysUntilLastLesson)))}`
+                    formula: 'Math.ceil((Task futuri totali stimati + Backlog attuale) / Giorni alla fine delle lezioni)',
+                    calc: `Math.ceil((${analysis.totalFutureTasks} + ${analysis.flowAnalysis.currentBacklog}) / ${analysis.daysUntilLastLesson}) = ${Math.max(0, Math.ceil((analysis.totalFutureTasks + analysis.flowAnalysis.currentBacklog) / analysis.daysUntilLastLesson))}`
                   })}
                   style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'flex', opacity: 0.7 }}
                   title="Vedi calcolo"
@@ -834,7 +837,7 @@ export function WorkloadFlowChart() {
                   <Info size={14} />
                 </button>
               </div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{Math.max(0, Math.ceil((analysis.futureTasksPerWeek / 7) + (analysis.flowAnalysis.currentBacklog / analysis.daysUntilLastLesson)))} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span></div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{Math.max(0, Math.ceil((analysis.totalFutureTasks + analysis.flowAnalysis.currentBacklog) / analysis.daysUntilLastLesson))} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span></div>
             </div>
           )}
         </div>
