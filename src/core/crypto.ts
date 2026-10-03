@@ -48,15 +48,36 @@ export function encryptData(data: any): string {
 }
 
 /**
+ * Controlla se una stringa è nel formato criptato (inizia con il prefisso tipico di CryptoJS)
+ */
+export function isEncryptedFormat(data: any): boolean {
+  if (typeof data !== 'string') return false;
+  // I dati criptati con CryptoJS base64 di solito iniziano con 'U2FsdGVkX1' (ovvero "Salted__")
+  return data.startsWith('U2FsdGVkX1');
+}
+
+/**
  * Decripta una stringa Base64 nell'oggetto originale
  */
 export function decryptData(encryptedStr: string): any {
   if (!sessionKey || typeof encryptedStr !== 'string') {
     return encryptedStr;
   }
+  
+  if (!isEncryptedFormat(encryptedStr)) {
+    // Se non è criptato, lo ritorna così com'è (utile per i vecchi dati in chiaro)
+    return encryptedStr;
+  }
+
   try {
     const bytes = CryptoJS.AES.decrypt(encryptedStr, sessionKey);
     const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
+    
+    if (!decryptedStr) {
+       console.warn('[Crypto] Decrittografia fallita (chiave errata o dati corrotti)');
+       return encryptedStr;
+    }
+    
     return JSON.parse(decryptedStr);
   } catch (error) {
     console.error('[Crypto] Errore durante la decrittografia', error);

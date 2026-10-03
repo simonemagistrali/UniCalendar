@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import { loadState, saveState } from "./persistence";
-import { encryptData, decryptData } from "./crypto";
+import { encryptData, decryptData, isEncryptedFormat } from "./crypto";
 import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord } from "./types";
 
 export interface UserSyncData {
@@ -72,7 +72,16 @@ export async function syncToCloud(userId: string, data: UserSyncData) {
     // Obfuscate the data before saving
     const encryptedPayload: any = {};
     for (const [key, value] of Object.entries(sanitizedData)) {
-      encryptedPayload[key] = encryptData(value);
+      const encryptedValue = encryptData(value);
+      
+      // Controllo di Sicurezza Continuo (Fail-Safe)
+      // Se il valore era definito, deve risultare in una stringa criptata.
+      if (value !== undefined && value !== null && !isEncryptedFormat(encryptedValue)) {
+        console.error(`[Security] 🚨 CRITICO: Il campo '${key}' non è stato criptato correttamente! Interrompo il salvataggio per evitare fughe di dati.`);
+        return; // Blocchiamo tutto per evitare di scrivere dati in chiaro!
+      }
+      
+      encryptedPayload[key] = encryptedValue;
     }
     
     await setDoc(userDocRef, {
@@ -96,12 +105,29 @@ export async function loadFromCloud(userId: string): Promise<UserSyncData | null
       console.log("[Sync] Data loaded from cloud successfully.");
       const rawData = docSnap.data();
       const decryptedData: any = {};
+      let needsMigration = false;
+      
       for (const [key, value] of Object.entries(rawData)) {
         if (key !== 'updatedAt') {
+          // Se troviamo un campo che non è criptato, l'utente ha vecchi dati
+          if (!isEncryptedFormat(value)) {
+            needsMigration = true;
+          }
           decryptedData[key] = decryptData(value as any);
         }
       }
-      return decryptedData as UserSyncData;
+      
+      const finalData = decryptedData as UserSyncData;
+      
+      // Auto-Migrazione dei vecchi dati
+      if (needsMigration) {
+        console.log("[Security] 🔄 Trovati dati in chiaro (vecchia versione). Avvio migrazione criptata in background...");
+        setTimeout(() => {
+          syncToCloud(userId, finalData).catch(console.error);
+        }, 1500);
+      }
+      
+      return finalData;
     }
   } catch (error) {
     console.error("[Sync] Error loading from cloud:", error);
