@@ -62,7 +62,7 @@ export function Home() {
       <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src="/icon.png" alt="UniCalendar Logo" style={{ width: 48, height: 48, objectFit: 'contain' }} />
+            <img src="/icon.png" alt="UniCalendar Logo" style={{ width: 64, height: 64, objectFit: 'contain' }} />
           </div>
           <span className="sidebar-logo-text">UniCalendar</span>
         </div>
