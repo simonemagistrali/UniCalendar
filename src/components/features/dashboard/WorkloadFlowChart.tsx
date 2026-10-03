@@ -865,103 +865,169 @@ export function WorkloadFlowChart() {
         <div style={{
           display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px'
         }}>
-          <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(16, 185, 129, 1)' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              Stare al passo
-              <button 
-                onClick={() => setDailyGoal(selectedDailyGoalType === 'PACE' ? null : 'PACE', analysis.ratePace)}
-                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: selectedDailyGoalType === 'PACE' ? 'rgba(16, 185, 129, 1)' : 'inherit', display: 'flex', opacity: selectedDailyGoalType === 'PACE' ? 1 : 0.7 }}
-                title="Imposta come obiettivo di oggi"
-              >
-                <CheckCircle size={14} />
-              </button>
-              <button 
-                onClick={() => setShowSimPace(!showSimPace)}
-                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: showSimPace ? 'rgba(16, 185, 129, 1)' : 'inherit', display: 'flex', opacity: showSimPace ? 1 : 0.7 }}
-                title="Mostra simulazione nel grafico"
-              >
-                {showSimPace ? <Eye size={14} /> : <EyeOff size={14} />}
-              </button>
-              <button 
-                onClick={() => setInfoPopup({
-                  title: 'Stare al passo',
-                  formula: 'Math.ceil(Media task aggiunti a settimana / 7 giorni)',
-                  calc: `Math.ceil(${analysis.flowAnalysis.avgCreatedPerWeek} / 7) = ${Math.max(0, Math.ceil(analysis.flowAnalysis.avgCreatedPerWeek / 7))}`
-                })}
-                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'flex', opacity: 0.7 }}
-                title="Vedi calcolo"
-              >
-                <Info size={14} />
-              </button>
-            </div>
-            <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{Math.max(0, Math.ceil(analysis.flowAnalysis.avgCreatedPerWeek / 7))} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span></div>
-          </div>
-          
-          <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(245, 158, 11, 1)' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              Recuperare (7 gg)
-              <button 
-                onClick={() => setDailyGoal(selectedDailyGoalType === '7DAYS' ? null : '7DAYS', analysis.rate7Days)}
-                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: selectedDailyGoalType === '7DAYS' ? 'rgba(245, 158, 11, 1)' : 'inherit', display: 'flex', opacity: selectedDailyGoalType === '7DAYS' ? 1 : 0.7 }}
-                title="Imposta come obiettivo di oggi"
-              >
-                <CheckCircle size={14} />
-              </button>
-              <button 
-                onClick={() => setShowSim7Days(!showSim7Days)}
-                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: showSim7Days ? 'rgba(245, 158, 11, 1)' : 'inherit', display: 'flex', opacity: showSim7Days ? 1 : 0.7 }}
-                title="Mostra simulazione nel grafico"
-              >
-                {showSim7Days ? <Eye size={14} /> : <EyeOff size={14} />}
-              </button>
-              <button 
-                onClick={() => setInfoPopup({
-                  title: 'Recuperare entro 7 giorni',
-                  formula: 'Math.ceil((Media task aggiunti a settimana / 7) + (Backlog attuale / 7))',
-                  calc: `Math.ceil((${analysis.flowAnalysis.avgCreatedPerWeek} / 7) + (${analysis.flowAnalysis.currentBacklog} / 7)) = ${Math.max(0, Math.ceil((analysis.flowAnalysis.avgCreatedPerWeek / 7) + (analysis.flowAnalysis.currentBacklog / 7)))}`
-                })}
-                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'flex', opacity: 0.7 }}
-                title="Vedi calcolo"
-              >
-                <Info size={14} />
-              </button>
-            </div>
-            <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{Math.max(0, Math.ceil((analysis.flowAnalysis.avgCreatedPerWeek / 7) + (analysis.flowAnalysis.currentBacklog / 7)))} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span></div>
-          </div>
-          
-          {analysis.daysUntilLastLesson && analysis.daysUntilLastLesson > 0 && (
-            <div style={{ flex: 1, minWidth: '200px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid rgba(124, 58, 237, 1)' }}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                Essere in pari a fine corsi
+          {/* PACE GOAL */}
+          <div 
+            onClick={() => setDailyGoal(selectedDailyGoalType === 'PACE' ? null : 'PACE', analysis.ratePace)}
+            style={{ 
+              flex: 1, minWidth: '220px', padding: '16px', 
+              background: selectedDailyGoalType === 'PACE' ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-tertiary)', 
+              borderRadius: '8px', 
+              border: selectedDailyGoalType === 'PACE' ? '2px solid rgba(16, 185, 129, 1)' : '1px solid transparent',
+              borderLeft: selectedDailyGoalType === 'PACE' ? '2px solid rgba(16, 185, 129, 1)' : '4px solid rgba(16, 185, 129, 1)', 
+              cursor: 'pointer',
+              position: 'relative',
+              transition: 'all 0.2s',
+              boxShadow: selectedDailyGoalType === 'PACE' ? '0 4px 12px rgba(16, 185, 129, 0.15)' : 'none'
+            }}
+            title="Clicca per impostare come obiettivo di oggi"
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: '0.85rem', color: selectedDailyGoalType === 'PACE' ? 'rgba(16, 185, 129, 1)' : 'var(--text-secondary)', fontWeight: selectedDailyGoalType === 'PACE' ? 700 : 500, marginBottom: '6px' }}>
+                  {selectedDailyGoalType === 'PACE' ? '🎯 OBIETTIVO ATTIVO' : 'Stare al passo'}
+                </div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {analysis.ratePace} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '6px' }} onClick={e => e.stopPropagation()}>
                 <button 
-                  onClick={() => setDailyGoal(selectedDailyGoalType === 'END' ? null : 'END', analysis.rateEnd)}
-                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: selectedDailyGoalType === 'END' ? 'rgba(124, 58, 237, 1)' : 'inherit', display: 'flex', opacity: selectedDailyGoalType === 'END' ? 1 : 0.7 }}
-                  title="Imposta come obiettivo di oggi"
+                  onClick={(e) => { e.stopPropagation(); setShowSimPace(!showSimPace); }}
+                  style={{ padding: '6px', background: showSimPace ? 'rgba(16, 185, 129, 0.2)' : 'var(--bg-secondary)', color: showSimPace ? 'rgba(16, 185, 129, 1)' : 'var(--text-secondary)', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex' }}
+                  title="Simula grafico"
                 >
-                  <CheckCircle size={14} />
+                  {showSimPace ? <Eye size={16} /> : <EyeOff size={16} />}
                 </button>
                 <button 
-                  onClick={() => setShowSimEnd(!showSimEnd)}
-                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: showSimEnd ? 'rgba(124, 58, 237, 1)' : 'inherit', display: 'flex', opacity: showSimEnd ? 1 : 0.7 }}
-                  title="Mostra simulazione nel grafico"
-                >
-                  {showSimEnd ? <Eye size={14} /> : <EyeOff size={14} />}
-                </button>
-                <button 
-                  onClick={() => setInfoPopup({
-                    title: 'Essere in pari a fine corsi',
-                    formula: 'Math.ceil((Task futuri totali stimati + Backlog attuale) / Giorni alla fine delle lezioni)',
-                    calc: `Math.ceil((${analysis.totalFutureTasks} + ${analysis.flowAnalysis.currentBacklog}) / ${analysis.daysUntilLastLesson}) = ${Math.max(0, Math.ceil((analysis.totalFutureTasks + analysis.flowAnalysis.currentBacklog) / analysis.daysUntilLastLesson))}`
-                  })}
-                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'flex', opacity: 0.7 }}
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    setInfoPopup({
+                      title: 'Stare al passo',
+                      formula: 'Math.ceil(Media task aggiunti a settimana / 7 giorni)',
+                      calc: `Math.ceil(${analysis.flowAnalysis.avgCreatedPerWeek} / 7) = ${analysis.ratePace}`
+                    });
+                  }}
+                  style={{ padding: '6px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex' }}
                   title="Vedi calcolo"
                 >
-                  <Info size={14} />
+                  <Info size={16} />
                 </button>
               </div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>{Math.max(0, Math.ceil((analysis.totalFutureTasks + analysis.flowAnalysis.currentBacklog) / analysis.daysUntilLastLesson))} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span></div>
             </div>
-          )}
+            {!selectedDailyGoalType && <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '12px', fontWeight: 500 }}>Clicca il riquadro per attivare</div>}
+            {selectedDailyGoalType === 'PACE' && <div style={{ fontSize: '0.75rem', color: 'rgba(16, 185, 129, 0.8)', marginTop: '12px', fontWeight: 500 }}>Evidenziato in "Attività"</div>}
+          </div>
+          
+          {/* 7 DAYS GOAL */}
+          <div 
+            onClick={() => setDailyGoal(selectedDailyGoalType === '7DAYS' ? null : '7DAYS', analysis.rate7Days)}
+            style={{ 
+              flex: 1, minWidth: '220px', padding: '16px', 
+              background: selectedDailyGoalType === '7DAYS' ? 'rgba(245, 158, 11, 0.1)' : 'var(--bg-tertiary)', 
+              borderRadius: '8px', 
+              border: selectedDailyGoalType === '7DAYS' ? '2px solid rgba(245, 158, 11, 1)' : '1px solid transparent',
+              borderLeft: selectedDailyGoalType === '7DAYS' ? '2px solid rgba(245, 158, 11, 1)' : '4px solid rgba(245, 158, 11, 1)', 
+              cursor: 'pointer',
+              position: 'relative',
+              transition: 'all 0.2s',
+              boxShadow: selectedDailyGoalType === '7DAYS' ? '0 4px 12px rgba(245, 158, 11, 0.15)' : 'none'
+            }}
+            title="Clicca per impostare come obiettivo di oggi"
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: '0.85rem', color: selectedDailyGoalType === '7DAYS' ? 'rgba(245, 158, 11, 1)' : 'var(--text-secondary)', fontWeight: selectedDailyGoalType === '7DAYS' ? 700 : 500, marginBottom: '6px' }}>
+                  {selectedDailyGoalType === '7DAYS' ? '🎯 OBIETTIVO ATTIVO' : 'Recupero (7 gg)'}
+                </div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {analysis.rate7Days} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '6px' }} onClick={e => e.stopPropagation()}>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setShowSim7Days(!showSim7Days); }}
+                  style={{ padding: '6px', background: showSim7Days ? 'rgba(245, 158, 11, 0.2)' : 'var(--bg-secondary)', color: showSim7Days ? 'rgba(245, 158, 11, 1)' : 'var(--text-secondary)', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex' }}
+                  title="Simula grafico"
+                >
+                  {showSim7Days ? <Eye size={16} /> : <EyeOff size={16} />}
+                </button>
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    setInfoPopup({
+                      title: 'Recuperare entro 7 giorni',
+                      formula: 'Math.ceil((Media task aggiunti a settimana / 7) + (Backlog attuale / 7))',
+                      calc: `Math.ceil((${analysis.flowAnalysis.avgCreatedPerWeek} / 7) + (${analysis.flowAnalysis.currentBacklog} / 7)) = ${analysis.rate7Days}`
+                    });
+                  }}
+                  style={{ padding: '6px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex' }}
+                  title="Vedi calcolo"
+                >
+                  <Info size={16} />
+                </button>
+              </div>
+            </div>
+            {!selectedDailyGoalType && <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '12px', fontWeight: 500 }}>Clicca il riquadro per attivare</div>}
+            {selectedDailyGoalType === '7DAYS' && <div style={{ fontSize: '0.75rem', color: 'rgba(245, 158, 11, 0.8)', marginTop: '12px', fontWeight: 500 }}>Evidenziato in "Attività"</div>}
+          </div>
+          
+          {/* END OF COURSES GOAL */}
+          {analysis.daysUntilLastLesson && analysis.daysUntilLastLesson > 0 ? (
+            <div 
+              onClick={() => setDailyGoal(selectedDailyGoalType === 'END' ? null : 'END', analysis.rateEnd)}
+              style={{ 
+                flex: 1, minWidth: '220px', padding: '16px', 
+                background: selectedDailyGoalType === 'END' ? 'rgba(124, 58, 237, 0.1)' : 'var(--bg-tertiary)', 
+                borderRadius: '8px', 
+                border: selectedDailyGoalType === 'END' ? '2px solid rgba(124, 58, 237, 1)' : '1px solid transparent',
+                borderLeft: selectedDailyGoalType === 'END' ? '2px solid rgba(124, 58, 237, 1)' : '4px solid rgba(124, 58, 237, 1)', 
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'all 0.2s',
+                boxShadow: selectedDailyGoalType === 'END' ? '0 4px 12px rgba(124, 58, 237, 0.15)' : 'none'
+              }}
+              title="Clicca per impostare come obiettivo di oggi"
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: '0.85rem', color: selectedDailyGoalType === 'END' ? 'rgba(124, 58, 237, 1)' : 'var(--text-secondary)', fontWeight: selectedDailyGoalType === 'END' ? 700 : 500, marginBottom: '6px' }}>
+                    {selectedDailyGoalType === 'END' ? '🎯 OBIETTIVO ATTIVO' : 'In pari a fine corsi'}
+                  </div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {analysis.rateEnd} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>task/giorno</span>
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '6px' }} onClick={e => e.stopPropagation()}>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setShowSimEnd(!showSimEnd); }}
+                    style={{ padding: '6px', background: showSimEnd ? 'rgba(124, 58, 237, 0.2)' : 'var(--bg-secondary)', color: showSimEnd ? 'rgba(124, 58, 237, 1)' : 'var(--text-secondary)', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex' }}
+                    title="Simula grafico"
+                  >
+                    {showSimEnd ? <Eye size={16} /> : <EyeOff size={16} />}
+                  </button>
+                  <button 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setInfoPopup({
+                        title: 'Essere in pari a fine corsi',
+                        formula: 'Math.ceil((Task futuri totali stimati + Backlog attuale) / Giorni alla fine delle lezioni)',
+                        calc: `Math.ceil((${analysis.totalFutureTasks} + ${analysis.flowAnalysis.currentBacklog}) / ${analysis.daysUntilLastLesson}) = ${analysis.rateEnd}`
+                      });
+                    }}
+                    style={{ padding: '6px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex' }}
+                    title="Vedi calcolo"
+                  >
+                    <Info size={16} />
+                  </button>
+                </div>
+              </div>
+              {!selectedDailyGoalType && <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '12px', fontWeight: 500 }}>Clicca il riquadro per attivare</div>}
+              {selectedDailyGoalType === 'END' && <div style={{ fontSize: '0.75rem', color: 'rgba(124, 58, 237, 0.8)', marginTop: '12px', fontWeight: 500 }}>Evidenziato in "Attività"</div>}
+            </div>
+          ) : null}
         </div>
       )}
 
