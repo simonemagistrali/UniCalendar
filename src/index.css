@@ -418,6 +418,9 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 }
 
 @media (max-width: 900px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
   .mobile-topbar {
     display: flex;
   }

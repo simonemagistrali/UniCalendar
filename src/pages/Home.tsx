@@ -78,7 +78,7 @@ export function Home() {
           <button className={`sidebar-nav-item ${activeTab === 'statistics' ? 'active' : ''}`} onClick={() => { setActiveTab('statistics'); setSidebarOpen(false); }}>
             <TrendingUp size={20} /> Statistiche
           </button>
-          <button className={`sidebar-nav-item ${activeTab === 'anki' ? 'active' : ''}`} onClick={() => { setActiveTab('anki'); setSidebarOpen(false); }}>
+          <button className={`sidebar-nav-item hide-on-mobile ${activeTab === 'anki' ? 'active' : ''}`} onClick={() => { setActiveTab('anki'); setSidebarOpen(false); }}>
             <img src="https://upload.wikimedia.org/wikipedia/commons/3/3d/Anki-icon.svg" alt="Anki" style={{ width: 20, height: 20, filter: 'grayscale(100%) brightness(200%)' }} /> Anki
           </button>
         </nav>
@@ -188,7 +188,7 @@ export function Home() {
           <span>Statistiche</span>
         </button>
         <button
-          className={`mobile-nav-item ${activeTab === 'anki' ? 'active' : ''}`}
+          className={`mobile-nav-item hide-on-mobile ${activeTab === 'anki' ? 'active' : ''}`}
           onClick={() => setActiveTab('anki')}
         >
           <span className="mobile-nav-icon"><Brain size={22} /></span>
