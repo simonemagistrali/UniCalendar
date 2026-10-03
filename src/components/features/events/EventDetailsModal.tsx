@@ -39,6 +39,7 @@ export function EventDetailsModal({ isOpen, onClose, event, onEdit }: EventDetai
       if (resp) {
         const idsToDelete = [event.id, ...similarEvents.map(e => e.id)];
         const nextEvents = events.filter(e => !idsToDelete.includes(e.id));
+        useAppStore.getState().saveSnapshot();
         setEvents(nextEvents);
       } else {
         removeEvent(event.id);

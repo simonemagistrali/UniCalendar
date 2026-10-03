@@ -13,16 +13,60 @@ export interface UserSyncData {
 }
 
 /**
+ * Limiti di sicurezza per prevenire attacchi di billing/sabotaggio
+ */
+const MAX_ARRAY_LENGTH = 5000;
+const FORBIDDEN_FIELDS = ['isAdmin', 'role', 'admin', 'permissions'];
+const SYNC_DEBOUNCE_MS = 3000;
+
+/**
+ * Valida i dati prima di scrivere su Firestore.
+ * Rimuove campi proibiti e tronca array troppo grandi.
+ */
+function validateSyncData(data: UserSyncData): UserSyncData | null {
+  try {
+    // Blocca campi proibiti al livello root
+    for (const field of FORBIDDEN_FIELDS) {
+      if (field in (data as any)) {
+        console.warn(`[Security] Blocked forbidden field: ${field}`);
+        delete (data as any)[field];
+      }
+    }
+
+    // Controlla che gli array non superino il limite massimo
+    const arrayFields: (keyof UserSyncData)[] = ['tasks', 'events', 'courses', 'studySessions', 'performanceHistory'];
+    for (const key of arrayFields) {
+      const arr = data[key];
+      if (Array.isArray(arr) && arr.length > MAX_ARRAY_LENGTH) {
+        console.warn(`[Security] Array "${key}" exceeds max length (${arr.length}/${MAX_ARRAY_LENGTH}), truncating.`);
+        (data as any)[key] = arr.slice(0, MAX_ARRAY_LENGTH);
+      }
+    }
+
+    return data;
+  } catch (error) {
+    console.error('[Security] Data validation failed:', error);
+    return null;
+  }
+}
+
+/**
  * Salva i dati correnti dello stato su Firestore.
  * Viene chiamato in modo debounced per non inondare il database di richieste.
  */
 export async function syncToCloud(userId: string, data: UserSyncData) {
   try {
+    const validated = validateSyncData(data);
+    if (!validated) {
+      console.error("[Sync] Data validation failed, skipping cloud sync.");
+      return;
+    }
+
     const userDocRef = doc(db, "users", userId);
     
     // Firestore non accetta campi con valore "undefined". 
     // Usiamo stringify/parse per rimuovere ricorsivamente tutte le chiavi undefined
-    const sanitizedData = JSON.parse(JSON.stringify(data));
+    const sanitizedData = JSON.parse(JSON.stringify(validated));
     
     await setDoc(userDocRef, {
       ...sanitizedData,
@@ -53,6 +97,11 @@ export async function loadFromCloud(userId: string): Promise<UserSyncData | null
 
 // Debounce timer per evitare troppe chiamate al db
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
+let syncCallCount = 0;
+const MAX_SYNCS_PER_MINUTE = 20;
+
+// Reset sync counter ogni minuto
+setInterval(() => { syncCallCount = 0; }, 60000);
 
 /**
  * Helper per salvare sia in locale che tentare il salvataggio in cloud se loggato.
@@ -61,12 +110,19 @@ export function persistState(data: UserSyncData, userId: string | null) {
   // Salva sempre in locale per offline
   saveState(data);
   
-  // Se utente loggato, salva nel cloud asincronamente con debounce di 2 secondi
+  // Se utente loggato, salva nel cloud asincronamente con debounce
   if (userId) {
+    // Rate limiting: max 20 sync al minuto
+    if (syncCallCount >= MAX_SYNCS_PER_MINUTE) {
+      console.warn("[Sync] Rate limit reached, skipping cloud sync.");
+      return;
+    }
+
     if (syncTimer) clearTimeout(syncTimer);
     syncTimer = setTimeout(() => {
+      syncCallCount++;
       syncToCloud(userId, data).catch(console.error);
-    }, 2000);
+    }, SYNC_DEBOUNCE_MS);
   }
 }
 

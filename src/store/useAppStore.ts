@@ -280,7 +280,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addEvents: (events) => {
-    get().saveSnapshot();
     set((s) => {
       const newEvents = events.filter(e => !isEventDuplicate(e, s.events));
       if (newEvents.length === 0) return s;
@@ -309,7 +308,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setEvents: (events) => {
-    get().saveSnapshot();
     set((s) => {
       const next = { ...s, events };
       persist(next as AppState);
@@ -328,7 +326,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addTasks: (tasks) => {
-    get().saveSnapshot();
     set((s) => {
       const next = { ...s, tasks: deduplicateTasks([...s.tasks, ...tasks]) };
       persist(next as AppState);
@@ -382,7 +379,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setTasks: (tasks) => {
-    get().saveSnapshot();
     set((s) => {
       const next = { ...s, tasks: deduplicateTasks(tasks) };
       persist(next as AppState);

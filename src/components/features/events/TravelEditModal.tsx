@@ -81,6 +81,7 @@ export function TravelEditModal({ isOpen, onClose, parentEvent, direction, curre
         }
         return e;
       });
+      useAppStore.getState().saveSnapshot();
       setEvents(updatedEvents);
     } else {
       updateEvent(parentEvent.id, eventUpdates);

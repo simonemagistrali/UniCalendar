@@ -12,6 +12,7 @@ export const authService = {
     const user = result.user;
 
     const loggedUser = {
+      id: user.uid,
       name: user.displayName || 'Utente Universitario',
       email: user.email || '',
       photoURL: user.photoURL || '',

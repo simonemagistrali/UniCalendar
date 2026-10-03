@@ -153,6 +153,7 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
           }
           return e;
         });
+        useAppStore.getState().saveSnapshot();
         setEvents(updatedEvents);
       } else {
         updateEvent(initialEvent.id, eventData);

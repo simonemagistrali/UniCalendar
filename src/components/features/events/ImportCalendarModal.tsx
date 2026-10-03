@@ -45,6 +45,7 @@ export function ImportCalendarModal({ isOpen, onClose }: ImportCalendarModalProp
       return e;
     });
 
+    useAppStore.getState().saveSnapshot();
     addEvents(enriched);
     setResult({ count: enriched.length, coursesFound: detectedCourses.length });
     setIsImporting(false);

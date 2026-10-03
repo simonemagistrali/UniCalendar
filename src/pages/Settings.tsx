@@ -77,13 +77,16 @@ export function Settings() {
   };
 
   const handleSave = () => {
+    // Clamp values to safe ranges to prevent engine malfunction
+    const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
+    
     updatePreferences({
       dailyStudyHours: dailyHours,
-      daysBeforeExamToIncreasePriority: parseInt(daysBeforeExam) || 14,
+      daysBeforeExamToIncreasePriority: clamp(parseInt(daysBeforeExam) || 14, 1, 60),
       defaultHomeAddress: homeAddress || undefined,
-      defaultCommuteTimeMinutes: parseInt(commuteTime) || 45,
+      defaultCommuteTimeMinutes: clamp(parseInt(commuteTime) || 45, 0, 300),
       isCommuteProductive,
-      ankiAverageTimeSeconds: parseInt(ankiAverageTime) || 15,
+      ankiAverageTimeSeconds: clamp(parseInt(ankiAverageTime) || 15, 1, 300),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);

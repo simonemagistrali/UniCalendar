@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Ogni utente può leggere e scrivere SOLO il proprio documento
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Validazione dimensione: limita i campi per prevenire attacchi di billing
+      allow write: if request.auth != null 
+                   && request.auth.uid == userId
+                   && request.resource.data.keys().size() <= 20
+                   && (!request.resource.data.keys().hasAny(['isAdmin', 'role', 'admin']));
+    }
+
+    // Blocca tutto il resto — nessun altro documento è accessibile
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

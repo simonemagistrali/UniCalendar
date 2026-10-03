@@ -171,12 +171,70 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
+/* ─── URL Validation ─── */
+
+const BLOCKED_HOSTS = [
+  'localhost', '127.0.0.1', '0.0.0.0', '::1',
+  '10.', '172.16.', '172.17.', '172.18.', '172.19.',
+  '172.20.', '172.21.', '172.22.', '172.23.', '172.24.',
+  '172.25.', '172.26.', '172.27.', '172.28.', '172.29.',
+  '172.30.', '172.31.', '192.168.',
+];
+
+const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
+
+function isUrlSafe(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    
+    // Only allow HTTPS
+    if (parsed.protocol !== 'https:') {
+      console.warn('[Security] Blocked non-HTTPS URL:', url);
+      return false;
+    }
+    
+    // Block localhost and private IPs
+    const hostname = parsed.hostname.toLowerCase();
+    if (BLOCKED_HOSTS.some(blocked => hostname === blocked || hostname.startsWith(blocked))) {
+      console.warn('[Security] Blocked private/local URL:', url);
+      return false;
+    }
+    
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /* ─── Fetch from URL ─── */
 
 export async function fetchCalendarFromURL(url: string): Promise<CalendarEvent[]> {
+  if (!isUrlSafe(url)) {
+    console.error('[Security] URL non consentito:', url);
+    return [];
+  }
+
   try {
-    const response = await fetch(url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    // Check content length before reading
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > MAX_RESPONSE_SIZE) {
+      console.error('[Security] Response too large:', contentLength);
+      return [];
+    }
+
     const text = await response.text();
+
+    // Double-check actual size
+    if (text.length > MAX_RESPONSE_SIZE) {
+      console.error('[Security] Response body too large:', text.length);
+      return [];
+    }
     
     if (text.includes('BEGIN:VCALENDAR') || text.includes('BEGIN:VEVENT')) {
       return parseICS(text);

@@ -109,7 +109,7 @@ export function Login() {
         </div>
 
         <p className="login-footer">
-          I tuoi dati restano nel browser. Nessun server esterno.
+          I tuoi dati vengono sincronizzati in modo sicuro su cloud per il backup e l'accesso multi-dispositivo.
         </p>
       </GlassPanel>
     </div>
