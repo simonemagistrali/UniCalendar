@@ -606,34 +606,35 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   }
 
   /* ─── Task Panel Mobile ─── */
-  .task-panel {
-    border: none !important;
-    background: transparent !important;
-    padding: 4px 0 !important;
+  .task-panel, .glass-panel {
+    background: #ffffff !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 16px !important;
+    padding: 16px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03) !important;
   }
   .task-list {
     max-height: calc(100vh - 280px);
-    gap: 12px;
+    gap: 0 !important;
   }
   .task-card {
-    padding: 16px;
+    padding: 16px 4px !important;
     border: none !important;
-    border-radius: 16px !important;
-    background: #ffffff !important;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.04) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .task-card:last-child {
+    border-bottom: none !important;
   }
   .task-title {
     font-size: 15px;
-    font-weight: 600;
-    line-height: 1.4;
+    font-weight: 500;
     margin-bottom: 4px;
   }
   .task-card-meta {
     font-size: 12px;
-    gap: 8px;
-  }
-  .task-badge-normal, .task-deps-note {
-    display: none !important;
   }
   .task-card-actions {
     border-top: none !important;
@@ -642,25 +643,20 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   }
 
   /* ─── Stats / Dashboard Mobile ─── */
-  .glass-panel {
-    border: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    padding: 8px 0 !important;
-  }
   .dashboard-quick-stats {
     flex-wrap: wrap;
     gap: 12px !important;
   }
   .dashboard-stat {
-    background: #ffffff !important;
+    background: #f8f9fa !important;
+    border: 1px solid var(--border-color) !important;
     padding: 16px !important;
-    border-radius: 16px !important;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.04) !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
     flex: 1 1 calc(50% - 6px);
   }
   .dashboard-stat-num {
-    font-size: 24px !important;
+    font-size: 22px !important;
   }
   .catchup-courses-grid {
     grid-template-columns: 1fr !important;
@@ -668,15 +664,19 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   }
 
   /* ─── Course Manager Mobile ─── */
+  .course-list {
+    gap: 0 !important;
+  }
   .course-item {
     border: none !important;
-    background: #ffffff !important;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.04) !important;
-    border-radius: 16px !important;
-    padding: 16px !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 16px 4px !important;
   }
-  .course-list {
-    gap: 12px !important;
+  .course-item:last-child {
+    border-bottom: none !important;
   }
   .course-form-row {
     flex-direction: column;
