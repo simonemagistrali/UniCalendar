@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2, TrendingUp, MoreHorizontal, CheckSquare, BarChart3, Brain } from "lucide-react";
 
 import { Calendar } from '../components/features/calendar/Calendar';
@@ -25,6 +25,22 @@ export function Home() {
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'calendar' | 'tasks' | 'statistics' | 'anki'>('calendar');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showSnackbar, setShowSnackbar] = useState(false);
+  const prevStatesLength = useRef(pastStates.length);
+
+  useEffect(() => {
+    if (pastStates.length > prevStatesLength.current) {
+      setShowSnackbar(true);
+      const timer = setTimeout(() => {
+        setShowSnackbar(false);
+      }, 4000);
+      prevStatesLength.current = pastStates.length;
+      return () => clearTimeout(timer);
+    } else {
+      setShowSnackbar(false);
+      prevStatesLength.current = pastStates.length;
+    }
+  }, [pastStates.length]);
 
   const handleLogout = async () => {
     await authService.logout();
@@ -198,10 +214,10 @@ export function Home() {
       )}
 
       {/* ═══ Modern Snackbar (Undo) ═══ */}
-      {pastStates.length > 0 && (
+      {showSnackbar && pastStates.length > 0 && (
         <div className="modern-snackbar">
           <span className="snackbar-message">Modifica applicata</span>
-          <button className="snackbar-action" onClick={undo}>
+          <button className="snackbar-action" onClick={() => { undo(); setShowSnackbar(false); }}>
             Annulla
           </button>
         </div>
