@@ -402,7 +402,9 @@
 @media (max-width: 768px) {
   .calendar-container {
     min-height: auto;
-    border-radius: 8px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
   }
 
   /* Calendar Header — stacked layout */
