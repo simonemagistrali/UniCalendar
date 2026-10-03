@@ -1,88 +1,133 @@
-import { useState, useEffect } from 'react';
-import { CalendarIcon, Brain, CheckSquare, X, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useEffect } from 'react';
+import { driver } from 'driver.js';
+import 'driver.js/dist/driver.css';
 
 export function Tutorial() {
-  const [isVisible, setIsVisible] = useState(false);
-  const [step, setStep] = useState(0);
-
   useEffect(() => {
-    const hasSeenTutorial = localStorage.getItem('uniCalendar_tutorialCompleted');
+    const hasSeenTutorial = localStorage.getItem('uniCalendar_tutorialDriverCompleted');
+    
     if (!hasSeenTutorial) {
-      setIsVisible(true);
+      // Small timeout to ensure DOM is fully rendered
+      const timer = setTimeout(() => {
+        const isMobile = window.innerWidth <= 900;
+
+        const steps = isMobile ? [
+          {
+            popover: {
+              title: 'Benvenuto in UniCalendar! 🎉',
+              description: 'Facciamo un rapido tour per scoprire le funzionalità principali.',
+              align: 'center'
+            }
+          },
+          {
+            element: '.calendar-main',
+            popover: {
+              title: 'Il tuo Calendario 📅',
+              description: 'Qui puoi visualizzare tutti gli eventi, le lezioni e le sessioni di studio.',
+              side: 'top',
+              align: 'start'
+            }
+          },
+          {
+            element: '.mobile-fab',
+            popover: {
+              title: 'Aggiungi Eventi ➕',
+              description: 'Tocca questo pulsante per creare un nuovo evento in qualsiasi momento.',
+              side: 'top',
+              align: 'end'
+            }
+          },
+          {
+            element: '.mobile-bottom-nav',
+            popover: {
+              title: 'Navigazione rapida 🚀',
+              description: 'Usa la barra inferiore per passare velocemente tra Attività (To-Do), Statistiche e Anki.',
+              side: 'top',
+              align: 'center'
+            }
+          },
+          {
+            element: '.mobile-nav-item:last-child',
+            popover: {
+              title: 'Menu Avanzato ed Esportazioni ⚙️',
+              description: 'Tocca "Altro" per aprire il menu laterale: lì troverai il pulsante "Importa .ics" per collegare Google Calendar!',
+              side: 'top',
+              align: 'end'
+            }
+          }
+        ] : [
+          {
+            popover: {
+              title: 'Benvenuto in UniCalendar! 🎉',
+              description: 'Facciamo un rapido tour per scoprire dove si trovano le funzionalità principali.',
+              align: 'center'
+            }
+          },
+          {
+            element: '.calendar-main',
+            popover: {
+              title: 'Il tuo Calendario 📅',
+              description: 'Qui avrai la visione d\'insieme delle tue giornate: lezioni, esami e studio.',
+              side: 'right',
+              align: 'start'
+            }
+          },
+          {
+            element: '.sidebar-create-btn',
+            popover: {
+              title: 'Crea Nuovi Eventi ➕',
+              description: 'Clicca qui per aggiungere rapidamente un nuovo impegno al calendario.',
+              side: 'right',
+              align: 'start'
+            }
+          },
+          {
+            element: '.sidebar-actions > button:nth-child(2)',
+            popover: {
+              title: 'Collega Google Calendar 🔄',
+              description: 'Usa questo pulsante per caricare il tuo file .ics esportato da Google Calendar e avere tutto sincronizzato.',
+              side: 'right',
+              align: 'start'
+            }
+          },
+          {
+            element: '.sidebar-nav',
+            popover: {
+              title: 'Strumenti di Studio 📚',
+              description: 'Da qui puoi passare alle tue Attività (To-Do list), vedere le Statistiche o usare l\'integrazione con Anki.',
+              side: 'right',
+              align: 'start'
+            }
+          },
+          {
+            element: '.calendar-sidebar',
+            popover: {
+              title: 'Obiettivi di Oggi 🎯',
+              description: 'La barra laterale ti mostrerà sempre i task urgenti per tenerti concentrato!',
+              side: 'left',
+              align: 'start'
+            }
+          }
+        ];
+
+        const driverObj = driver({
+          showProgress: true,
+          steps: steps as any,
+          nextBtnText: 'Avanti',
+          prevBtnText: 'Indietro',
+          doneBtnText: 'Fatto',
+          allowClose: false,
+          onDestroyed: () => {
+            localStorage.setItem('uniCalendar_tutorialDriverCompleted', 'true');
+          }
+        });
+        
+        driverObj.drive();
+      }, 500);
+
+      return () => clearTimeout(timer);
     }
   }, []);
 
-  if (!isVisible) return null;
-
-  const handleClose = () => {
-    localStorage.setItem('uniCalendar_tutorialCompleted', 'true');
-    setIsVisible(false);
-  };
-
-  const steps = [
-    {
-      title: 'Benvenuto in UniCalendar! 🎉',
-      description: 'Il tuo compagno ideale per organizzare al meglio lo studio universitario e massimizzare la produttività. Scopriamo in pochi passi come ottenere il massimo!',
-      icon: <img src="/icon.png" alt="Logo" style={{ width: 80, height: 80, objectFit: 'contain' }} />,
-    },
-    {
-      title: 'Pianifica le Tue Giornate 📅',
-      description: 'Gestisci lezioni, esami e sessioni di studio. Crea eventi o collegati a Google Calendar: basta scaricare il file .ics da Google e caricarlo tramite "Importa .ics" nel menu!',
-      icon: <CalendarIcon size={64} className="tutorial-icon-accent" />,
-    },
-    {
-      title: 'Attività & Produttività ✅',
-      description: 'Usa la sezione Attività per creare le tue to-do list giornaliere. Suddividi i task complessi e tieni d\'occhio la barra di progresso per rimanere sempre motivato.',
-      icon: <CheckSquare size={64} className="tutorial-icon-accent" />,
-    },
-    {
-      title: 'Ripasso Intelligente con Anki 🧠',
-      description: 'Ottimizza lo studio sfruttando la ripetizione dilazionata! Se usi Anki, esplora la sezione dedicata per generare automaticamente il tuo piano di ripasso ideale.',
-      icon: <Brain size={64} className="tutorial-icon-accent" />,
-    }
-  ];
-
-  return (
-    <div className="modal-overlay tutorial-overlay">
-      <div className="tutorial-backdrop" onClick={handleClose}></div>
-      <div className="tutorial-container">
-        <button className="tutorial-close-btn" onClick={handleClose}>
-          <X size={20} />
-        </button>
-        <div className="tutorial-content-wrapper">
-          <div className="tutorial-icon-wrapper">
-            {steps[step].icon}
-          </div>
-          <h2 className="tutorial-title">{steps[step].title}</h2>
-          <p className="tutorial-description">{steps[step].description}</p>
-        </div>
-        
-        <div className="tutorial-footer">
-          <div className="tutorial-indicators">
-            {steps.map((_, i) => (
-              <div key={i} className={`tutorial-dot ${i === step ? 'active' : ''}`} />
-            ))}
-          </div>
-          <div className="tutorial-actions">
-            {step > 0 ? (
-              <button className="btn btn-ghost tutorial-btn-prev" onClick={() => setStep(s => s - 1)}>
-                <ArrowLeft size={16} /> Indietro
-              </button>
-            ) : (
-              <div style={{ width: 90 }}></div> // Placeholder for layout
-            )}
-            {step < steps.length - 1 ? (
-              <button className="btn btn-primary tutorial-btn-next" onClick={() => setStep(s => s + 1)}>
-                Avanti <ArrowRight size={16} />
-              </button>
-            ) : (
-              <button className="btn btn-primary tutorial-btn-finish" onClick={handleClose}>
-                Inizia 🎉
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 }
