@@ -7,7 +7,7 @@ import { SchedulerEngine } from '../core/SchedulerEngine';
 import { TravelManager } from '../core/TravelManager';
 import { MealManager } from '../core/MealManager';
 import { FutureProjectionEngine } from '../core/FutureProjectionEngine';
-import { persistState, loadFromCloud } from '../core/syncManager';
+import { persistState, loadFromCloud, subscribeToCloud } from '../core/syncManager';
 
 /* ─── Default per-day study hours ─── */
 function defaultDailyHours(): Record<number, DayStudyHours> {
@@ -134,7 +134,7 @@ function persist(state: AppState) {
 function deduplicateTasks(tasks: Task[]): Task[] {
   const uniqueMap = new Map<string, Task>();
   for (const t of tasks) {
-    const key = `${t.courseId}-${t.title}`;
+    const key = t.id;
     if (uniqueMap.has(key)) {
       const existing = uniqueMap.get(key)!;
       // Prefer keeping 'done' tasks over 'todo'
@@ -210,23 +210,33 @@ export const useAppStore = create<AppState>((set, get) => ({
       const cloudData = await loadFromCloud(user.id);
       console.log("[Sync] Dati ricevuti dal cloud:", cloudData);
       
-      if (cloudData) {
+      const updateFromCloud = (data: any) => {
         set((s) => {
           const next = {
             ...s,
-            events: deduplicateEventsList(cloudData.events || s.events),
-            tasks: deduplicateTasks(cloudData.tasks || s.tasks),
-            courses: cloudData.courses || s.courses,
-            preferences: mergePreferences(cloudData.preferences || s.preferences),
-            studySessions: cloudData.studySessions || s.studySessions,
-            performanceHistory: cloudData.performanceHistory || s.performanceHistory,
+            events: deduplicateEventsList(data.events || s.events),
+            tasks: deduplicateTasks(data.tasks || s.tasks),
+            courses: data.courses || s.courses,
+            preferences: mergePreferences(data.preferences || s.preferences),
+            studySessions: data.studySessions || s.studySessions,
+            performanceHistory: data.performanceHistory || s.performanceHistory,
           };
           
           // Forza il salvataggio locale per cache
           setTimeout(() => persist(next as AppState), 500);
           return next;
         });
+      };
+
+      if (cloudData) {
+        updateFromCloud(cloudData);
       }
+      
+      // Iscriviti ai cambiamenti in tempo reale per supportare il multi-device
+      subscribeToCloud(user.id, (realtimeData) => {
+        updateFromCloud(realtimeData);
+      });
+      
     } catch (error) {
       console.error("Failed to hydrate from cloud", error);
     }

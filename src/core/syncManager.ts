@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import { loadState, saveState } from "./persistence";
 import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord } from "./types";
@@ -68,4 +68,33 @@ export function persistState(data: UserSyncData, userId: string | null) {
       syncToCloud(userId, data).catch(console.error);
     }, 2000);
   }
+}
+
+let unsubscribeSnapshot: (() => void) | null = null;
+
+/**
+ * Ascolta i cambiamenti in tempo reale dal cloud (per supportare modifiche da altri dispositivi)
+ */
+export function subscribeToCloud(userId: string, onDataUpdate: (data: UserSyncData) => void) {
+  if (unsubscribeSnapshot) {
+    unsubscribeSnapshot();
+  }
+  
+  const userDocRef = doc(db, "users", userId);
+  
+  unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
+    if (docSnap.exists()) {
+      // Ignora i cambiamenti generati localmente per evitare loop di aggiornamento UI inutili,
+      // a meno che non vogliamo essere super sicuri. 'hasPendingWrites' è true per scritture locali non ancora confermate.
+      if (!docSnap.metadata.hasPendingWrites) {
+        console.log("[Sync] Dati aggiornati dal cloud (Real-time).");
+        const data = docSnap.data() as UserSyncData;
+        onDataUpdate(data);
+      }
+    }
+  }, (error) => {
+    console.error("[Sync] Error in real-time subscription:", error);
+  });
+  
+  return unsubscribeSnapshot;
 }

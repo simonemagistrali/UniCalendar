@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, BrainCircuit, Target, Sparkles, ArrowRight } from 'lucide-react';
 import { GlassPanel } from '../components/ui/GlassPanel';
 import { Button } from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +9,7 @@ export function Login() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showLogin, setShowLogin] = useState(false);
 
   const handleLogin = async () => {
     setIsLoading(true);
@@ -29,16 +30,57 @@ export function Login() {
     }
   };
 
+  if (!showLogin) {
+    return (
+      <div className="landing-page">
+        <div className="landing-hero">
+          <div className="landing-badge">
+            <Sparkles size={16} />
+            <span>Il tuo nuovo metodo di studio</span>
+          </div>
+          <h1 className="landing-title">
+            Studia in modo <span>Intelligente</span>, non di più.
+          </h1>
+          <p className="landing-description">
+            UniCalendar è l'app definitiva per gli studenti universitari. Organizza le tue giornate, calcola le priorità in automatico e sfrutta algoritmi di spaced repetition per preparare i tuoi esami senza stress.
+          </p>
+          <div className="landing-cta">
+            <Button variant="primary" className="landing-btn-start" onClick={() => setShowLogin(true)}>
+              Inizia Ora <ArrowRight size={18} />
+            </Button>
+          </div>
+        </div>
+        
+        <div className="landing-features">
+          <GlassPanel className="feature-card">
+            <div className="feature-icon"><Target size={28} /></div>
+            <h3>Priorità Automatiche</h3>
+            <p>Non sai da dove iniziare? L'app calcola per te su cosa devi concentrarti oggi per non restare indietro.</p>
+          </GlassPanel>
+          <GlassPanel className="feature-card">
+            <div className="feature-icon"><CalendarIcon size={28} /></div>
+            <h3>Pianificazione Smart</h3>
+            <p>Distribuisci il carico di studio in base ai giorni disponibili e alle pagine da fare. Tutto sotto controllo.</p>
+          </GlassPanel>
+          <GlassPanel className="feature-card">
+            <div className="feature-icon"><BrainCircuit size={28} /></div>
+            <h3>Metodo Spaced Repetition</h3>
+            <p>Massimizza la memorizzazione a lungo termine con il sistema di ripetizione dilazionata integrato (stile Anki).</p>
+          </GlassPanel>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="login-page">
-      <GlassPanel className="login-card">
+      <GlassPanel className="login-card fade-in">
         <div className="login-icon-wrapper">
           <CalendarIcon size={48} />
         </div>
-        <h1 className="login-title">UniCalendar</h1>
+        <h1 className="login-title">Bentornato</h1>
         <p className="login-subtitle">
-          Il tuo assistente allo studio personale.<br />
-          Organizza le tue giornate, calcola le priorità e non rimanere mai più indietro.
+          Accedi al tuo account UniCalendar per riprendere lo studio.
         </p>
 
         {error && (
@@ -59,6 +101,12 @@ export function Login() {
           </svg>
           {isLoading ? 'Accesso in corso...' : 'Accedi con Google'}
         </Button>
+        
+        <div style={{ marginTop: '16px' }}>
+          <Button variant="secondary" className="login-btn" onClick={() => setShowLogin(false)} disabled={isLoading}>
+            Torna alla pagina iniziale
+          </Button>
+        </div>
 
         <p className="login-footer">
           I tuoi dati restano nel browser. Nessun server esterno.
