@@ -24,7 +24,13 @@ export function Home() {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'calendar' | 'tasks' | 'statistics' | 'anki'>('calendar');
+  const [activeTab, setActiveTab] = useState<'calendar' | 'tasks' | 'statistics' | 'anki'>(() => {
+    return (localStorage.getItem('unicalendar_activeTab') as any) || 'calendar';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('unicalendar_activeTab', activeTab);
+  }, [activeTab]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showSnackbar, setShowSnackbar] = useState(false);
   const prevStatesLength = useRef(pastStates.length);
