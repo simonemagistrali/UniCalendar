@@ -26,36 +26,10 @@ Le funzionalità principali includono:
 - **UI & Stile:** CSS personalizzato con un design "Glassmorphism" e icone Lucide-React
 - **Date & Orari:** Date-fns
 
-## 🚀 Come iniziare (Installazione e Uso)
+## 🚀 Come iniziare
 
-### Prerequisiti
-Assicurati di avere [Node.js](https://nodejs.org/) (versione 18+) installato sul tuo computer.
-
-### 1. Clonare il repository
-```bash
-git clone https://github.com/simonemagistrali/UniCalendar.git
-cd UniCalendar
-```
-
-### 2. Installare le dipendenze
-```bash
-npm install
-```
-
-### 3. Configurare l'ambiente (Variabili d'ambiente)
-Crea un file `.env` nella directory principale del progetto. Dovrai aggiungere le tue chiavi API di Firebase e (opzionalmente) di Google Calendar.
-```env
-VITE_FIREBASE_API_KEY=tua_chiave_api
-VITE_FIREBASE_AUTH_DOMAIN=tuo_dominio_auth
-VITE_FIREBASE_PROJECT_ID=tuo_project_id
-# Aggiungi altre variabili necessarie per Firebase o Google Calendar
-```
-
-### 4. Avviare l'applicazione in locale
-```bash
-npm run dev
-```
-L'applicazione sarà disponibile all'indirizzo `http://localhost:5173`.
+L'applicazione è live! Puoi utilizzarla direttamente senza dover scaricare o installare nulla in locale. 
+L'app è ospitata su **Vercel** ed è accessibile da qualsiasi dispositivo tramite browser.
 
 ## 📖 Come usarla
 
