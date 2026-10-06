@@ -1,0 +1,76 @@
+/* ─── Task Quick Add ─── */
+.task-quick-add {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-quick-add-main {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.task-quick-add-main input[type="text"] {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  outline: none;
+  font-size: 0.95rem;
+}
+
+.task-quick-add-main input[type="text"]:focus {
+  border-color: var(--accent-primary);
+}
+
+.task-quick-add-expand {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.task-quick-add-expand:hover {
+  background: var(--bg-hover);
+}
+
+.task-quick-add-btn {
+  height: 36px;
+  padding: 0 16px;
+}
+
+.task-quick-add-extra {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.task-quick-add-extra .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task-quick-add-extra label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.task-quick-add-extra select,
+.task-quick-add-extra input {
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}

@@ -7,6 +7,7 @@ import { SchedulerEngine } from '../../../core/SchedulerEngine';
 import { TravelManager } from '../../../core/TravelManager';
 import { FutureProjectionEngine } from '../../../core/FutureProjectionEngine';
 import { TaskCard } from './TaskCard';
+import { TaskQuickAdd } from './TaskQuickAdd';
 
 
 export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }) {
@@ -249,6 +250,8 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
               </button>
             )}
           </div>
+          
+          {filter === 'todo' && <TaskQuickAdd />}
         </>
       )}
 
