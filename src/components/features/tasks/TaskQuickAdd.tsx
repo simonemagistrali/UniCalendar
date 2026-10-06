@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, MoreHorizontal } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
-import { Task } from '../../../core/types';
+import type { Task } from '../../../core/types';
 import './TaskQuickAdd.css';
 
 export function TaskQuickAdd() {
