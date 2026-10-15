@@ -44,3 +44,8 @@ I contributi sono benvenuti! Se hai idee per nuove funzionalità o hai trovato u
 
 ## 📄 Licenza
 Questo progetto è distribuito sotto licenza MIT.
+
+## ?? Impact analysis
+
+Stima scientifica del tempo e del carico mentale risparmiati dall'app (modello Monte Carlo, letteratura, protocollo di misurazione): [docs/impact-analysis](docs/impact-analysis/README.md).
+
