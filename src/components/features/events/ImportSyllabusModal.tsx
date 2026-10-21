@@ -189,8 +189,22 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
     setMatchResults([]);
   };
 
+  const handleClose = () => {
+    handleReset();
+    onClose();
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      handleReset();
+      if (courses.length > 0 && (!selectedCourseId || !courses.some(c => c.id === selectedCourseId))) {
+        setSelectedCourseId(courses[0].id);
+      }
+    }
+  }, [isOpen]);
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Importa Note & Calendario con AI">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Importa Note & Calendario con AI">
       <div className="syllabus-modal-content" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxHeight: '75vh' }}>
         
         {/* STEP 1: UPLOAD & SETUP */}
@@ -514,8 +528,11 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
               Abbiamo aggiornato <strong>{summaryStats.updated}</strong> lezioni e <strong>{summaryStats.tasksUpdated || summaryStats.updated}</strong> task di studio con i dettagli del syllabus. Eventuali task duplicati sono stati ripuliti.
               {summaryStats.created > 0 && <span> Sono state inoltre create <strong>{summaryStats.created}</strong> nuove lezioni.</span>}
             </p>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
-              <Button variant="primary" onClick={onClose}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <Button variant="secondary" onClick={handleReset} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Sparkles size={16} /> Importa un altro file / corso
+              </Button>
+              <Button variant="primary" onClick={handleClose}>
                 Vai al Calendario
               </Button>
             </div>
