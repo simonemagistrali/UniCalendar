@@ -57,22 +57,47 @@ export class TaskManager {
       const prefs = event.studyPreferencesOverride || course.defaultStudyPreferences;
       
       const eventDate = new Date(event.startTime).toLocaleDateString('it-IT');
-      const followTitle = `Seguire/Recuperare lezione: ${event.title} (${eventDate})`;
-      const notesTitle = `Sistemare appunti: ${event.title} (${eventDate})`;
-      const exerciseTitle = `Esercizi: ${event.title} (${eventDate})`;
+      const startHM = new Date(event.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      const endHM = new Date(event.endTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      const timeSlot = `${startHM} - ${endHM}`;
+
+      const followTitle = `Seguire/Recuperare lezione: ${event.title} (${eventDate} ${timeSlot})`;
+      const notesTitle = `Sistemare appunti: ${event.title} (${eventDate} ${timeSlot})`;
+      const exerciseTitle = `Esercizi: ${event.title} (${eventDate} ${timeSlot})`;
 
       const followKey = `${course.id}-${followTitle}`;
       const notesKey = `${course.id}-${notesTitle}`;
       const exerciseKey = `${course.id}-${exerciseTitle}`;
 
-      // Also check if any existing task for this course already targets this date
-      const hasFollowForDate = existingTasks.some(t => t.courseId === course.id && isFollowTask(t) && t.title.includes(`(${eventDate})`));
-      const hasNotesForDate = existingTasks.some(t => t.courseId === course.id && isNotesTask(t) && t.title.includes(`(${eventDate})`));
-      const hasExerciseForDate = existingTasks.some(t => t.courseId === course.id && isExerciseTask(t) && t.title.includes(`(${eventDate})`));
+      // Check if any existing task matches this specific event or time slot
+      const hasFollowForSlot = existingTasks.some(t => 
+        t.relatedEventId === event.id || 
+        (t.courseId === course.id && isFollowTask(t) && (
+          (t.lessonDate === eventDate && t.lessonTimeSlot === timeSlot) ||
+          t.title.includes(`(${eventDate} ${timeSlot})`) ||
+          (!t.lessonTimeSlot && t.title.includes(`(${eventDate})`))
+        ))
+      );
+      const hasNotesForSlot = existingTasks.some(t => 
+        t.relatedEventId === event.id || 
+        (t.courseId === course.id && isNotesTask(t) && (
+          (t.lessonDate === eventDate && t.lessonTimeSlot === timeSlot) ||
+          t.title.includes(`(${eventDate} ${timeSlot})`) ||
+          (!t.lessonTimeSlot && t.title.includes(`(${eventDate})`))
+        ))
+      );
+      const hasExerciseForSlot = existingTasks.some(t => 
+        t.relatedEventId === event.id || 
+        (t.courseId === course.id && isExerciseTask(t) && (
+          (t.lessonDate === eventDate && t.lessonTimeSlot === timeSlot) ||
+          t.title.includes(`(${eventDate} ${timeSlot})`) ||
+          (!t.lessonTimeSlot && t.title.includes(`(${eventDate})`))
+        ))
+      );
 
-      const needsFollow = !existingFollowTasks.has(event.id) && !existingFollowTaskTitles.has(followKey) && !hasFollowForDate;
-      const needsNotes = prefs.requiresNotesRevision && !existingNotesTasks.has(event.id) && !existingNotesTaskTitles.has(notesKey) && !hasNotesForDate;
-      const needsExercises = prefs.requiresExercises && !existingExerciseTasks.has(event.id) && !existingExerciseTaskTitles.has(exerciseKey) && !hasExerciseForDate;
+      const needsFollow = !existingFollowTasks.has(event.id) && !existingFollowTaskTitles.has(followKey) && !hasFollowForSlot;
+      const needsNotes = prefs.requiresNotesRevision && !existingNotesTasks.has(event.id) && !existingNotesTaskTitles.has(notesKey) && !hasNotesForSlot;
+      const needsExercises = prefs.requiresExercises && !existingExerciseTasks.has(event.id) && !existingExerciseTaskTitles.has(exerciseKey) && !hasExerciseForSlot;
 
       if (!needsFollow && !needsNotes && !needsExercises) {
         if (!event.isDone) updatedEvents[i] = { ...event, isDone: true };
@@ -97,7 +122,6 @@ export class TaskManager {
       }
       if (totalNominal > 0) {
         lessonMultiplier = totalActual / totalNominal;
-        // Cap the multiplier to avoid crazy values (e.g., between 0.5 and 3.0)
         lessonMultiplier = Math.max(0.5, Math.min(3.0, lessonMultiplier));
       }
       
@@ -110,12 +134,14 @@ export class TaskManager {
       if (needsFollow) {
         const followTask: Task = {
           id: uuidv4(),
-          title: `Seguire/Recuperare lezione: ${event.title} (${eventDate})`,
+          title: followTitle,
           description: `Segna come completato se hai seguito la lezione, altrimenti l'app pianificherà il recupero.`,
           courseId: course.id,
           relatedEventId: event.id,
+          lessonDate: eventDate,
+          lessonTimeSlot: timeSlot,
           status: 'todo',
-          priorityScore: 50, // High priority for recovering a missed lesson
+          priorityScore: 50,
           estimatedDuration: adjustedLessonDuration,
           createdAt: now,
           dependencies: [],
@@ -132,10 +158,12 @@ export class TaskManager {
       if (needsNotes) {
         const notesTask: Task = {
           id: uuidv4(),
-          title: `Sistemare appunti: ${event.title} (${eventDate})`,
+          title: notesTitle,
           description: `Revisione appunti della lezione`,
           courseId: course.id,
           relatedEventId: event.id,
+          lessonDate: eventDate,
+          lessonTimeSlot: timeSlot,
           status: 'todo',
           priorityScore: 0,
           estimatedDuration: prefs.estimatedRevisionTimePerLesson,
@@ -159,10 +187,12 @@ export class TaskManager {
 
         const exerciseTask: Task = {
           id: uuidv4(),
-          title: `Esercizi: ${event.title} (${eventDate})`,
+          title: exerciseTitle,
           description: `Esercitazione post-lezione`,
           courseId: course.id,
           relatedEventId: event.id,
+          lessonDate: eventDate,
+          lessonTimeSlot: timeSlot,
           status: 'todo',
           priorityScore: 0,
           estimatedDuration: Math.round(prefs.estimatedRevisionTimePerLesson * 1.5),

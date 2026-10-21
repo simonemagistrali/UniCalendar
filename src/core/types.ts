@@ -87,6 +87,8 @@ export interface Task {
   completionMode?: 'attended' | 'recovered' | 'normal'; // Track how the task was completed
   isPhantom?: boolean; // True for predicted future tasks (not yet real)
   phantomSourceLesson?: string; // Description of the future lesson that will generate this task
+  lessonDate?: string; // Date of the lesson, e.g. "15/09/2026"
+  lessonTimeSlot?: string; // Time window of the lesson, e.g. "14:30 - 16:30"
 }
 
 /* ─── Study Session ─── */

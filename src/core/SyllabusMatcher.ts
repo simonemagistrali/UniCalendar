@@ -55,13 +55,24 @@ export function matchSyllabusWithCalendar(
 
     if (dayMatches.length === 1) {
       matched = dayMatches[0];
-    } else if (dayMatches.length > 1 && lesson.startTime) {
-      // If multiple events on the same day, compare start hour
-      const targetHour = parseInt(lesson.startTime.split(':')[0], 10);
-      matched = dayMatches.find(e => {
-        const evHour = new Date(e.startTime).getHours();
-        return Math.abs(evHour - targetHour) <= 1;
-      }) || dayMatches[0];
+    } else if (dayMatches.length > 1) {
+      // Multiple lessons on the same day: match closest start time (hour & minute)
+      if (lesson.startTime) {
+        const [targetH, targetM = 0] = lesson.startTime.split(':').map(Number);
+        const targetTotalMin = targetH * 60 + targetM;
+        let bestDiff = Infinity;
+        for (const ev of dayMatches) {
+          const evD = new Date(ev.startTime);
+          const evTotalMin = evD.getHours() * 60 + evD.getMinutes();
+          const diff = Math.abs(evTotalMin - targetTotalMin);
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            matched = ev;
+          }
+        }
+      } else {
+        matched = dayMatches.find(e => e.lessonType === lesson.lessonType) || dayMatches[0];
+      }
     }
 
     // Find any existing tasks associated with this event or date
@@ -147,35 +158,38 @@ export function deduplicateCourseTasks(tasks: Task[], courseId: string): Task[] 
       continue;
     }
 
-    // Extract date from title e.g. "(15/09/2026)"
-    const dateMatch = t.title.match(/\((\d{1,2}\/\d{1,2}(?:\/\d{4})?)\)/);
-    const dateKey = dateMatch ? dateMatch[1] : (t.relatedEventId || t.id);
+    // Extract date and time slot from task metadata or title
+    const dateMatch = t.title.match(/\((\d{1,2}\/\d{1,2}(?:\/\d{4})?)/);
+    const dateKey = t.lessonDate || (dateMatch ? dateMatch[1] : (t.relatedEventId || t.id));
+    const timeMatch = t.title.match(/(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})/);
+    const slotKey = t.lessonTimeSlot || (timeMatch ? timeMatch[1] : 'all');
+    const fullKey = `${dateKey}__${slotKey}`;
 
     const isNotes = t.title.toLowerCase().includes('appunti') || t.title.toLowerCase().includes('ripasso') || t.title.toLowerCase().includes('notes');
     const isExercise = t.title.toLowerCase().includes('eserciz');
     const isFollow = t.title.toLowerCase().includes('seguire') || t.title.toLowerCase().includes('recuperare');
 
     if (isNotes) {
-      if (seenNotes.has(dateKey)) {
-        const existing = seenNotes.get(dateKey)!;
+      if (seenNotes.has(fullKey)) {
+        const existing = seenNotes.get(fullKey)!;
         if (!existing.description && t.description) {
           existing.description = t.description;
         }
         continue; // drop duplicate
       }
-      seenNotes.set(dateKey, t);
+      seenNotes.set(fullKey, t);
       result.push(t);
     } else if (isExercise) {
-      if (seenExercises.has(dateKey)) {
+      if (seenExercises.has(fullKey)) {
         continue; // drop duplicate
       }
-      seenExercises.set(dateKey, t);
+      seenExercises.set(fullKey, t);
       result.push(t);
     } else if (isFollow) {
-      if (seenFollow.has(dateKey)) {
+      if (seenFollow.has(fullKey)) {
         continue; // drop duplicate
       }
-      seenFollow.set(dateKey, t);
+      seenFollow.set(fullKey, t);
       result.push(t);
     } else {
       result.push(t);
@@ -235,6 +249,9 @@ export function applySyllabusMatches(
         eventsEnrichedCount++;
 
         const eventDate = new Date(target.startTime).toLocaleDateString('it-IT');
+        const startHM = new Date(target.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+        const endHM = new Date(target.endTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+        const timeSlot = `${startHM} - ${endHM}`;
 
         // Build rich description
         const descParts: string[] = [];
@@ -255,22 +272,25 @@ export function applySyllabusMatches(
         // Update corresponding Task(s) for this event (matching by relatedEventId or course + date)
         for (const task of tasksMap.values()) {
           const isDirectEventMatch = task.relatedEventId === target.id;
-          const isCourseDateMatch = task.courseId === course.id && task.title.includes(`(${eventDate})`);
+          const isCourseDateMatch = task.courseId === course.id && (
+            (task.lessonDate === eventDate && (!task.lessonTimeSlot || task.lessonTimeSlot === timeSlot)) ||
+            task.title.includes(`(${eventDate})`)
+          );
 
           if (isDirectEventMatch || isCourseDateMatch) {
-            // Attach relatedEventId if missing
-            if (!task.relatedEventId) {
-              task.relatedEventId = target.id;
-            }
+            // Attach relatedEventId and metadata
+            task.relatedEventId = target.id;
+            task.lessonDate = eventDate;
+            task.lessonTimeSlot = timeSlot;
 
-            // Keep standard prefixes required by TaskManager
+            // Keep standard prefixes required by TaskManager, including timeSlot
             const lowerTitle = task.title.toLowerCase();
             if (lowerTitle.includes('appunti') || lowerTitle.includes('ripasso')) {
-              task.title = `Sistemare appunti: ${course.name} - ${syllabusLesson.topic} (${eventDate})`;
+              task.title = `Sistemare appunti: ${course.name} - ${syllabusLesson.topic} (${eventDate} ${timeSlot})`;
             } else if (lowerTitle.includes('eserciz')) {
-              task.title = `Esercizi: ${course.name} - ${syllabusLesson.topic} (${eventDate})`;
+              task.title = `Esercizi: ${course.name} - ${syllabusLesson.topic} (${eventDate} ${timeSlot})`;
             } else if (lowerTitle.includes('seguire') || lowerTitle.includes('recuperare')) {
-              task.title = `Seguire/Recuperare lezione: ${course.name} - ${syllabusLesson.topic} (${eventDate})`;
+              task.title = `Seguire/Recuperare lezione: ${course.name} - ${syllabusLesson.topic} (${eventDate} ${timeSlot})`;
             }
 
             if (formattedDesc) {

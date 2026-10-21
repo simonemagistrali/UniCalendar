@@ -11,6 +11,7 @@ export function TaskCard({ task }: TaskCardProps) {
   const completeTask = useAppStore(s => s.completeTask);
   const updateTask = useAppStore(s => s.updateTask);
   const courses = useAppStore(s => s.courses);
+  const events = useAppStore(s => s.events);
   const [completeMode, setCompleteMode] = useState<'attended' | 'recovered' | 'normal' | null>(null);
   const [actualTime, setActualTime] = useState(task.estimatedDuration.toString());
 
@@ -20,10 +21,56 @@ export function TaskCard({ task }: TaskCardProps) {
   const isInProgress = task.status === 'in_progress';
   const isLessonTask = task.title.startsWith('Seguire/Recuperare lezione');
 
+  // Resolve lesson date and time slot
+  const relatedEvent = task.relatedEventId ? events.find(e => e.id === task.relatedEventId) : null;
+  
+  let rawDate = task.lessonDate;
+  let rawTimeSlot = task.lessonTimeSlot;
+
+  if (!rawDate && relatedEvent) {
+    rawDate = relatedEvent.startTime.split('T')[0];
+  }
+  if (!rawTimeSlot && relatedEvent) {
+    const s = new Date(relatedEvent.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const e = new Date(relatedEvent.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    rawTimeSlot = `${s} - ${e}`;
+  }
+
+  // Fallback regex from title if still missing
+  if (!rawDate || !rawTimeSlot) {
+    const timeMatch = task.title.match(/\((\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4})\s+([0-9:]+\s*-\s*[0-9:]+)\)/);
+    if (timeMatch) {
+      if (!rawDate) rawDate = timeMatch[1];
+      if (!rawTimeSlot) rawTimeSlot = timeMatch[2];
+    } else {
+      const dateMatch = task.title.match(/\((\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4})\)/);
+      if (dateMatch && !rawDate) {
+        rawDate = dateMatch[1];
+      }
+    }
+  }
+
+  // Format date nicely to DD/MM/YYYY
+  const formatDisplayDate = (dStr?: string) => {
+    if (!dStr) return null;
+    if (dStr.includes('/')) return dStr;
+    if (dStr.includes('-')) {
+      const parts = dStr.split('-');
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dStr;
+  };
+
+  const displayLessonDate = formatDisplayDate(rawDate);
+  const displayLessonTime = rawTimeSlot;
+
   const displayTitle = task.title
     .replace('[Previsto] ', '')
     .replace('Sistemare appunti: Lezione: ', 'Appunti: ')
-    .replace('Seguire/Recuperare lezione: ', 'Seguire: ');
+    .replace('Sistemare appunti: ', 'Appunti: ')
+    .replace('Seguire/Recuperare lezione: ', 'Seguire: ')
+    .replace(/\s*\(\d{4}-\d{2}-\d{2}(\s+\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})?\)$/, '')
+    .replace(/\s*\(\d{2}\/\d{2}\/\d{4}(\s+\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})?\)$/, '');
 
   const getTotalAccumulated = () => {
     let elapsed = 0;
@@ -56,6 +103,12 @@ export function TaskCard({ task }: TaskCardProps) {
             <Clock size={12} />
             <span>Stima: ~{task.estimatedDuration} min</span>
           </div>
+          {(displayLessonDate || displayLessonTime) && (
+            <div className="task-meta-item" style={{ color: 'var(--primary, #1a73e8)', fontWeight: 500, fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Calendar size={12} />
+              <span>{displayLessonDate} {displayLessonTime && `(${displayLessonTime})`}</span>
+            </div>
+          )}
           {course && <span className="task-course-name">{course.name}</span>}
         </div>
 
@@ -158,6 +211,38 @@ export function TaskCard({ task }: TaskCardProps) {
           <div className="task-meta-item">
             <Check size={12} />
             <span>Reale: {task.actualDuration} min</span>
+          </div>
+        )}
+        {(displayLessonDate || displayLessonTime) && (
+          <div 
+            className="task-meta-item task-meta-lesson-slot"
+            style={{ 
+              color: '#1d4ed8', 
+              backgroundColor: 'rgba(59, 130, 246, 0.08)',
+              padding: '2px 8px',
+              borderRadius: '6px',
+              fontWeight: 600,
+              fontSize: '0.75rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              border: '1px solid rgba(59, 130, 246, 0.2)'
+            }}
+            title="Data e fascia oraria della lezione corrispondente"
+          >
+            <Calendar size={12} />
+            <span>
+              {displayLessonDate ? `Lezione: ${displayLessonDate}` : 'Lezione'}
+              {displayLessonDate && displayLessonTime ? ' • ' : ''}
+              {displayLessonTime && <Clock size={11} style={{ display: 'inline', margin: '0 2px -1px 2px' }} />}
+              {displayLessonTime}
+            </span>
+          </div>
+        )}
+        {task.deadline && (
+          <div className="task-meta-item" style={{ color: '#ea4335', fontWeight: 500, fontSize: '0.75rem' }}>
+            <Calendar size={12} />
+            <span>Scadenza: {new Date(task.deadline).toLocaleDateString('it-IT')}</span>
           </div>
         )}
         {isDone && task.completedAt && (

@@ -323,7 +323,7 @@ function MonthView({ currentDate, items, onEventClick }: { currentDate: Date; it
         )}
         <div className="calendar-events">
           {dayItems.slice(0, 4).map(it => (
-            <div key={it.id} className="calendar-event" title={it.title} onClick={() => onEventClick(it.id)} style={{ cursor: 'pointer' }}>
+            <div key={it.id} className="calendar-event" title={`${it.title} (${format(it.start, 'HH:mm')} - ${format(it.end, 'HH:mm')})`} onClick={() => onEventClick(it.id)} style={{ cursor: 'pointer' }}>
               <span
                 className={`calendar-event-dot ${it.type === 'phantom' ? 'phantom' : ''}`}
                 style={{
@@ -333,7 +333,12 @@ function MonthView({ currentDate, items, onEventClick }: { currentDate: Date; it
                   borderStyle: it.type === 'phantom' ? 'dashed' : 'solid'
                 }}
               />
-              <span className="calendar-event-text">{it.title}</span>
+              <span className="calendar-event-text">
+                <span style={{ fontSize: '0.68rem', opacity: 0.85, marginRight: '4px', fontWeight: 600 }}>
+                  {format(it.start, 'HH:mm')}
+                </span>
+                {it.title}
+              </span>
             </div>
           ))}
           {dayItems.length > 4 && <div className="calendar-event-more">+{dayItems.length - 4} altri</div>}

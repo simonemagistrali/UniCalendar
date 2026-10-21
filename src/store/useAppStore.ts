@@ -166,9 +166,9 @@ function deduplicateTasks(tasks: Task[], events: CalendarEvent[] = []): Task[] {
     else if (titleLower.includes('appunti') || titleLower.includes('ripasso') || titleLower.includes('notes')) category = 'notes';
     else if (titleLower.includes('eserciz')) category = 'exercise';
 
-    // Extract target date from title (DD/MM/YYYY) or related event
-    const dateMatch = t.title.match(/\((\d{1,2}\/\d{1,2}(?:\/\d{4})?)\)/);
-    let dateKey = dateMatch ? dateMatch[1] : '';
+    // Extract target date from title (DD/MM/YYYY), lessonDate property, or related event
+    const dateMatch = t.title.match(/\((\d{1,2}\/\d{1,2}(?:\/\d{4})?)/);
+    let dateKey = t.lessonDate || (dateMatch ? dateMatch[1] : '');
     if (!dateKey && t.relatedEventId && eventsMap.has(t.relatedEventId)) {
       dateKey = new Date(eventsMap.get(t.relatedEventId)!.startTime).toLocaleDateString('it-IT');
     }
@@ -176,7 +176,20 @@ function deduplicateTasks(tasks: Task[], events: CalendarEvent[] = []): Task[] {
       dateKey = t.id; // Fallback: preserve unique task if date cannot be resolved
     }
 
-    const key = `${t.courseId || 'nocourse'}::${category}::${dateKey}`;
+    // Extract time slot from lessonTimeSlot, related event, or title (HH:mm - HH:mm)
+    let slotKey = t.lessonTimeSlot;
+    if (!slotKey && t.relatedEventId && eventsMap.has(t.relatedEventId)) {
+      const ev = eventsMap.get(t.relatedEventId)!;
+      const startHM = new Date(ev.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      const endHM = new Date(ev.endTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      slotKey = `${startHM} - ${endHM}`;
+    }
+    if (!slotKey) {
+      const timeMatch = t.title.match(/(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})/);
+      slotKey = timeMatch ? timeMatch[1] : 'noslot';
+    }
+
+    const key = `${t.courseId || 'nocourse'}::${category}::${dateKey}::${slotKey}`;
 
     if (groupMap.has(key)) {
       const existing = groupMap.get(key)!;
