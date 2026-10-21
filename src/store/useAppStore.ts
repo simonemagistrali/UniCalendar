@@ -222,8 +222,16 @@ export const useAppStore = create<AppState>((set, get) => ({
             performanceHistory: data.performanceHistory || s.performanceHistory,
           };
           
-          // Forza il salvataggio locale per cache
-          setTimeout(() => persist(next as AppState), 500);
+          // Salva solo in cache locale: NON ri-caricare sul cloud, altrimenti si
+          // cancellerebbe un eventuale salvataggio locale in attesa (debounce).
+          saveState({
+            events: next.events,
+            tasks: next.tasks,
+            courses: next.courses,
+            preferences: next.preferences,
+            performanceHistory: next.performanceHistory,
+            studySessions: next.studySessions,
+          });
           return next;
         });
       };
