@@ -52,7 +52,7 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
   const [extractedLessons, setExtractedLessons] = useState<ParsedLessonNote[]>([]);
   const [matchResults, setMatchResults] = useState<MatchResultItem[]>([]);
   const [createMissingEvents, setCreateMissingEvents] = useState(false);
-  const [summaryStats, setSummaryStats] = useState<{ updated: number; created: number; tasksUpdated?: number; tokens?: number }>({ updated: 0, created: 0, tasksUpdated: 0 });
+  const [summaryStats, setSummaryStats] = useState<{ updated: number; created: number; tasksUpdated?: number; tokens?: number; model?: string }>({ updated: 0, created: 0, tasksUpdated: 0 });
 
   const activeCourse: Course | undefined = courses.find(c => c.id === selectedCourseId);
 
@@ -121,14 +121,17 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
         throw new Error('Nessun testo leggibile trovato nel file selezionato.');
       }
 
-      setStatusMessage('2/2 Analisi con Google Gemini Flash (estrazione lezioni, note, capitoli)...');
+      setStatusMessage('2/2 Analisi con Google Gemini AI (selezione automatica modello Flash)...');
       
       const currentYear = new Date().getFullYear();
       const aiResult = await analyzeSyllabusWithGemini(
         rawText, 
         apiKey.trim(), 
         courseToUse.name, 
-        currentYear
+        currentYear,
+        ({ model, attempt, total }) => {
+          setStatusMessage(`2/2 Analisi con Google Gemini: test modello ${model} (${attempt}/${total})...`);
+        }
       );
 
       if (!aiResult.lessons || aiResult.lessons.length === 0) {
@@ -144,7 +147,7 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
       // Default createMissingEvents to false: AI never creates duplicate events or tasks without explicit user opt-in
       setCreateMissingEvents(false);
 
-      setSummaryStats(prev => ({ ...prev, tokens: aiResult.tokensUsed }));
+      setSummaryStats(prev => ({ ...prev, tokens: aiResult.tokensUsed, model: aiResult.modelUsed }));
       setStep('review');
     } catch (err: any) {
       setError(err?.message || 'Si è verificato un errore durante l\'analisi.');
@@ -171,12 +174,12 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
 
     setEvents(updatedEvents);
     setTasks(updatedTasks);
-    setSummaryStats({
+    setSummaryStats(prev => ({
+      ...prev,
       updated: eventsEnrichedCount,
       created: newEventsCreatedCount,
       tasksUpdated: tasksUpdatedCount,
-      tokens: summaryStats.tokens,
-    });
+    }));
     setStep('success');
   };
 
@@ -368,7 +371,7 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
                   {extractedLessons.length} lezioni trovate
                 </span>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  Corso: <strong>{activeCourse?.name}</strong> • Token utilizzati: ~{summaryStats.tokens || '6k'}
+                  Corso: <strong>{activeCourse?.name}</strong> • Modello AI: <strong>{summaryStats.model || 'Gemini Flash'}</strong> • Token utilizzati: ~{summaryStats.tokens || '6k'}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', fontSize: '0.8rem' }}>
@@ -527,6 +530,11 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
             <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.92rem', maxWidth: '420px', lineHeight: 1.5 }}>
               Abbiamo aggiornato <strong>{summaryStats.updated}</strong> lezioni e <strong>{summaryStats.tasksUpdated || summaryStats.updated}</strong> task di studio con i dettagli del syllabus. Eventuali task duplicati sono stati ripuliti.
               {summaryStats.created > 0 && <span> Sono state inoltre create <strong>{summaryStats.created}</strong> nuove lezioni.</span>}
+              {summaryStats.model && (
+                <span style={{ display: 'block', marginTop: '8px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                  Modello AI utilizzato con successo: <strong style={{ color: '#a855f7' }}>{summaryStats.model}</strong> (costo ≤ Gemini Flash).
+                </span>
+              )}
             </p>
             <div style={{ display: 'flex', gap: '10px', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
               <Button variant="secondary" onClick={handleReset} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

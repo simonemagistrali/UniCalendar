@@ -118,11 +118,35 @@ export function normalizeDate(rawDate: string, defaultYear = new Date().getFullY
  * Calls Google Gemini Flash API with structured output schema to extract
  * all lectures, dates, topics, textbook references, and exercise markers.
  */
+/**
+ * Lista ordinata di modelli Google Gemini della famiglia Flash / Flash-Lite.
+ * Tutti questi modelli hanno costo token INFERIORE o UGUALE a Gemini Flash
+ * (escludendo categoricamente i modelli Pro, molto più onerosi).
+ * Vengono testati sequenzialmente in caso di sovraccarico (503), rate limit (429) o indisponibilità temporanea.
+ */
+export const GEMINI_FLASH_CANDIDATE_MODELS = [
+  'gemini-3.5-flash-lite',        // Costo token inferiore a Flash, velocità massima e alta disponibilità
+  'gemini-flash-lite-latest',     // Alias Flash-Lite
+  'gemini-3.5-flash',             // Flash standard, alta accuratezza e velocità
+  'gemini-flash-latest',          // Alias Flash standard
+  'gemini-3.8-flash',             // Famiglia Flash
+  'gemini-3.7-flash',             // Famiglia Flash
+  'gemini-3.6-flash',             // Famiglia Flash
+  'gemini-3.1-flash-lite',        // Famiglia Flash-Lite
+  'gemini-3.1-flash-lite-preview',// Flash-Lite preview
+  'gemini-3-flash-preview',       // Flash preview
+];
+
+/**
+ * Calls Google Gemini API with fallback across all models with cost <= Flash.
+ * Returns extracted syllabus lectures, notes, chapters, topics.
+ */
 export async function analyzeSyllabusWithGemini(
   rawContent: string,
   apiKey: string,
   courseContextName?: string,
-  defaultYear: number = new Date().getFullYear()
+  defaultYear: number = new Date().getFullYear(),
+  onModelAttempt?: (info: { model: string; attempt: number; total: number }) => void
 ): Promise<SyllabusExtractionResult> {
   if (!apiKey) {
     throw new Error('API Key di Gemini mancante. Configurala nelle impostazioni.');
@@ -171,72 +195,104 @@ ${compressed}
     generationConfig: {
       response_mime_type: 'application/json',
       temperature: 0.1,
-      thinkingConfig: {
-        thinkingBudget: 0,
-      },
     }
   };
 
-  const response = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-goog-api-key': apiKey,
-      },
-      body: JSON.stringify(payload),
-    }
-  );
+  const modelErrors: Array<{ model: string; status: number; message: string }> = [];
 
-  if (!response.ok) {
-    const errText = await response.text();
-    let parsedMsg = errText;
+  for (let i = 0; i < GEMINI_FLASH_CANDIDATE_MODELS.length; i++) {
+    const currentModel = GEMINI_FLASH_CANDIDATE_MODELS[i];
+    onModelAttempt?.({ model: currentModel, attempt: i + 1, total: GEMINI_FLASH_CANDIDATE_MODELS.length });
+
     try {
-      const j = JSON.parse(errText);
-      parsedMsg = j.error?.message || errText;
-    } catch {
-      // ignore
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-goog-api-key': apiKey,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawJson) {
+          throw new Error('Nessun testo generato dal modello.');
+        }
+
+        let lessons: ParsedLessonNote[] = [];
+        try {
+          const parsed = JSON.parse(rawJson);
+          if (Array.isArray(parsed)) {
+            lessons = parsed;
+          } else if (Array.isArray(parsed.lessons)) {
+            lessons = parsed.lessons;
+          } else if (Array.isArray(parsed.lectures)) {
+            lessons = parsed.lectures;
+          }
+        } catch {
+          throw new Error('Impossibile decodificare il JSON restituito da Gemini.');
+        }
+
+        // Post-process to ensure IDs and normalized dates
+        const processed = lessons.map((l, index) => ({
+          ...l,
+          id: `syllabus-lesson-${index + 1}`,
+          parsedDate: l.parsedDate || normalizeDate(l.rawDate, defaultYear),
+          lessonType: l.lessonType === 'exercise' ? ('exercise' as const) : ('theory' as const),
+          readingsOrLinks: Array.isArray(l.readingsOrLinks) ? l.readingsOrLinks : [],
+          isCancelled: Boolean(l.isCancelled),
+        }));
+
+        const tokensUsed = data.usageMetadata?.totalTokenCount;
+
+        return {
+          courseName: courseContextName,
+          lessons: processed,
+          totalExtracted: processed.length,
+          tokensUsed,
+          modelUsed: currentModel,
+        };
+      }
+
+      // If response not ok, inspect status & error
+      const errText = await response.text();
+      let parsedMsg = errText;
+      try {
+        const j = JSON.parse(errText);
+        parsedMsg = j.error?.message || errText;
+      } catch {
+        // ignore
+      }
+
+      modelErrors.push({ model: currentModel, status: response.status, message: parsedMsg });
+      console.warn(`[Gemini Fallback] Modello ${currentModel} ha risposto con ${response.status}: ${parsedMsg}. Tentativo con il modello successivo...`);
+
+      // If the API key is universally invalid (not a model issue), interrupt immediately
+      if (response.status === 400 && (parsedMsg.includes('API key not valid') || parsedMsg.includes('API_KEY_INVALID'))) {
+        throw new Error(`Chiave API non valida: ${parsedMsg}`);
+      }
+
+    } catch (err: any) {
+      if (err.message && err.message.startsWith('Chiave API non valida')) {
+        throw err;
+      }
+      modelErrors.push({ model: currentModel, status: 0, message: err?.message || String(err) });
+      console.warn(`[Gemini Fallback] Errore su ${currentModel}:`, err);
     }
-    throw new Error(`Errore chiamata Gemini (${response.status}): ${parsedMsg}`);
   }
 
-  const data = await response.json();
-  const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawJson) {
-    throw new Error('Nessuna risposta generata da Gemini.');
-  }
+  // All fallback models failed
+  const errorDetails = modelErrors
+    .map(e => `• ${e.model} (${e.status || 'errore'}): ${e.message}`)
+    .slice(0, 4)
+    .join('\n');
 
-  let lessons: ParsedLessonNote[] = [];
-  try {
-    const parsed = JSON.parse(rawJson);
-    if (Array.isArray(parsed)) {
-      lessons = parsed;
-    } else if (Array.isArray(parsed.lessons)) {
-      lessons = parsed.lessons;
-    } else if (Array.isArray(parsed.lectures)) {
-      lessons = parsed.lectures;
-    }
-  } catch (err) {
-    throw new Error('Impossibile decodificare il JSON restituito da Gemini.');
-  }
-
-  // Post-process to ensure IDs and normalized dates
-  const processed = lessons.map((l, index) => ({
-    ...l,
-    id: `syllabus-lesson-${index + 1}`,
-    parsedDate: l.parsedDate || normalizeDate(l.rawDate, defaultYear),
-    lessonType: l.lessonType === 'exercise' ? ('exercise' as const) : ('theory' as const),
-    readingsOrLinks: Array.isArray(l.readingsOrLinks) ? l.readingsOrLinks : [],
-    isCancelled: Boolean(l.isCancelled),
-  }));
-
-  const tokensUsed = data.usageMetadata?.totalTokenCount;
-
-  return {
-    courseName: courseContextName,
-    lessons: processed,
-    totalExtracted: processed.length,
-    tokensUsed,
-  };
+  throw new Error(
+    `Tutti i modelli Gemini a costo equivalente o inferiore (${GEMINI_FLASH_CANDIDATE_MODELS.length} modelli testati) sono attualmente non disponibili o sovraccarichi.\n\nDettagli errori:\n${errorDetails}\n\nRiprova tra qualche istante.`
+  );
 }

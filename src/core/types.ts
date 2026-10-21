@@ -157,6 +157,7 @@ export interface SyllabusExtractionResult {
   lessons: ParsedLessonNote[];
   totalExtracted: number;
   tokensUsed?: number;
+  modelUsed?: string;
 }
 
 /* ─── Anki History (salvata localmente + cloud, disponibile anche offline) ─── */
