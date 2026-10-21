@@ -1402,6 +1402,27 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   color: var(--accent-primary);
 }
 
+.course-repair-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--accent-primary);
+  border-radius: 8px;
+  background: rgba(26, 115, 232, 0.08);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-primary);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.course-repair-btn:hover {
+  background: rgba(26, 115, 232, 0.18);
+  transform: translateY(-1px);
+}
+
 /* ─── Event Form ─── */
 .event-form {
   display: flex;

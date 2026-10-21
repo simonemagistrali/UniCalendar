@@ -1,30 +1,56 @@
 /**
- * courseNames — Estrazione robusta del nome del corso dal titolo di un evento
- * e riparazione automatica dei corsi salvati con nomi troncati (es. solo la prima parola).
+ * courseNames — Estrazione avanzata del nome del corso dal titolo di un evento
+ * e riparazione automatica e completa dei corsi salvati con nomi troncati (es. solo la prima parola).
  */
 import type { CalendarEvent, Course, Task, PerformanceRecord } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
-/** Prefissi comuni nei calendari universitari che indicano la tipologia dell'evento */
-const LESSON_PREFIX = /^\s*(?:lezione|lezioni|lez\.?|lecture|lesson|esercitazione|esercitazioni|eserc\.?|laboratorio|lab\.?|teoria|corso|insegnamento)\b\.?\s*(?:n\.?\s*\d+|#?\d+|\d+)?\s*(?:[:\-–—|]\s*)?(?:(?:di|del|della|dello|dei|degli|delle|of|on|in)\s+|d['’]\s*)?(?:[:\-–—|]\s*)?/i;
+/** Parole o etichette che da sole NON possono mai costituire il nome di un corso */
+export const BOGUS_COURSE_NAMES = new Set([
+  'lezione', 'lezioni', 'lez',
+  'esercitazione', 'esercitazioni', 'eserc', 'esercizi',
+  'laboratorio', 'lab',
+  'teoria',
+  'corso', 'insegnamento', 'modulo', 'mod',
+  'aula', 'room', 'sede', 'edificio', 'plesso', 'piano',
+  'prof', 'professore', 'professoressa', 'docente', 'dottore', 'dott', 'dott.ssa', 'ing',
+  'canale', 'gruppo', 'sezione', 'sez',
+  'online', 'remoto', 'presenza', 'telematico',
+  'esame', 'appello', 'parziale', 'recupero', 'prova',
+  'generico', 'studio', 'attivita', 'scadenza',
+]);
 
-/** Prefissi di codici di corso: es. [INF-01], (084723), o 084723 - (deve contenere almeno una cifra!) */
-const LEADING_CODE_OR_BRACKET = /^\s*(?:\[[^\]]+\]|\([^)]+\))\s*[-–—|:]?\s*/;
-const LEADING_NUMERIC_CODE = /^\s*(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{4,12}\s*[-–—|:]\s*/;
+/** Prefissi comuni nei calendari universitari che indicano la tipologia dell'evento */
+const LESSON_PREFIX = /^\s*(?:lezione|lezioni|lez\.?|lecture|lesson|esercitazione|esercitazioni|eserc\.?|laboratorio|lab\.?|teoria|corso|insegnamento|modulo|mod\.?)\b\.?\s*(?:n\.?\s*\d+|#?\d+|\d+)?\s*(?:[:\-–—|/]\s*)?(?:(?:di|del|della|dello|dei|degli|delle|of|on|in)\s+|d['’]\s*)?(?:[:\-–—|/]\s*)?/i;
+
+/** Prefissi esame o appello */
+const EXAM_PREFIX = /^\s*(?:esame|appello|prova|parziale|recupero|preappello)\b\.?\s*(?:[:\-–—|/]\s*)?(?:(?:di|del|della|dello|dei|degli|delle|of|on|in)\s+|d['’]\s*)?(?:[:\-–—|/]\s*)?/i;
+
+/** Settore Scientifico Disciplinare italiano: es. ING-INF/05, MAT/05, FIS/01, SECS-P/07, IUS/01, CHIM/03, BIO/10 */
+const SSD_CODE = /^\s*(?:[A-Z]{3,4}(?:-[A-Z]{2,4})?\s*\/\s*\d{2})\s*[-–—|:]\s*/i;
+
+/** Prefissi di codici numerici o alfanumerici: es. 084723 - , B012345 - , COD. 12345 - */
+const NUMERIC_CODE = /^\s*(?:cod\.?\s*)?(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{4,12}\s*[-–—|:]\s*/i;
+
+/** Prefissi tra parentesi o quadre all'inizio del titolo: es. [INF-01], (084723) */
+const LEADING_BRACKETS = /^\s*(?:\[[^\]]+\]|\([^)]+\))\s*[-–—|:]?\s*/;
 
 /** Nomi di docenti all'inizio del titolo: es. "Prof. Mario Rossi - ", "Docente: Rossi - " */
-const LEADING_INSTRUCTOR = /^\s*(?:prof\.?|prof\.ssa|docente|dott\.?|ing\.?)\s+[A-Za-zÀ-ÿ'\s]+[-–—|:]\s*/i;
+const LEADING_INSTRUCTOR = /^\s*(?:prof\.?|prof\.ssa|docente|dott\.?|dott\.ssa|ing\.?)\s+[A-Za-zÀ-ÿ'\s.]*?[-–—|:]\s*/i;
+
+/** Prefissi di anno/semestre all'inizio: es. 1° Semestre - , A.A. 2024/2025 - */
+const LEADING_ACADEMIC_YEAR = /^\s*(?:(?:1|2|i|ii)[°^]?\s*(?:semestre|sem\.?|anno|periodo)|a\.?a\.?\s*\d{2,4}[/-]\d{2,4})\s*[-–—|:]\s*/i;
 
 /** Segmenti che indicano chiaramente metadati/informazioni accessorie (aula, docente, canale, modalità, ecc.) */
-const ACCESSORY_SEGMENT = /^(?:aula|room|edificio|sede|plesso|piano|prof\.?|prof\.ssa|docente|dott\.?|ing\.?|canale|gruppo|sez\.?|sezione|telematico|online|in presenza|presenza|remoto|zoom|teams|meet|cfu|crediti|semestre|anno)\b/i;
-const ACCESSORY_LESSON_SEGMENT = /^(?:lezione|lez\.?|lecture|lesson|esercitazione|eserc\.?|laboratorio|lab\.?|teoria)\s*(?:n\.?\s*\d+|#\d+|\d+)?$/i;
-const ACCESSORY_TAG = /^(?:n\.?\s*|#)\d+$/i;
+const ACCESSORY_SEGMENT = /^(?:aula|room|edificio|sede|plesso|piano|prof\.?|prof\.ssa|docente|dott\.?|dott\.ssa|ing\.?|canale|gruppo|sez\.?|sezione|telematico|online|in presenza|presenza|remoto|zoom|teams|meet|cfu|crediti|semestre|anno|lezione|lez\.?|lecture|lesson|esercitazione|eserc\.?|laboratorio|lab\.?|teoria|n\.?\s*\d+|#\d+)\b/i;
 
 /** Code accessorie da ripulire in fondo al nome */
 const TRAILING_NOISE = [
   /[\s,]+(?:aula|room|edificio|sede|plesso|prof\.?|prof\.ssa|docente|dott\.?|ing\.?)\b.*$/i,
+  /[\s,]+(?:canale|gruppo|sez\.?|sezione)\s+[A-Za-z0-9]+$/i,
   /[\s,]+(?:lezione|lez\.?|lecture|lesson)\s*(?:n\.?\s*)?#?\d*\s*$/i,
   /[\s,]+(?:esercitazione|esercitazioni|teoria|laboratorio|lab\.?)\s*$/i,
+  /[\s,]+(?:cfu|crediti)\s*\d+\s*$/i,
   /[\s,]+(?:n\.?\s*|#)\d+\s*$/i,
   /[\s:,.\-–—|/]+$/,
 ];
@@ -35,10 +61,13 @@ function stripPrefixes(text: string): string {
   while (cur !== prev) {
     prev = cur;
     cur = cur
-      .replace(LEADING_CODE_OR_BRACKET, '')
-      .replace(LEADING_NUMERIC_CODE, '')
+      .replace(SSD_CODE, '')
+      .replace(NUMERIC_CODE, '')
+      .replace(LEADING_BRACKETS, '')
       .replace(LEADING_INSTRUCTOR, '')
       .replace(LESSON_PREFIX, '')
+      .replace(EXAM_PREFIX, '')
+      .replace(LEADING_ACADEMIC_YEAR, '')
       .trim();
   }
   return cur;
@@ -67,49 +96,41 @@ export function formatCourseTitleCase(str: string): string {
 }
 
 /**
- * Estrae il nome completo del corso dal titolo di un evento.
- * Gestisce correttamente:
- * - Titoli universitari con trattini intermedi: "ANALISI - MATEMATICA 1 - AULA 3" → "Analisi Matematica 1"
- * - Prefissi di tipo lezione: "Lezione di Ingegneria del Software" → "Ingegneria del Software"
- * - Codici corso o docenti: "084723 - SISTEMI OPERATIVI" → "Sistemi Operativi"
- * - Informazioni accessorie tra parentesi: "Economia Aziendale (Canale A)" → "Economia Aziendale"
+ * Pulisce ed estrae il nome del corso da qualsiasi stringa (titolo evento, titolo task, nome corso grezzo).
  */
-export function extractCourseName(title: string): string {
+export function cleanCourseName(title: string): string {
   if (!title) return '';
 
-  // 1. Rimuovi prefissi iniziali (codici numerici, prefisso lezione, docente iniziale)
-  let name = stripPrefixes(title.replace(/\s+/g, ' '));
+  // 1. Rimuovi prefissi iniziali (SSD, codici numerici, tipo lezione, docente iniziale)
+  let cur = stripPrefixes(title.replace(/\s+/g, ' '));
 
-  // 2. Rimuovi parentesi con informazioni accessorie (docente, aula, canale, cfu...)
-  name = name.replace(/\s*\((?:prof\.?|docente|aula|edificio|canale|gruppo|sede|ore|cfu)[^)]*\)/gi, '');
-  name = name.replace(/\s*\[(?:prof\.?|docente|aula|edificio|canale|gruppo|sede|ore|cfu)[^\]]*\]/gi, '');
+  // 2. Rimuovi informazioni accessorie tra parentesi tonde o quadre
+  cur = cur.replace(/\s*\((?:prof\.?|prof\.ssa|docente|aula|room|edificio|canale|gruppo|sez\.?|sezione|sede|ore|cfu|crediti|teoria|esercitazione|lab\.?|laboratorio|online|remoto|presenza|[a-z]-[a-z]|\d+)[^)]*\)/gi, '');
+  cur = cur.replace(/\s*\[(?:prof\.?|prof\.ssa|docente|aula|room|edificio|canale|gruppo|sez\.?|sezione|sede|ore|cfu|crediti|teoria|esercitazione|lab\.?|laboratorio|online|remoto|presenza|[a-z]-[a-z]|\d+)[^\]]*\]/gi, '');
+  cur = cur.replace(/\s*\([^)]*\)\s*$/g, '');
 
-  // 3. Dividi sui separatori principali: " - ", " – ", " — ", " | ", " ; ", " / ", " @ "
-  const rawSegments = name.split(/\s+[-–—|/]\s+|\s*;\s*|\s+@\s+/).map(s => s.trim()).filter(Boolean);
+  // 3. Normalizza trattini interni tra parole prima di dividere (es. ANALISI-MATEMATICA -> ANALISI - MATEMATICA)
+  cur = cur.replace(/([A-Za-zÀ-ÿ0-9])\s*[-–—]\s*([A-Za-zÀ-ÿ0-9])/g, '$1 - $2');
 
+  // 4. Dividi sui delimitatori principali
+  const segments = cur.split(/\s*[-–—|/]\s+|\s*;\s*|\s*:\s*|\s*@\s*/).map(s => s.trim()).filter(Boolean);
   const keptSegments: string[] = [];
-  for (let i = 0; i < rawSegments.length; i++) {
-    const seg = stripPrefixes(rawSegments[i]);
+  for (let i = 0; i < segments.length; i++) {
+    const seg = stripPrefixes(segments[i]);
     if (!seg) continue;
 
-    // Se il segmento è palesemente un'informazione accessoria, interrompi la raccolta
-    if (ACCESSORY_SEGMENT.test(seg) || ACCESSORY_LESSON_SEGMENT.test(seg) || ACCESSORY_TAG.test(seg)) {
-      break;
-    }
+    // Se incontriamo un segmento accessorio, interrompi
+    if (ACCESSORY_SEGMENT.test(seg)) break;
 
-    // Se contiene menzione di aula o docente all'interno del segmento, ripuliscila e fermati
-    if (/\b(?:prof\.?|prof\.ssa|docente|aula|edificio|sede)\b/i.test(seg)) {
-      const cleaned = seg.replace(/[\s,]+(?:aula|room|edificio|sede|prof\.?|prof\.ssa|docente)\b.*$/i, '').trim();
-      if (cleaned) keptSegments.push(cleaned);
-      break;
-    }
-
-    keptSegments.push(seg);
+    // Se il segmento contiene internamente parole accessorie in coda, ripuliscilo e fermati
+    const cleaned = seg.replace(/[\s,]+(?:aula|room|edificio|sede|prof\.?|prof\.ssa|docente|dott\.?|ing\.?|canale|gruppo)\b.*$/i, '').trim();
+    if (cleaned) keptSegments.push(cleaned);
+    if (cleaned !== seg) break;
   }
 
-  let result = keptSegments.length > 0 ? keptSegments.join(' ') : name;
+  let result = keptSegments.length > 0 ? keptSegments.join(' ') : cur;
 
-  // 4. Ripulisci eventuale rumore di coda residuo
+  // 5. Ripulisci code residue
   let prev = '';
   while (result !== prev) {
     prev = result;
@@ -119,7 +140,12 @@ export function extractCourseName(title: string): string {
   return formatCourseTitleCase(result.trim());
 }
 
-/** Nome corso dal titolo, con fallback al titolo intero se l'estrazione fallisce */
+/** Estrae il nome completo del corso dal titolo di un evento (alias di cleanCourseName) */
+export function extractCourseName(title: string): string {
+  return cleanCourseName(title);
+}
+
+/** Nome corso dal titolo, con fallback al titolo originale se l'estrazione fallisce */
 export function courseNameFromTitle(title: string): string {
   return extractCourseName(title) || title.trim();
 }
@@ -134,7 +160,23 @@ export function normalizeCourseName(name: string): string {
     .trim();
 }
 
-/** Trova il corso corrispondente al titolo di un evento (gestisce match esatto e prefisso/estensione) */
+/** Estrae il nome del corso da un titolo di task generato automaticamente */
+export function extractCourseFromTaskTitle(title: string): string {
+  if (!title) return '';
+  const cleaned = title
+    .replace(/^Seguire\/Recuperare lezione:\s*/i, '')
+    .replace(/^Sistemare appunti:\s*/i, '')
+    .replace(/^Esercizi:\s*/i, '')
+    .replace(/^Studio:\s*/i, '')
+    .replace(/^Studio\s+/i, '')
+    .replace(/^Progetto:\s*/i, '')
+    .replace(/^Preparazione esame:\s*/i, '')
+    .replace(/\s*\(\d{1,2}\/\d{1,2}\/\d{2,4}\)\s*$/i, '')
+    .trim();
+  return cleanCourseName(cleaned);
+}
+
+/** Trova il corso corrispondente al titolo di un evento (gestisce match esatto, prefisso ed estensione) */
 export function findCourseForTitle(title: string, courses: Course[]): Course | undefined {
   const extracted = courseNameFromTitle(title);
   const target = normalizeCourseName(extracted);
@@ -165,7 +207,32 @@ export function findCourseForTitle(title: string, courses: Course[]): Course | u
   return undefined;
 }
 
-const COURSE_COLORS = ['#1a73e8', '#d93025', '#188038', '#f29900', '#a142f4', '#e8710a', '#1967d2', '#c5221f'];
+/** Punteggio di affidabilità di un candidato nome corso */
+function scoreCandidate(name: string, origCourseName: string, eventCount: number, taskCount: number): number {
+  const norm = normalizeCourseName(name);
+  if (!norm || BOGUS_COURSE_NAMES.has(norm) || /^\d+$/.test(norm)) return -100000;
+
+  const words = norm.split(/\s+/).filter(Boolean).length;
+  // Forte premialità ai nomi composti (> 1 parola): è la radice del problema degli utenti!
+  let score = words > 1 ? 1000 + words * 50 : 10;
+
+  const origNorm = normalizeCourseName(origCourseName);
+  if (origNorm) {
+    if (norm === origNorm) score += 100;
+    else if (norm.includes(origNorm) || origNorm.includes(norm)) score += 200;
+  }
+
+  // Bonus se contiene specificazioni numeriche o romane (es. Analisi 1, Fisica II)
+  if (/\b(?:[1-9]|I|II|III|IV|V|VI|VII|VIII|IX|X)\b/i.test(name)) {
+    score += 50;
+  }
+
+  score += eventCount * 5;
+  score += taskCount * 5;
+  return score;
+}
+
+const COURSE_COLORS = ['#1a73e8', '#d93025', '#188038', '#f29900', '#a142f4', '#e8710a', '#1967d2', '#c5221f', '#137333', '#b31412'];
 
 interface RepairInput {
   courses: Course[];
@@ -176,116 +243,173 @@ interface RepairInput {
 
 interface RepairResult extends RepairInput {
   changed: boolean;
+  repairedCount: number;
 }
 
 /**
- * Ripara i corsi salvati con nomi troncati (es. solo la prima parola salvata in precedenza).
- * - Identifica corsi con nomi a parola singola o prefissi e cerca negli eventi del calendario
- *   il nome reale e completo (es. "Analisi" → "Analisi Matematica 1").
- * - Se più corsi diversi erano stati salvati sotto lo stesso prefisso, li separa correttamente.
- * - Collega le lezioni orfane o con type generico al corso corrispondente.
- * - Aggiorna coerentemente corsi, eventi, task e cronologia performance.
- * - Idempotente: una seconda esecuzione non produce ulteriori modifiche.
+ * Ripara i corsi salvati con nomi troncati (es. solo la prima parola salvata in precedenza),
+ * rimuove codici grezzi e prefissi errati, collega coerentemente eventi e task,
+ * e deduplica eventuali corsi doppioni.
  */
 export function repairCourseNames(input: RepairInput): RepairResult {
   let changed = false;
-  const courses = input.courses.map(c => ({ ...c }));
-  let events = input.events.map(e => ({ ...e }));
-  const eventCourseOverride = new Map<string, string>(); // eventId → nuovo courseId
+  let repairedCount = 0;
+  const courses: Course[] = input.courses.map(c => ({ ...c }));
+  let events: CalendarEvent[] = input.events.map(e => ({ ...e }));
+  let tasks: Task[] = input.tasks.map(t => ({ ...t }));
+  let performanceHistory: PerformanceRecord[] = input.performanceHistory.map(p => ({ ...p }));
+  const eventCourseOverride = new Map<string, string>(); // eventId -> new courseId
 
   for (const course of [...courses]) {
     const courseNorm = normalizeCourseName(course.name);
-
-    // Eventi collegati a questo corso (sia lesson che generic o altro, escluso exam)
-    const linked = events.filter(e => (e.courseId === course.id || eventCourseOverride.get(e.id) === course.id) && e.type !== 'exam');
-
-    // Se il corso ha solo una parola o nessun evento collegato, cerca tra gli eventi orfani che iniziano col nome del corso
     const wordCount = course.name.trim().split(/\s+/).length;
-    if (linked.length === 0 || wordCount === 1) {
-      const candidatesFromUnlinked = events.filter(e => {
-        if (e.type === 'exam' || e.type === 'sport' || e.type === 'travel' || e.type === 'meal') return false;
-        if (e.courseId && e.courseId !== course.id) return false;
-        const extracted = courseNameFromTitle(e.title);
-        const norm = normalizeCourseName(extracted);
-        return norm === courseNorm || norm.startsWith(courseNorm + ' ');
-      });
-      for (const e of candidatesFromUnlinked) {
-        if (!linked.some(l => l.id === e.id)) linked.push(e);
+    const isBogusName = BOGUS_COURSE_NAMES.has(courseNorm) || /^\d+$/.test(courseNorm);
+
+    // Raccoglie i candidati per questo corso
+    interface CandidateEntry {
+      name: string;
+      events: CalendarEvent[];
+      taskCount: number;
+    }
+    const candidateMap = new Map<string, CandidateEntry>();
+
+    const recordCandidate = (rawCand: string, ev?: CalendarEvent, isTask?: boolean) => {
+      const clean = cleanCourseName(rawCand);
+      const key = normalizeCourseName(clean);
+      if (!key || BOGUS_COURSE_NAMES.has(key) || /^\d+$/.test(key)) return;
+      if (!candidateMap.has(key)) {
+        candidateMap.set(key, { name: clean, events: [], taskCount: 0 });
+      }
+      const entry = candidateMap.get(key)!;
+      if (ev && !entry.events.some(e => e.id === ev.id)) {
+        entry.events.push(ev);
+      }
+      if (isTask) {
+        entry.taskCount++;
+      }
+    };
+
+    // 1. Candidato dal nome stesso del corso (se aveva prefissi o rumore da ripulire)
+    recordCandidate(course.name);
+
+    // 2. Candidati dagli eventi già collegati al corso
+    const linkedEvents = events.filter(e => e.courseId === course.id);
+    for (const e of linkedEvents) {
+      recordCandidate(e.title, e);
+    }
+
+    // 3. Candidati dai task già collegati al corso
+    const linkedTasks = tasks.filter(t => t.courseId === course.id);
+    for (const t of linkedTasks) {
+      const fromTask = extractCourseFromTaskTitle(t.title);
+      recordCandidate(fromTask, undefined, true);
+    }
+
+    // 4. Se il nome del corso ha solo 1 parola, o è bogus, cerca tra tutti gli eventi orfani o parziali
+    if (wordCount === 1 || isBogusName || linkedEvents.length === 0) {
+      for (const e of events) {
+        if (e.type === 'exam' || e.type === 'sport' || e.type === 'travel' || e.type === 'meal') continue;
+        const eCand = cleanCourseName(e.title);
+        const eNorm = normalizeCourseName(eCand);
+        if (!eNorm) continue;
+
+        // Se l'evento contiene la parola del corso o inizia col corso
+        const matchesWord = courseNorm && (
+          eNorm === courseNorm ||
+          eNorm.startsWith(courseNorm + ' ') ||
+          new RegExp(`\\b${courseNorm}\\b`).test(eNorm)
+        );
+
+        if (matchesWord && (!e.courseId || e.courseId === course.id || isBogusName)) {
+          recordCandidate(eCand, e);
+        }
+      }
+
+      // Cerca anche tra tutti i task che menzionano il corso
+      for (const t of tasks) {
+        const tCand = extractCourseFromTaskTitle(t.title);
+        const tNorm = normalizeCourseName(tCand);
+        if (tNorm && courseNorm && (tNorm === courseNorm || tNorm.startsWith(courseNorm + ' ') || new RegExp(`\\b${courseNorm}\\b`).test(tNorm))) {
+          recordCandidate(tCand, undefined, true);
+        }
       }
     }
 
-    if (linked.length === 0) {
-      const cleaned = extractCourseName(course.name);
+    if (candidateMap.size === 0) {
+      const cleaned = cleanCourseName(course.name);
       if (cleaned && cleaned !== course.name) {
         course.name = cleaned;
         changed = true;
+        repairedCount++;
       }
       continue;
     }
 
-    // Raggruppa gli eventi per nome estratto completo
-    const groups = new Map<string, { name: string; events: CalendarEvent[] }>();
-    for (const e of linked) {
-      const name = courseNameFromTitle(e.title);
-      if (!name) continue;
-      const key = normalizeCourseName(name);
-      if (!groups.has(key)) groups.set(key, { name, events: [] });
-      groups.get(key)!.events.push(e);
-    }
-    if (groups.size === 0) continue;
-
-    // Ordina per frequenza (e a parità di frequenza per lunghezza del nome)
-    const sorted = [...groups.entries()].sort((a, b) => {
-      const freqDiff = b[1].events.length - a[1].events.length;
-      if (freqDiff !== 0) return freqDiff;
-      return b[1].name.length - a[1].name.length;
+    // Calcola il punteggio di tutti i candidati
+    const scoredCandidates = [...candidateMap.values()].map(entry => ({
+      ...entry,
+      score: scoreCandidate(entry.name, course.name, entry.events.length, entry.taskCount),
+    })).sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return b.name.length - a.name.length;
     });
 
-    const [, bestGroup] = sorted[0];
+    const best = scoredCandidates[0];
 
-    // Se il miglior nome estratto è più completo del vecchio nome salvato
-    if (bestGroup.name && bestGroup.name !== course.name) {
-      const bestNorm = normalizeCourseName(bestGroup.name);
-      if (bestNorm === courseNorm || bestNorm.startsWith(courseNorm + ' ') || wordCount === 1) {
-        course.name = bestGroup.name;
-        changed = true;
+    // Se il miglior candidato è un nome valido e migliore del vecchio nome
+    if (best && best.score > 0 && best.name !== course.name) {
+      const oldName = course.name;
+      course.name = best.name;
+      changed = true;
+      repairedCount++;
+      console.log(`[repairCourseNames] Corso "${oldName}" riparato in "${best.name}"`);
+    }
+
+    // Associa gli eventi del gruppo migliore al corso corrente
+    if (best) {
+      for (const e of best.events) {
+        if (e.courseId !== course.id) {
+          eventCourseOverride.set(e.id, course.id);
+          changed = true;
+        }
       }
     }
 
-    // Collega gli eventi al corso
-    for (const e of bestGroup.events) {
-      if (e.courseId !== course.id) {
-        eventCourseOverride.set(e.id, course.id);
-        changed = true;
-      }
-    }
-
-    // Se c'erano più corsi distinti fusi insieme (es. Analisi 1 e Analisi 2)
-    for (const [key, group] of sorted.slice(1)) {
-      if (key === normalizeCourseName(course.name)) continue;
-      let target = courses.find(c => c.id !== course.id && normalizeCourseName(c.name) === key);
-      if (!target) {
-        target = {
-          ...course,
-          id: uuidv4(),
-          name: group.name,
-          color: COURSE_COLORS[courses.length % COURSE_COLORS.length],
-        };
-        courses.push(target);
-        changed = true;
-      }
-      for (const e of group.events) {
-        eventCourseOverride.set(e.id, target.id);
-        changed = true;
+    // Se c'erano più corsi distinti e validi fusi insieme (es. Analisi 1 e Analisi 2 con score > 1000)
+    for (const alt of scoredCandidates.slice(1)) {
+      if (alt.score >= 1000 && normalizeCourseName(alt.name) !== normalizeCourseName(course.name)) {
+        const altKey = normalizeCourseName(alt.name);
+        let target = courses.find(c => c.id !== course.id && normalizeCourseName(c.name) === altKey);
+        if (!target) {
+          target = {
+            ...course,
+            id: uuidv4(),
+            name: alt.name,
+            color: COURSE_COLORS[courses.length % COURSE_COLORS.length],
+          };
+          courses.push(target);
+          changed = true;
+          repairedCount++;
+        }
+        for (const e of alt.events) {
+          eventCourseOverride.set(e.id, target.id);
+          changed = true;
+        }
       }
     }
   }
 
-  // Deduplica eventuali corsi che ora condividono lo stesso nome normalizzato
+  // Deduplica i corsi che ora condividono lo stesso nome normalizzato
   const uniqueCourses: Course[] = [];
-  const courseIdRemap = new Map<string, string>();
+  const courseIdRemap = new Map<string, string>(); // oldCourseId -> keptCourseId
+
   for (const c of courses) {
     const norm = normalizeCourseName(c.name);
+    // Se è un nome bogus senza eventi/task, scartalo
+    if (BOGUS_COURSE_NAMES.has(norm) || /^\d+$/.test(norm)) {
+      changed = true;
+      continue;
+    }
     const existing = uniqueCourses.find(u => normalizeCourseName(u.name) === norm);
     if (existing) {
       courseIdRemap.set(c.id, existing.id);
@@ -301,27 +425,50 @@ export function repairCourseNames(input: RepairInput): RepairResult {
     if (newCourseId && courseIdRemap.has(newCourseId)) {
       newCourseId = courseIdRemap.get(newCourseId);
     }
-    // Se non ha corso associato, prova ad associarlo
+
+    // Se l'evento non ha ancora un corso associato (ed è accademico), prova ad associarlo
     if (!newCourseId && e.type !== 'exam' && e.type !== 'sport' && e.type !== 'travel' && e.type !== 'meal') {
       const match = findCourseForTitle(e.title, uniqueCourses);
       if (match) {
         newCourseId = match.id;
-        changed = true;
       }
     }
-    if (newCourseId !== e.courseId) {
+
+    let updatedTitle = e.title;
+    // Se il titolo dell'evento era in MAIUSCOLO grezzo o conteneva prefissi tipo 084723 -
+    if (newCourseId) {
+      const targetCourse = uniqueCourses.find(c => c.id === newCourseId);
+      if (targetCourse) {
+        const cleanTitleStr = cleanCourseName(e.title);
+        // Se il titolo dell'evento era solo una parola o conteneva codici grezzi,
+        // aggiorna con il nome completo del corso
+        if (
+          e.title.trim().split(/\s+/).length <= 2 ||
+          SSD_CODE.test(e.title) ||
+          NUMERIC_CODE.test(e.title) ||
+          normalizeCourseName(e.title) === normalizeCourseName(targetCourse.name)
+        ) {
+          updatedTitle = targetCourse.name;
+        } else if (cleanTitleStr && cleanTitleStr !== e.title && cleanTitleStr.split(/\s+/).length >= 2) {
+          updatedTitle = cleanTitleStr;
+        }
+      }
+    }
+
+    const titleChanged = updatedTitle !== e.title;
+    const courseChanged = newCourseId !== e.courseId;
+
+    if (titleChanged || courseChanged) {
       changed = true;
       return {
         ...e,
+        title: updatedTitle,
         courseId: newCourseId,
-        type: (e.type === 'generic' || !e.type) ? ('lesson' as const) : e.type
+        type: (e.type === 'generic' || !e.type) ? ('lesson' as const) : e.type,
       };
     }
     return e;
   });
-
-  let tasks = input.tasks;
-  let performanceHistory = input.performanceHistory;
 
   // Aggiorna i task il cui relatedEventId o courseId è stato modificato
   const taskCourseOverride = new Map<string, string>();
@@ -333,21 +480,42 @@ export function repairCourseNames(input: RepairInput): RepairResult {
     if (newCourseId && courseIdRemap.has(newCourseId)) {
       newCourseId = courseIdRemap.get(newCourseId)!;
     }
-    if (newCourseId !== t.courseId) {
-      taskCourseOverride.set(t.id, newCourseId!);
+
+    let updatedTitle = t.title;
+    if (newCourseId) {
+      const targetCourse = uniqueCourses.find(c => c.id === newCourseId);
+      if (targetCourse) {
+        // Se il titolo del task contiene il vecchio nome troncato di una sola parola, aggiornalo
+        for (const oldCourse of courses) {
+          if (oldCourse.name !== targetCourse.name && targetCourse.name.startsWith(oldCourse.name)) {
+            const pattern = new RegExp(`\\b${oldCourse.name}\\b`, 'g');
+            if (pattern.test(updatedTitle)) {
+              updatedTitle = updatedTitle.replace(pattern, targetCourse.name);
+            }
+          }
+        }
+      }
+    }
+
+    const titleChanged = updatedTitle !== t.title;
+    const courseChanged = newCourseId !== t.courseId;
+
+    if (titleChanged || courseChanged) {
+      if (newCourseId) taskCourseOverride.set(t.id, newCourseId);
       changed = true;
-      return { ...t, courseId: newCourseId };
+      return { ...t, title: updatedTitle, courseId: newCourseId };
     }
     return t;
   });
 
+  // Aggiorna la cronologia delle performance
   if (taskCourseOverride.size > 0 || courseIdRemap.size > 0) {
     performanceHistory = performanceHistory.map(p => {
       let newCourseId = p.courseId;
       if (taskCourseOverride.has(p.taskId)) {
         newCourseId = taskCourseOverride.get(p.taskId)!;
       }
-      if (courseIdRemap.has(newCourseId)) {
+      if (newCourseId && courseIdRemap.has(newCourseId)) {
         newCourseId = courseIdRemap.get(newCourseId)!;
       }
       if (newCourseId !== p.courseId) {
@@ -358,6 +526,12 @@ export function repairCourseNames(input: RepairInput): RepairResult {
     });
   }
 
-  if (!changed) return { ...input, changed: false };
-  return { courses: uniqueCourses, events, tasks, performanceHistory, changed: true };
+  return {
+    courses: uniqueCourses,
+    events,
+    tasks,
+    performanceHistory,
+    changed,
+    repairedCount,
+  };
 }

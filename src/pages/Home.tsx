@@ -23,6 +23,10 @@ export function Home() {
   const undo = useAppStore(s => s.undo);
   const pastStates = useAppStore(s => s.pastStates);
 
+  useEffect(() => {
+    useAppStore.getState().repairCourses();
+  }, []);
+
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);

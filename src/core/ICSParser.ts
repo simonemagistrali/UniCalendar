@@ -67,7 +67,7 @@ export function parseICS(raw: string): CalendarEvent[] {
 
     switch (key) {
       case 'SUMMARY':
-        current.title = val;
+        current.title = val.replace(/\\([,;nN\\])/g, (_, ch) => (ch === 'n' || ch === 'N' ? ' ' : ch)).trim();
         break;
       case 'DTSTART':
         current.startTime = parseICSDate(val);

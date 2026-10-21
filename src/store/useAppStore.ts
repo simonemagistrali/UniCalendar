@@ -96,6 +96,7 @@ interface AppState {
   addCourse: (course: Course) => void;
   updateCourse: (id: string, updates: Partial<Course>) => void;
   removeCourse: (id: string) => void;
+  repairCourses: () => { changed: boolean; count: number };
   
   // Sessions
   setStudySessions: (sessions: StudySession[]) => void;
@@ -458,6 +459,38 @@ export const useAppStore = create<AppState>((set, get) => ({
       persist(next as AppState);
       return next;
     });
+  },
+
+  repairCourses: () => {
+    const s = get();
+    const result = repairCourseNames({
+      courses: s.courses,
+      events: s.events,
+      tasks: s.tasks,
+      performanceHistory: s.performanceHistory,
+    });
+    if (result.changed) {
+      console.log(`[repairCourses] ${result.repairedCount} corsi riparati`);
+      const next = {
+        ...s,
+        courses: result.courses,
+        events: result.events,
+        tasks: result.tasks,
+        performanceHistory: result.performanceHistory,
+      };
+      set(next);
+      saveState({
+        events: next.events,
+        tasks: next.tasks,
+        courses: next.courses,
+        preferences: next.preferences,
+        performanceHistory: next.performanceHistory,
+        studySessions: next.studySessions,
+        ankiHistory: next.ankiHistory,
+      });
+      persist(next as AppState);
+    }
+    return { changed: result.changed, count: result.repairedCount };
   },
 
   // ── Sessions ──

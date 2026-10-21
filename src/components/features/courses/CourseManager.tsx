@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Edit2, Check, X, Sparkles } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { Modal } from '../../ui/Modal';
 import type { Course } from '../../../core/types';
@@ -17,9 +17,22 @@ export function CourseManager({ isOpen, onClose }: CourseManagerProps) {
   const addCourse = useAppStore(s => s.addCourse);
   const updateCourse = useAppStore(s => s.updateCourse);
   const removeCourse = useAppStore(s => s.removeCourse);
+  const repairCourses = useAppStore(s => s.repairCourses);
 
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [repairMsg, setRepairMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const res = repairCourses();
+      if (res.changed && res.count > 0) {
+        setRepairMsg(`${res.count} corso/i riparati automaticamente!`);
+        const timer = setTimeout(() => setRepairMsg(null), 4000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isOpen, repairCourses]);
 
   // Form state
   const [name, setName] = useState('');
@@ -161,9 +174,42 @@ export function CourseManager({ isOpen, onClose }: CourseManagerProps) {
             </div>
           </div>
         ) : (
-          <button className="course-add-btn" onClick={() => setIsAdding(true)}>
-            <Plus size={16} /> Aggiungi Corso
-          </button>
+          <div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="course-add-btn" onClick={() => setIsAdding(true)} style={{ flex: 1 }}>
+                <Plus size={16} /> Aggiungi Corso
+              </button>
+              <button
+                type="button"
+                className="course-repair-btn"
+                onClick={() => {
+                  const res = repairCourses();
+                  setRepairMsg(res.changed && res.count > 0 ? `${res.count} corso/i riparati con successo!` : 'Tutti i nomi dei corsi sono corretti');
+                  setTimeout(() => setRepairMsg(null), 3500);
+                }}
+                title="Rileva e corregge i nomi dei corsi troncati, errati o con codici numerici"
+              >
+                <Sparkles size={15} /> Ripara Nomi
+              </button>
+            </div>
+            {repairMsg && (
+              <div style={{
+                marginTop: '10px',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                backgroundColor: 'rgba(24, 128, 56, 0.12)',
+                color: '#188038',
+                border: '1px solid rgba(24, 128, 56, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <Check size={14} />
+                <span>{repairMsg}</span>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </Modal>
