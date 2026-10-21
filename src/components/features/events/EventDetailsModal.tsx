@@ -98,7 +98,49 @@ export function EventDetailsModal({ isOpen, onClose, event, onEdit }: EventDetai
               <div>{event.location.type === 'remote' ? 'Online' : event.location.address || 'In presenza'}</div>
             </div>
           )}
+          {event.lecturer && (
+            <div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Docente</div>
+              <div>{event.lecturer}</div>
+            </div>
+          )}
         </div>
+
+        {/* Syllabus / AI Notes Info */}
+        {(event.topic || event.notes || (event.readings && event.readings.length > 0)) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: 'var(--bg-secondary)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            {event.topic && (
+              <div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Argomento Lezione:</div>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>{event.topic}</div>
+              </div>
+            )}
+            {event.notes && (
+              <div style={{ marginTop: '2px' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Riferimenti / Capitoli:</div>
+                <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginTop: '2px' }}>{event.notes}</div>
+              </div>
+            )}
+            {event.readings && event.readings.length > 0 && (
+              <div style={{ marginTop: '4px' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Materiali e Link:</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {event.readings.map((link, idx) => (
+                    <a
+                      key={idx}
+                      href={link}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ fontSize: '0.82rem', color: 'var(--primary)', textDecoration: 'underline', wordBreak: 'break-all' }}
+                    >
+                      {link}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="form-actions" style={{ marginTop: '8px' }}>
           <Button variant="danger" onClick={handleDelete}>Elimina</Button>

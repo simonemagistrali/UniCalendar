@@ -30,6 +30,7 @@ const defaultPreferences: UserPreferences = {
   defaultCommuteTimeMinutes: 45,
   isCommuteProductive: false,
   ankiAverageTimeSeconds: 15,
+  geminiApiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || '',
 };
 
 /**
@@ -56,6 +57,7 @@ function mergePreferences(saved: unknown): UserPreferences {
     defaultCommuteTimeMinutes: p.defaultCommuteTimeMinutes ?? 45,
     isCommuteProductive: p.isCommuteProductive ?? false,
     ankiAverageTimeSeconds: p.ankiAverageTimeSeconds ?? 15,
+    geminiApiKey: p.geminiApiKey || defaultPreferences.geminiApiKey,
   };
 }
 

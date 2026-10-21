@@ -143,6 +143,12 @@ export function TaskCard({ task }: TaskCardProps) {
         </div>
       </div>
 
+      {task.description && (
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '4px 0 8px 0', padding: '6px 8px', borderRadius: '6px', background: 'var(--bg-secondary)', borderLeft: '3px solid var(--primary)', whiteSpace: 'pre-line', lineHeight: 1.4 }}>
+          {task.description}
+        </div>
+      )}
+
       <div className="task-card-meta">
         <div className="task-meta-item">
           <Clock size={12} />

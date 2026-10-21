@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2, TrendingUp, CheckSquare, BarChart3, Brain } from "lucide-react";
+import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2, TrendingUp, CheckSquare, BarChart3, Brain, Sparkles } from "lucide-react";
 
 import { Calendar } from '../components/features/calendar/Calendar';
 
@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { EventFormModal } from '../components/features/events/EventFormModal';
 import { ImportCalendarModal } from '../components/features/events/ImportCalendarModal';
+import { ImportSyllabusModal } from '../components/features/events/ImportSyllabusModal';
 import { TaskPanel } from '../components/features/tasks/TaskPanel';
 import { CourseManager } from '../components/features/courses/CourseManager';
 import { CatchUpMini } from '../components/features/dashboard/CatchUpIndicator';
@@ -29,6 +30,7 @@ export function Home() {
 
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isSyllabusModalOpen, setIsSyllabusModalOpen] = useState(false);
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'calendar' | 'tasks' | 'statistics' | 'anki'>(() => {
     return (localStorage.getItem('unicalendar_activeTab') as any) || 'calendar';
@@ -89,6 +91,18 @@ export function Home() {
           <button className="sidebar-action-btn" onClick={() => { setIsImportModalOpen(true); setSidebarOpen(false); }}>
             <Upload size={16} />
             <span>Importa .ics</span>
+          </button>
+          <button 
+            className="sidebar-action-btn" 
+            onClick={() => { setIsSyllabusModalOpen(true); setSidebarOpen(false); }}
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(99, 102, 241, 0.15))', 
+              border: '1px solid rgba(168, 85, 247, 0.35)',
+              fontWeight: 600
+            }}
+          >
+            <Sparkles size={16} style={{ color: '#a855f7' }} />
+            <span>Note AI (PDF/Excel)</span>
           </button>
           <button className="sidebar-action-btn" onClick={() => { setIsCourseModalOpen(true); setSidebarOpen(false); }}>
             <GraduationCap size={16} />
@@ -241,6 +255,7 @@ export function Home() {
       {/* Modals */}
       <EventFormModal isOpen={isEventModalOpen} onClose={() => setIsEventModalOpen(false)} />
       <ImportCalendarModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} />
+      <ImportSyllabusModal isOpen={isSyllabusModalOpen} onClose={() => setIsSyllabusModalOpen(false)} />
       <CourseManager isOpen={isCourseModalOpen} onClose={() => setIsCourseModalOpen(false)} />
       
       <Tutorial />

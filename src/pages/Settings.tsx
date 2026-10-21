@@ -29,6 +29,8 @@ export function Settings() {
   const [commuteTime, setCommuteTime] = useState((preferences.defaultCommuteTimeMinutes || 45).toString());
   const [isCommuteProductive, setIsCommuteProductive] = useState(preferences.isCommuteProductive || false);
   const [ankiAverageTime, setAnkiAverageTime] = useState((preferences.ankiAverageTimeSeconds || 15).toString());
+  const [geminiApiKey, setGeminiApiKey] = useState(preferences.geminiApiKey || '');
+  const [showApiKey, setShowApiKey] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const handleToggleDay = (dayId: number) => {
@@ -87,6 +89,7 @@ export function Settings() {
       defaultCommuteTimeMinutes: clamp(parseInt(commuteTime) || 45, 0, 300),
       isCommuteProductive,
       ankiAverageTimeSeconds: clamp(parseInt(ankiAverageTime) || 15, 1, 300),
+      geminiApiKey: geminiApiKey.trim() || undefined,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -257,6 +260,56 @@ export function Settings() {
                 className="settings-number-input"
               />
               <span className="settings-field-label">secondi</span>
+            </div>
+          </GlassPanel>
+
+          {/* AI Tools (Gemini) */}
+          <GlassPanel>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <h2 className="settings-section-title" style={{ margin: 0 }}>Strumenti AI (Google Gemini)</h2>
+              <span style={{ 
+                fontSize: '0.75rem', 
+                padding: '2px 8px', 
+                borderRadius: '12px', 
+                background: geminiApiKey ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                color: geminiApiKey ? '#22c55e' : '#ef4444',
+                fontWeight: 600
+              }}>
+                {geminiApiKey ? 'Attiva' : 'Non configurata'}
+              </span>
+            </div>
+            <p className="settings-section-desc">
+              Usata per l'analisi intelligente di calendari PDF/Excel e l'inserimento automatico di note e argomenti nelle lezioni e nei task.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  value={geminiApiKey}
+                  onChange={e => setGeminiApiKey(e.target.value)}
+                  placeholder="Incolla la tua Gemini API Key..."
+                  className="settings-text-input"
+                  style={{ flex: 1, fontFamily: 'monospace', fontSize: '0.85rem' }}
+                />
+                <Button 
+                  variant="secondary"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  style={{ padding: '0.5rem 0.8rem' }}
+                >
+                  {showApiKey ? 'Nascondi' : 'Mostra'}
+                </Button>
+              </div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                Puoi generare una chiave gratuita (1.500 richieste/giorno) su{' '}
+                <a 
+                  href="https://aistudio.google.com/app/apikey" 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  style={{ color: 'var(--primary)', textDecoration: 'underline' }}
+                >
+                  Google AI Studio
+                </a>.
+              </span>
             </div>
           </GlassPanel>
 

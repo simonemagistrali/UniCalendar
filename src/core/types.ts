@@ -57,6 +57,11 @@ export interface CalendarEvent {
   travelInEndOffset?: number;   // Minutes before lesson start to arrive
   travelOutStartOffset?: number; // Minutes after lesson end to begin return commute
   travelOutEndOffset?: number;   // Minutes after lesson end to arrive
+  // Syllabus & Lesson notes
+  topic?: string;
+  notes?: string;
+  readings?: string[];
+  lecturer?: string;
 }
 
 /* ─── Task ─── */
@@ -123,6 +128,32 @@ export interface UserPreferences {
   defaultCommuteTimeMinutes?: number; // Estimated commute time in minutes
   isCommuteProductive?: boolean; // True if commute is by train/bus and can be used for study
   ankiAverageTimeSeconds?: number; // Average time to review a single Anki card
+  geminiApiKey?: string; // Google Gemini API Key for smart syllabus/notes analysis
+}
+
+/* ─── Syllabus / Calendar Import via AI ─── */
+export interface ParsedLessonNote {
+  id?: string;
+  rawDate: string; // e.g. "15/09/2026" or "Tuesday 15/9"
+  parsedDate?: string; // "YYYY-MM-DD"
+  startTime?: string; // "14:15" or "14:30"
+  endTime?: string; // "16:15"
+  room?: string; // "6.0.1" or "9.12"
+  lecturer?: string; // "Francesco" or "Brambilla"
+  topic: string; // "Introduction to Big Data"
+  lessonType: LessonType; // 'theory' | 'exercise' | 'lab'
+  coursePart?: string; // "Intro, RDBMS, DWH"
+  sectionsOrChapters?: string; // "Chapter 1, Sections 1-2"
+  readingsOrLinks?: string[]; // ["https://..."]
+  isCancelled?: boolean; // true if NO CLASS
+  matchedEventId?: string; // Existing CalendarEvent id if matched
+}
+
+export interface SyllabusExtractionResult {
+  courseName?: string;
+  lessons: ParsedLessonNote[];
+  totalExtracted: number;
+  tokensUsed?: number;
 }
 
 /* ─── Anki History (salvata localmente + cloud, disponibile anche offline) ─── */
