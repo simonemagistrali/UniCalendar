@@ -26,8 +26,8 @@ export function CourseManager({ isOpen, onClose }: CourseManagerProps) {
   useEffect(() => {
     if (isOpen) {
       const res = repairCourses();
-      if (res.changed && res.count > 0) {
-        setRepairMsg(`${res.count} corso/i riparati automaticamente!`);
+      if (res.changed) {
+        setRepairMsg('Duplicati rimossi e corsi unificati!');
         const timer = setTimeout(() => setRepairMsg(null), 4000);
         return () => clearTimeout(timer);
       }
@@ -184,12 +184,12 @@ export function CourseManager({ isOpen, onClose }: CourseManagerProps) {
                 className="course-repair-btn"
                 onClick={() => {
                   const res = repairCourses();
-                  setRepairMsg(res.changed && res.count > 0 ? `${res.count} corso/i riparati con successo!` : 'Tutti i nomi dei corsi sono corretti');
+                  setRepairMsg(res.changed ? 'Doppioni rimossi e corsi unificati con successo!' : 'Tutti i corsi sono corretti e senza doppioni');
                   setTimeout(() => setRepairMsg(null), 3500);
                 }}
-                title="Rileva e corregge i nomi dei corsi troncati, errati o con codici numerici"
+                title="Rimuove i corsi doppioni e corregge eventuali nomi troncati"
               >
-                <Sparkles size={15} /> Ripara Nomi
+                <Sparkles size={15} /> Unifica e Ripara
               </button>
             </div>
             {repairMsg && (

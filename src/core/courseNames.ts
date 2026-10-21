@@ -232,7 +232,82 @@ function scoreCandidate(name: string, origCourseName: string, eventCount: number
   return score;
 }
 
-const COURSE_COLORS = ['#1a73e8', '#d93025', '#188038', '#f29900', '#a142f4', '#e8710a', '#1967d2', '#c5221f', '#137333', '#b31412'];
+/** Converte numeri romani in cifre arabe e normalizza per comparazioni di equivalenza */
+export function canonicalizeCourseName(name: string): string {
+  let n = normalizeCourseName(name);
+  n = n
+    .replace(/\bx\b/g, '10')
+    .replace(/\bix\b/g, '9')
+    .replace(/\bviii\b/g, '8')
+    .replace(/\bvii\b/g, '7')
+    .replace(/\bvi\b/g, '6')
+    .replace(/\biv\b/g, '4')
+    .replace(/\bv\b/g, '5')
+    .replace(/\biii\b/g, '3')
+    .replace(/\bii\b/g, '2')
+    .replace(/\bi\b/g, '1');
+  return n;
+}
+
+/** Estrae eventuale numero di modulo o semestre (es. 1, 2) */
+function extractCourseNumber(name: string): string | null {
+  const m = canonicalizeCourseName(name).match(/\b([1-9]|10)\b/);
+  return m ? m[1] : null;
+}
+
+/** Estrae le parole significative escludendo congiunzioni e numeri */
+function getCourseWords(name: string): string[] {
+  const STOPWORDS = new Set(['di', 'del', 'della', 'dello', 'dei', 'degli', 'delle', 'ed', 'e', 'per', 'in', 'con', 'su', 'da', 'a']);
+  return canonicalizeCourseName(name)
+    .split(/\s+/)
+    .filter(w => !STOPWORDS.has(w) && !/^\d+$/.test(w));
+}
+
+/**
+ * Determina se due nomi di corsi si riferiscono allo stesso insegnamento
+ * (es. "Analisi" e "Analisi Matematica 1", "Fisica Generale" e "Fisica", "Analisi 1" e "Analisi I").
+ */
+export function areSameCourse(nameA: string, nameB: string): boolean {
+  const cA = canonicalizeCourseName(nameA);
+  const cB = canonicalizeCourseName(nameB);
+  if (cA === cB) return true;
+
+  const numA = extractCourseNumber(nameA);
+  const numB = extractCourseNumber(nameB);
+  // Se hanno numeri espliciti diversi (es. Analisi 1 vs Analisi 2), sono corsi diversi!
+  if (numA && numB && numA !== numB) return false;
+
+  const wordsA = getCourseWords(nameA);
+  const wordsB = getCourseWords(nameB);
+  if (wordsA.length === 0 || wordsB.length === 0) return false;
+
+  // Se uno ha solo una parola radice e l'altro inizia con quella (es. "Analisi" e "Analisi Matematica")
+  if (wordsA.length === 1 && wordsB[0] === wordsA[0]) return true;
+  if (wordsB.length === 1 && wordsA[0] === wordsB[0]) return true;
+
+  // Se le parole del più corto sono prefisso del più lungo
+  const shorter = wordsA.length <= wordsB.length ? wordsA : wordsB;
+  const longer = wordsA.length <= wordsB.length ? wordsB : wordsA;
+  const isPrefix = shorter.every((w, i) => longer[i] === w);
+  if (isPrefix) return true;
+
+  // Se condividono il numero e la prima parola principale (es. "Analisi 1" e "Analisi Matematica 1")
+  if (numA && numB && numA === numB && shorter[0] === longer[0]) return true;
+
+  return false;
+}
+
+/** Punteggio di qualità del corso per determinare il nome canonico da preservare nel cluster */
+function scoreCourseQuality(c: Course, eventCount: number, taskCount: number): number {
+  const norm = normalizeCourseName(c.name);
+  const words = norm.split(/\s+/).filter(Boolean).length;
+  let score = words > 1 ? 1000 + words * 50 : 10;
+  if (/\b(?:[1-9]|I|II|III|IV|V|VI|VII|VIII|IX|X)\b/i.test(c.name)) score += 100;
+  score += eventCount * 10;
+  score += taskCount * 5;
+  score += c.name.length;
+  return score;
+}
 
 interface RepairInput {
   courses: Course[];
@@ -249,7 +324,7 @@ interface RepairResult extends RepairInput {
 /**
  * Ripara i corsi salvati con nomi troncati (es. solo la prima parola salvata in precedenza),
  * rimuove codici grezzi e prefissi errati, collega coerentemente eventi e task,
- * e deduplica eventuali corsi doppioni.
+ * e deduplica/unifica in modo intelligente tutti i corsi doppioni o varianti.
  */
 export function repairCourseNames(input: RepairInput): RepairResult {
   let changed = false;
@@ -260,12 +335,12 @@ export function repairCourseNames(input: RepairInput): RepairResult {
   let performanceHistory: PerformanceRecord[] = input.performanceHistory.map(p => ({ ...p }));
   const eventCourseOverride = new Map<string, string>(); // eventId -> new courseId
 
-  for (const course of [...courses]) {
+  // 1. Ripara il nome di ciascun corso esistente
+  for (const course of courses) {
     const courseNorm = normalizeCourseName(course.name);
     const wordCount = course.name.trim().split(/\s+/).length;
     const isBogusName = BOGUS_COURSE_NAMES.has(courseNorm) || /^\d+$/.test(courseNorm);
 
-    // Raccoglie i candidati per questo corso
     interface CandidateEntry {
       name: string;
       events: CalendarEvent[];
@@ -289,23 +364,19 @@ export function repairCourseNames(input: RepairInput): RepairResult {
       }
     };
 
-    // 1. Candidato dal nome stesso del corso (se aveva prefissi o rumore da ripulire)
     recordCandidate(course.name);
 
-    // 2. Candidati dagli eventi già collegati al corso
     const linkedEvents = events.filter(e => e.courseId === course.id);
     for (const e of linkedEvents) {
       recordCandidate(e.title, e);
     }
 
-    // 3. Candidati dai task già collegati al corso
     const linkedTasks = tasks.filter(t => t.courseId === course.id);
     for (const t of linkedTasks) {
       const fromTask = extractCourseFromTaskTitle(t.title);
       recordCandidate(fromTask, undefined, true);
     }
 
-    // 4. Se il nome del corso ha solo 1 parola, o è bogus, cerca tra tutti gli eventi orfani o parziali
     if (wordCount === 1 || isBogusName || linkedEvents.length === 0) {
       for (const e of events) {
         if (e.type === 'exam' || e.type === 'sport' || e.type === 'travel' || e.type === 'meal') continue;
@@ -313,7 +384,6 @@ export function repairCourseNames(input: RepairInput): RepairResult {
         const eNorm = normalizeCourseName(eCand);
         if (!eNorm) continue;
 
-        // Se l'evento contiene la parola del corso o inizia col corso
         const matchesWord = courseNorm && (
           eNorm === courseNorm ||
           eNorm.startsWith(courseNorm + ' ') ||
@@ -325,7 +395,6 @@ export function repairCourseNames(input: RepairInput): RepairResult {
         }
       }
 
-      // Cerca anche tra tutti i task che menzionano il corso
       for (const t of tasks) {
         const tCand = extractCourseFromTaskTitle(t.title);
         const tNorm = normalizeCourseName(tCand);
@@ -345,7 +414,6 @@ export function repairCourseNames(input: RepairInput): RepairResult {
       continue;
     }
 
-    // Calcola il punteggio di tutti i candidati
     const scoredCandidates = [...candidateMap.values()].map(entry => ({
       ...entry,
       score: scoreCandidate(entry.name, course.name, entry.events.length, entry.taskCount),
@@ -356,7 +424,6 @@ export function repairCourseNames(input: RepairInput): RepairResult {
 
     const best = scoredCandidates[0];
 
-    // Se il miglior candidato è un nome valido e migliore del vecchio nome
     if (best && best.score > 0 && best.name !== course.name) {
       const oldName = course.name;
       course.name = best.name;
@@ -365,7 +432,6 @@ export function repairCourseNames(input: RepairInput): RepairResult {
       console.log(`[repairCourseNames] Corso "${oldName}" riparato in "${best.name}"`);
     }
 
-    // Associa gli eventi del gruppo migliore al corso corrente
     if (best) {
       for (const e of best.events) {
         if (e.courseId !== course.id) {
@@ -374,48 +440,63 @@ export function repairCourseNames(input: RepairInput): RepairResult {
         }
       }
     }
-
-    // Se c'erano più corsi distinti e validi fusi insieme (es. Analisi 1 e Analisi 2 con score > 1000)
-    for (const alt of scoredCandidates.slice(1)) {
-      if (alt.score >= 1000 && normalizeCourseName(alt.name) !== normalizeCourseName(course.name)) {
-        const altKey = normalizeCourseName(alt.name);
-        let target = courses.find(c => c.id !== course.id && normalizeCourseName(c.name) === altKey);
-        if (!target) {
-          target = {
-            ...course,
-            id: uuidv4(),
-            name: alt.name,
-            color: COURSE_COLORS[courses.length % COURSE_COLORS.length],
-          };
-          courses.push(target);
-          changed = true;
-          repairedCount++;
-        }
-        for (const e of alt.events) {
-          eventCourseOverride.set(e.id, target.id);
-          changed = true;
-        }
-      }
-    }
   }
 
-  // Deduplica i corsi che ora condividono lo stesso nome normalizzato
-  const uniqueCourses: Course[] = [];
-  const courseIdRemap = new Map<string, string>(); // oldCourseId -> keptCourseId
+  // 2. Raggruppa e deduplica semanticamente tutti i corsi (evita doppioni e varianti)
+  const clusters: Course[][] = [];
+  const courseEventCounts = new Map<string, number>();
+  const courseTaskCounts = new Map<string, number>();
 
   for (const c of courses) {
-    const norm = normalizeCourseName(c.name);
-    // Se è un nome bogus senza eventi/task, scartalo
+    const eCount = events.filter(e => (eventCourseOverride.get(e.id) || e.courseId) === c.id).length;
+    const tCount = tasks.filter(t => t.courseId === c.id).length;
+    courseEventCounts.set(c.id, eCount);
+    courseTaskCounts.set(c.id, tCount);
+  }
+
+  for (const course of courses) {
+    const norm = normalizeCourseName(course.name);
+    // Elimina etichette riservate rimaste come corsi vuoti
     if (BOGUS_COURSE_NAMES.has(norm) || /^\d+$/.test(norm)) {
       changed = true;
       continue;
     }
-    const existing = uniqueCourses.find(u => normalizeCourseName(u.name) === norm);
-    if (existing) {
-      courseIdRemap.set(c.id, existing.id);
-      changed = true;
+
+    let matchedCluster: Course[] | null = null;
+    for (const cluster of clusters) {
+      if (cluster.some(existing => areSameCourse(existing.name, course.name))) {
+        matchedCluster = cluster;
+        break;
+      }
+    }
+    if (matchedCluster) {
+      matchedCluster.push(course);
     } else {
-      uniqueCourses.push(c);
+      clusters.push([course]);
+    }
+  }
+
+  const uniqueCourses: Course[] = [];
+  const courseIdRemap = new Map<string, string>(); // oldCourseId -> keptCourseId
+
+  for (const cluster of clusters) {
+    // Ordina il cluster in modo da promuovere il nome canonico più completo e con più attività
+    cluster.sort((a, b) => {
+      const sa = scoreCourseQuality(a, courseEventCounts.get(a.id) || 0, courseTaskCounts.get(a.id) || 0);
+      const sb = scoreCourseQuality(b, courseEventCounts.get(b.id) || 0, courseTaskCounts.get(b.id) || 0);
+      return sb - sa;
+    });
+
+    const canonical = cluster[0];
+    uniqueCourses.push(canonical);
+
+    if (cluster.length > 1) {
+      changed = true;
+      for (let i = 1; i < cluster.length; i++) {
+        courseIdRemap.set(cluster[i].id, canonical.id);
+        repairedCount++;
+        console.log(`[repairCourseNames] Unificato corso duplicato "${cluster[i].name}" in "${canonical.name}"`);
+      }
     }
   }
 
