@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2, TrendingUp, CheckSquare, BarChart3, Brain, Sparkles } from "lucide-react";
+import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, TrendingUp, CheckSquare, BarChart3, Brain, Sparkles } from "lucide-react";
 
 import { Calendar } from '../components/features/calendar/Calendar';
 

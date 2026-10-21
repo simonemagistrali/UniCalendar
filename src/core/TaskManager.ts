@@ -131,7 +131,7 @@ export class TaskManager {
           description: `Segna come completato se hai seguito la lezione, altrimenti l'app pianificherà il recupero.`,
           courseId: course.id,
           relatedEventId: event.id,
-          lessonDate: eventDate,
+          lessonDate: eventDateIt,
           lessonTimeSlot: timeSlot,
           status: 'todo',
           priorityScore: 50,
@@ -147,6 +147,8 @@ export class TaskManager {
         existingFollowTaskTitles.add(followKey);
       }
 
+      const revisionTime = course.defaultStudyPreferences.estimatedRevisionTimePerLesson || 45;
+
       // Notes revision task
       if (needsNotes) {
         const notesTask: Task = {
@@ -155,11 +157,11 @@ export class TaskManager {
           description: `Revisione appunti della lezione`,
           courseId: course.id,
           relatedEventId: event.id,
-          lessonDate: eventDate,
+          lessonDate: eventDateIt,
           lessonTimeSlot: timeSlot,
           status: 'todo',
           priorityScore: 0,
-          estimatedDuration: prefs.estimatedRevisionTimePerLesson,
+          estimatedDuration: revisionTime,
           createdAt: now,
           dependencies: followTaskId ? [followTaskId] : [],
           postponedCount: 0,
@@ -184,11 +186,11 @@ export class TaskManager {
           description: `Esercitazione post-lezione`,
           courseId: course.id,
           relatedEventId: event.id,
-          lessonDate: eventDate,
+          lessonDate: eventDateIt,
           lessonTimeSlot: timeSlot,
           status: 'todo',
           priorityScore: 0,
-          estimatedDuration: Math.round(prefs.estimatedRevisionTimePerLesson * 1.5),
+          estimatedDuration: Math.round(revisionTime * 1.5),
           createdAt: now,
           dependencies,
           postponedCount: 0,

@@ -14,7 +14,7 @@ import annotationPlugin from 'chartjs-plugin-annotation';
 import { Line } from 'react-chartjs-2';
 import { GlassPanel } from '../../ui/GlassPanel';
 import { useAppStore } from '../../../store/useAppStore';
-import { Activity, TrendingUp, TrendingDown, Equal, Crosshair, ZoomIn, ZoomOut, Calendar, Info, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, Equal, Crosshair, ZoomIn, ZoomOut, Calendar, Info, Eye, EyeOff } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 
 ChartJS.register(
@@ -244,7 +244,6 @@ export function WorkloadFlowChart() {
 
     // ─── Detect last lesson and future task rate ───
     const now = new Date();
-    const nowWeek = getWeekStart(now);
     const futureLessons = events.filter(e => {
       if (e.type !== 'lesson') return false;
       return new Date(e.endTime).getTime() > now.getTime();
@@ -861,10 +860,9 @@ export function WorkloadFlowChart() {
       )}
 
       {/* Obiettivi Giornalieri */}
-      {analysis.flowAnalysis.status !== 'no_data' && (
-        <div style={{
-          display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px'
-        }}>
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px'
+      }}>
           {/* PACE GOAL */}
           <div 
             onClick={() => setDailyGoal(selectedDailyGoalType === 'PACE' ? null : 'PACE', analysis.ratePace)}
@@ -1029,7 +1027,6 @@ export function WorkloadFlowChart() {
             </div>
           ) : null}
         </div>
-      )}
 
       {/* Modal formula */}
       <Modal 

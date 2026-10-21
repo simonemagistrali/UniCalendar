@@ -23,7 +23,6 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineEleme
 
 export function EfficiencyDashboard() {
   const tasks = useAppStore(s => s.tasks);
-  const performanceHistory = useAppStore(s => s.performanceHistory);
   const courses = useAppStore(s => s.courses);
 
   const stats = useMemo(() => {
@@ -102,7 +101,7 @@ export function EfficiencyDashboard() {
     }
 
     return { completionRate, doneTasks: doneTasks.length, todoTasks: todoTasks.length, courseStats, weeklyEfficiency, trend, attendanceRate, attendedCount, recoveredCount };
-  }, [tasks, performanceHistory, courses]);
+  }, [tasks, courses]);
 
   const barData = {
     labels: stats.courseStats.length > 0 ? stats.courseStats.map(c => c.name) : ['Nessun dato'],

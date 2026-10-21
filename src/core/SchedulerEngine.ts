@@ -1,5 +1,4 @@
 import type { Task, StudySession, UserPreferences, CalendarEvent, PerformanceRecord, FutureWorkloadProjection } from './types';
-import { FutureProjectionEngine } from './FutureProjectionEngine';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -15,7 +14,7 @@ export class SchedulerEngine {
     startDate: Date,
     daysToSchedule: number = 14,
     history: PerformanceRecord[] = [],
-    futureProjection?: FutureWorkloadProjection
+    _futureProjection?: FutureWorkloadProjection
   ): StudySession[] {
     const sessions: StudySession[] = [];
     const todoTasks = tasks.filter(t => t.status !== 'done');
@@ -234,13 +233,6 @@ export class SchedulerEngine {
       }
     }
     return nearest;
-  }
-
-  /** Parse lunch break duration in minutes from start/end time strings */
-  private static parseLunchBreakMinutes(start: string, end: string): number {
-    const [sH, sM] = start.split(':').map(Number);
-    const [eH, eM] = end.split(':').map(Number);
-    return (eH * 60 + eM) - (sH * 60 + sM);
   }
 
   private static nextDay(d: Date): Date {

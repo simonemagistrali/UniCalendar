@@ -228,7 +228,7 @@ export const ankiService = {
                 this.getTodayQueueCounts().catch(() => null),
                 this.getNewCardsCount().catch(() => 0),
                 this.getTodayReviews().catch(() => ({ count: 0, totalSeconds: 0, avgSeconds: null })),
-                this.getReviewsByDay().catch(() => ({})),
+                this.getReviewsByDay().catch(() => ({} as Record<string, number>)),
                 this.getAverageTimeSeconds().catch(() => null),
             ]);
 

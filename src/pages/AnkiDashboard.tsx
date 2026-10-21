@@ -11,7 +11,7 @@ import {
   Legend,
   Filler,
 } from 'chart.js';
-import { Bar, Line } from 'react-chartjs-2';
+import { Chart, Line } from 'react-chartjs-2';
 import {
   Brain,
   RefreshCw,
@@ -23,10 +23,8 @@ import {
   Zap,
   TrendingUp,
   TrendingDown,
-  Calendar,
   Layers,
   Info,
-  Check,
 } from 'lucide-react';
 import { ankiService } from '../core/anki';
 import { useAppStore } from '../store/useAppStore';
@@ -498,7 +496,7 @@ export function AnkiDashboard() {
             <GlassPanel className="anki-chart-panel">
               <div style={{ height: 340, width: '100%' }}>
                 {activeChartTab === 'cards' ? (
-                  <Bar data={cardsChartData} options={chartOptions} />
+                  <Chart type="bar" data={cardsChartData} options={chartOptions} />
                 ) : (
                   <Line data={speedChartData} options={chartOptions} />
                 )}

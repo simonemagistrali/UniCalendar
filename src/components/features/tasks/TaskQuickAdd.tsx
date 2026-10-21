@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Plus, MoreHorizontal } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { Task } from '../../../core/types';

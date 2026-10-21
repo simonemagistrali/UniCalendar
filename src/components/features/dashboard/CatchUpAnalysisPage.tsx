@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { 
   Target, Calendar as CalendarIcon, AlertTriangle, 
-  CheckCircle, Clock, Zap, Flame, ThermometerSun, Info 
+  CheckCircle, Zap, Flame, ThermometerSun, Info 
 } from 'lucide-react';
 import { GlassPanel } from '../../ui/GlassPanel';
 import { useAppStore } from '../../../store/useAppStore';
@@ -56,7 +56,7 @@ export function CatchUpAnalysisPage() {
   const courses = useAppStore(s => s.courses);
   const studySessions = useAppStore(s => s.studySessions);
   const performanceHistory = useAppStore(s => s.performanceHistory);
-  const settings = useAppStore(s => s.settings);
+  const preferences = useAppStore(s => s.preferences);
 
   // Calcolo stato attuale
   const catchUpSummary = useMemo(() => {
@@ -68,7 +68,23 @@ export function CatchUpAnalysisPage() {
     return FutureProjectionEngine.project(events, courses, tasks, performanceHistory, 14);
   }, [events, courses, tasks, performanceHistory]);
 
-  const dailyCapacityHours = settings?.maxStudyHoursPerDay || 4;
+  const dailyCapacityHours = useMemo(() => {
+    if (!preferences?.dailyStudyHours) return 6;
+    const activeDays = Object.values(preferences.dailyStudyHours).filter(d => d.enabled);
+    if (activeDays.length === 0) return 6;
+    const totalMinutes = activeDays.reduce((sum, d) => {
+      const [sh, sm] = d.start.split(':').map(Number);
+      const [eh, em] = d.end.split(':').map(Number);
+      let mins = (eh * 60 + em) - (sh * 60 + sm);
+      if (d.lunchBreak?.enabled) {
+        const [lbsh, lbsm] = d.lunchBreak.start.split(':').map(Number);
+        const [lbeh, lbem] = d.lunchBreak.end.split(':').map(Number);
+        mins -= Math.max(0, (lbeh * 60 + lbem) - (lbsh * 60 + lbsm));
+      }
+      return sum + Math.max(0, mins);
+    }, 0);
+    return Math.round((totalMinutes / activeDays.length / 60) * 10) / 10 || 6;
+  }, [preferences]);
 
   // Analisi per Insight Generali
   const insights = useMemo(() => {

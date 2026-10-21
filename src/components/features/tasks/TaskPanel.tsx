@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Clock, BookOpen, Zap, Eye, Sparkles, Trash2, CheckSquare, Square, Filter } from 'lucide-react';
+import { Clock, BookOpen, Zap, Eye, Sparkles, Trash2, CheckSquare } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { PriorityEngine } from '../../../core/PriorityEngine';
 import { TaskManager } from '../../../core/TaskManager';

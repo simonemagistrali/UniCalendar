@@ -48,7 +48,6 @@ export function Calendar() {
   const courses = useAppStore(s => s.courses);
   const studySessions = useAppStore(s => s.studySessions);
   const preferences = useAppStore(s => s.preferences);
-  const performanceHistory = useAppStore(s => s.performanceHistory);
   const addEvents = useAppStore(s => s.addEvents);
 
   const [isSyncing, setIsSyncing] = useState(false);
@@ -114,7 +113,6 @@ export function Calendar() {
     if (showTasks) {
       for (const t of tasks) {
         if (t.deadline) {
-          const course = t.courseId ? courses.find(c => c.id === t.courseId) : undefined;
           items.push({
             id: `deadline-${t.id}`,
             title: `Scadenza: ${t.title}`,
@@ -152,7 +150,7 @@ export function Calendar() {
     }
 
     return items;
-  }, [events, studySessions, tasks, courses, preferences, performanceHistory, showTasks]);
+  }, [events, studySessions, tasks, courses, preferences, showTasks, currentDate]);
 
   const dateFormat = viewMode === 'month'
     ? "MMMM yyyy"
@@ -437,7 +435,7 @@ function WeekView({ currentDate, items, onEventClick }: { currentDate: Date; ite
 }
 
 /* ─── Day View ─── */
-function DayView({ currentDate, items, onEventClick }: { currentDate: Date; items: { id: string; title: string; start: Date; end: Date; color: string; type: string; isTravelStudyTime?: boolean }[]; onEventClick: (id: string) => void }) {
+function DayView({ currentDate, items, onEventClick }: { currentDate: Date; items: { id: string; title: string; start: Date; end: Date; color: string; type: string; isTravelStudyTime?: boolean; isAllDay?: boolean }[]; onEventClick: (id: string) => void }) {
   const dayItems = items.filter(it => isSameDay(it.start, currentDate));
 
   return (

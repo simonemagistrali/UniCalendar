@@ -154,7 +154,6 @@ export function getAnkiTrendStats(history: AnkiDaySnapshot[], daysWindow: number
     const now = new Date();
     const startDate = new Date(now);
     startDate.setDate(startDate.getDate() - (daysWindow - 1));
-    const startKey = startDate.toISOString().split('T')[0];
 
     // Mappa date storiche esistenti
     const historyMap = new Map<string, AnkiDaySnapshot>();

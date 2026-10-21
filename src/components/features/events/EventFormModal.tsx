@@ -46,6 +46,14 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
   const [overrideNotesRevision, setOverrideNotesRevision] = useState<boolean | null>(null);
   const [overrideExercises, setOverrideExercises] = useState<boolean | null>(null);
 
+  const resetForm = () => {
+    setTitle(''); setDate(''); setStartTime(''); setEndTime('');
+    setCourseId(''); setLessonType('theory'); setLocationType('in_person');
+    setAddress(''); setSportType(''); setProjectTotalHours('10');
+    setProjectFrequency('3'); setProjectImportance('5'); setIsTravelStudyTime(false);
+    setOverrideNotesRevision(null); setOverrideExercises(null);
+  };
+
   useEffect(() => {
     if (initialEvent && isOpen) {
       setTitle(initialEvent.title);
@@ -70,14 +78,6 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
       resetForm();
     }
   }, [initialEvent, isOpen]);
-
-  const resetForm = () => {
-    setTitle(''); setDate(''); setStartTime(''); setEndTime('');
-    setCourseId(''); setLessonType('theory'); setLocationType('in_person');
-    setAddress(''); setSportType(''); setProjectTotalHours('10');
-    setProjectFrequency('3'); setProjectImportance('5'); setIsTravelStudyTime(false);
-    setOverrideNotesRevision(null); setOverrideExercises(null);
-  };
 
   const isSimilarEvent = (e1: CalendarEvent, e2: CalendarEvent) => {
     const d1 = new Date(e1.startTime);
@@ -104,7 +104,6 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
       lessonType: type === 'lesson' ? lessonType : undefined,
       location: { type: locationType, address: locationType === 'in_person' ? address : undefined },
       isDone: initialEvent ? initialEvent.isDone : false,
-      postponedCount: initialEvent ? initialEvent.postponedCount : 0,
       sportType: type === 'sport' ? sportType : undefined,
       isTravelStudyTime: type === 'travel' ? isTravelStudyTime : undefined,
       projectTotalHours: type === 'project_deadline' ? parseFloat(projectTotalHours) : undefined,
@@ -166,8 +165,7 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
 
       // Auto-generate project tasks
       if (type === 'project_deadline') {
-        const course = courses.find(c => c.id === courseId);
-        const projectTasks = TaskManager.generateProjectTasks(newEvent, course);
+        const projectTasks = TaskManager.generateProjectTasks(newEvent);
         if (projectTasks.length > 0) addTasks(projectTasks);
       }
     }

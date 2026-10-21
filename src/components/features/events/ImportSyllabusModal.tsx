@@ -11,9 +11,7 @@ import {
   FileText, 
   CheckCircle2, 
   AlertCircle, 
-  ArrowRight, 
   ArrowLeft, 
-  Calendar, 
   BookOpen, 
   ExternalLink,
   Check,
@@ -200,8 +198,9 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
   useEffect(() => {
     if (isOpen) {
       handleReset();
-      if (courses.length > 0 && (!selectedCourseId || !courses.some(c => c.id === selectedCourseId))) {
-        setSelectedCourseId(courses[0].id);
+      const currentCourses = useAppStore.getState().courses;
+      if (currentCourses.length > 0) {
+        setSelectedCourseId(prev => (prev && currentCourses.some(c => c.id === prev)) ? prev : currentCourses[0].id);
       }
     }
   }, [isOpen]);
@@ -405,7 +404,7 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
             {/* List of Extracted Lessons */}
             <div style={{ overflowY: 'auto', maxHeight: '42vh', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
               {matchResults.map((item, idx) => {
-                const { syllabusLesson, matchedEvent, isNewEventNeeded } = item;
+                const { syllabusLesson, matchedEvent } = item;
                 return (
                   <div 
                     key={idx}

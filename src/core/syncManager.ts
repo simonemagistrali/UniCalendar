@@ -1,6 +1,6 @@
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
-import { loadState, saveState } from "./persistence";
+import { saveState } from "./persistence";
 import { encryptData, decryptData, isEncryptedFormat } from "./crypto";
 import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord, AnkiDaySnapshot } from "./types";
 
@@ -197,7 +197,15 @@ function scheduleCloudSync(userId: string, data: UserSyncData, delay: number) {
  */
 export function persistState(data: UserSyncData, userId: string | null) {
   // Salva sempre in locale per offline
-  saveState(data);
+  saveState({
+    events: data.events || [],
+    tasks: data.tasks || [],
+    courses: data.courses || [],
+    preferences: data.preferences,
+    performanceHistory: data.performanceHistory || [],
+    studySessions: data.studySessions || [],
+    ankiHistory: data.ankiHistory || [],
+  });
   
   // Se utente loggato, salva nel cloud asincronamente con debounce
   if (userId) {

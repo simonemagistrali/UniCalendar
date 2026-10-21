@@ -78,6 +78,7 @@ export class CatchUpEngine {
           pendingMinutes: 0,
           catchUpPercentage: 100,
           estimatedCatchUpDate: null,
+          isPlanningCaughtUp: true,
         });
         continue;
       }

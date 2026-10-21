@@ -1,16 +1,13 @@
-import * as XLSX from 'xlsx';
-import * as pdfjsLib from 'pdfjs-dist';
 import type { ParsedLessonNote, SyllabusExtractionResult } from './types';
-
-// Set worker source for browser pdf.js execution
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.10.111/pdf.worker.min.js';
-}
 
 /**
  * Extracts raw textual content from a PDF file preserving layout order.
  */
 export async function extractTextFromPDF(fileData: ArrayBuffer): Promise<string> {
+  const pdfjsLib = await import('pdfjs-dist');
+  if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.10.111/pdf.worker.min.js';
+  }
   const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(fileData) });
   const pdfDoc = await loadingTask.promise;
   const pageTexts: string[] = [];
@@ -57,6 +54,7 @@ export async function extractTextFromPDF(fileData: ArrayBuffer): Promise<string>
  * Extracts raw tabular content from an Excel file (.xlsx, .xls) or CSV.
  */
 export async function extractTextFromExcel(fileData: ArrayBuffer): Promise<string> {
+  const XLSX = await import('xlsx');
   const workbook = XLSX.read(fileData, { type: 'array' });
   const sheetNames = workbook.SheetNames;
   if (!sheetNames || sheetNames.length === 0) {
