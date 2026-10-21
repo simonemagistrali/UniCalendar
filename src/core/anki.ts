@@ -17,7 +17,7 @@ async function invoke(action: string, version: number = 6, params: any = {}) {
             throw new Error(result.error);
         }
         return result.result;
-    } catch (e) {
+    } catch {
         // Silently fail if Anki is not open, as this is expected behavior for many users
         throw new Error('Anki not reachable');
     }
@@ -76,7 +76,6 @@ export const ankiService = {
 
     async getStudiedTodayCount(): Promise<number> {
         try {
-            // rated:1 means cards that were answered today (1 day ago)
             const cards = await invoke('findCards', 6, { query: 'rated:1' });
             return cards.length;
         } catch {
@@ -114,7 +113,6 @@ export const ankiService = {
     /**
      * Code di oggi come le mostra Anki nella schermata dei mazzi
      * (nuove limitate dal limite giornaliero + apprendimento + ripasso).
-     * Somma solo i mazzi di primo livello: i loro conteggi includono già i sotto-mazzi.
      */
     async getTodayQueueCounts(): Promise<AnkiQueueCounts | null> {
         try {
@@ -130,11 +128,11 @@ export const ankiService = {
             }
             return counts;
         } catch {
-            // Fallback per versioni di AnkiConnect senza getDeckStats
+            // Fallback se getDeckStats non è disponibile (es. finestra Anki non su panoramica mazzi)
             try {
                 const [review, learn] = await Promise.all([
-                    invoke('findCards', 6, { query: 'is:review is:due' }),
-                    invoke('findCards', 6, { query: 'is:learn' }),
+                    invoke('findCards', 6, { query: 'is:review is:due' }).catch(() => []),
+                    invoke('findCards', 6, { query: 'is:learn' }).catch(() => []),
                 ]);
                 return { reviewDue: review.length, learnDue: learn.length, newToday: 0 };
             } catch {
@@ -165,7 +163,7 @@ export const ankiService = {
             return {
                 count,
                 totalSeconds,
-                avgSeconds: count > 0 && totalSeconds > 0 ? totalSeconds / count : null,
+                avgSeconds: count > 0 && totalSeconds > 0 ? Math.round((totalSeconds / count) * 10) / 10 : null,
             };
         } catch {
             try {
@@ -208,8 +206,7 @@ export const ankiService = {
                 }
             }
             return null;
-        } catch (e) {
-            console.error("Failed to parse Anki stats", e);
+        } catch {
             return null;
         }
     },
@@ -226,33 +223,42 @@ export const ankiService = {
         const connected = await this.checkConnection();
         if (!connected) return null;
 
-        const [queue, newTotal, todayReviews, reviewsByDay, collectionAvgSeconds] = await Promise.all([
-            this.getTodayQueueCounts(),
-            this.getNewCardsCount(),
-            this.getTodayReviews(),
-            this.getReviewsByDay(),
-            this.getAverageTimeSeconds(),
-        ]);
+        try {
+            const [queue, newTotal, todayReviews, reviewsByDay, collectionAvgSeconds] = await Promise.all([
+                this.getTodayQueueCounts().catch(() => null),
+                this.getNewCardsCount().catch(() => 0),
+                this.getTodayReviews().catch(() => ({ count: 0, totalSeconds: 0, avgSeconds: null })),
+                this.getReviewsByDay().catch(() => ({})),
+                this.getAverageTimeSeconds().catch(() => null),
+            ]);
 
-        const effectiveNewToday = q.newToday > 0 ? q.newToday : (newTotal > 0 ? Math.min(newTotal, 20) : 0);
-        const remaining = q.reviewDue + q.learnDue + effectiveNewToday;
+            const q = queue || { reviewDue: 0, learnDue: 0, newToday: 0 };
+            const todayKey = getAnkiDayKey();
+            const studied = Math.max(todayReviews?.count || 0, reviewsByDay?.[todayKey] || 0);
 
-        return {
-            today: {
-                date: todayKey,
-                updatedAt: new Date().toISOString(),
-                reviewDue: q.reviewDue,
-                learnDue: q.learnDue,
-                newToday: q.newToday > 0 ? q.newToday : effectiveNewToday,
-                newTotal,
-                remaining,
-                studied,
-                studyMinutes: todayReviews.totalSeconds > 0 ? Math.round(todayReviews.totalSeconds / 6) / 10 : undefined,
-                avgSecondsPerCard: todayReviews.avgSeconds ?? undefined,
-                collectionAvgSeconds: collectionAvgSeconds ?? undefined,
-            },
-            reviewsByDay,
-            collectionAvgSeconds,
-        };
+            const effectiveNewToday = q.newToday > 0 ? q.newToday : ((newTotal || 0) > 0 ? Math.min(newTotal || 0, 20) : 0);
+            const remaining = q.reviewDue + q.learnDue + effectiveNewToday;
+
+            return {
+                today: {
+                    date: todayKey,
+                    updatedAt: new Date().toISOString(),
+                    reviewDue: q.reviewDue,
+                    learnDue: q.learnDue,
+                    newToday: q.newToday > 0 ? q.newToday : effectiveNewToday,
+                    newTotal: newTotal || 0,
+                    remaining,
+                    studied,
+                    studyMinutes: (todayReviews?.totalSeconds || 0) > 0 ? Math.round(todayReviews.totalSeconds / 6) / 10 : undefined,
+                    avgSecondsPerCard: todayReviews?.avgSeconds ?? undefined,
+                    collectionAvgSeconds: collectionAvgSeconds ?? undefined,
+                },
+                reviewsByDay: reviewsByDay || {},
+                collectionAvgSeconds,
+            };
+        } catch (e) {
+            console.error('Error fetching Anki snapshot:', e);
+            return null;
+        }
     },
 };
