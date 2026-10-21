@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import type { Task } from '../../../core/types';
 import { useAppStore } from '../../../store/useAppStore';
-import { Clock, Check, ChevronRight, AlertTriangle, SkipForward, RotateCcw, Eye, Play, Pause, Calendar } from 'lucide-react';
+import { Clock, Check, ChevronRight, AlertTriangle, SkipForward, RotateCcw, Eye, Play, Pause, Calendar, Trash2, Sparkles } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
+  isSelectable?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }
 
-export function TaskCard({ task }: TaskCardProps) {
+export function TaskCard({ task, isSelectable = false, isSelected = false, onToggleSelect }: TaskCardProps) {
   const completeTask = useAppStore(s => s.completeTask);
   const updateTask = useAppStore(s => s.updateTask);
+  const removeTask = useAppStore(s => s.removeTask);
   const courses = useAppStore(s => s.courses);
   const events = useAppStore(s => s.events);
   const [completeMode, setCompleteMode] = useState<'attended' | 'recovered' | 'normal' | null>(null);
@@ -163,9 +167,26 @@ export function TaskCard({ task }: TaskCardProps) {
     });
   };
 
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm(`Vuoi eliminare l'attività:\n"${displayTitle}"?`)) {
+      removeTask(task.id);
+    }
+  };
+
   return (
     <div className={`task-card ${isDone ? 'task-done' : ''} ${isUrgent ? 'task-urgent' : ''}`}>
       <div className="task-card-header">
+        {isSelectable && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onToggleSelect}
+            style={{ width: '16px', height: '16px', cursor: 'pointer', marginRight: '8px', accentColor: 'var(--primary, #3b82f6)' }}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Seleziona task"
+          />
+        )}
         <div className="task-card-left">
           {course && (
             <span className="task-course-dot" style={{ backgroundColor: course.color }} />
@@ -173,6 +194,11 @@ export function TaskCard({ task }: TaskCardProps) {
           <span className={`task-title ${isDone ? 'line-through' : ''}`} title={task.title}>{displayTitle}</span>
         </div>
         <div className="task-card-badges">
+          {task.isAiEnriched && (
+            <span className="task-badge" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#9333ea', border: '1px solid rgba(168, 85, 247, 0.3)' }} title="Note o argomento aggiunti tramite AI">
+              <Sparkles size={10} /> AI
+            </span>
+          )}
           {isInProgress && (
             <span className="task-badge" style={{ backgroundColor: '#10b981', color: 'white' }}>
               <Play size={10} /> IN CORSO
@@ -298,6 +324,14 @@ export function TaskCard({ task }: TaskCardProps) {
               <button className="task-action-btn task-postpone-btn" onClick={handlePostpone}>
                 <SkipForward size={14} /> Rimanda
               </button>
+              <button 
+                className="task-action-btn" 
+                onClick={handleDelete}
+                title="Elimina definitivamente questa attività"
+                style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.25)', marginLeft: 'auto' }}
+              >
+                <Trash2 size={13} /> Elimina
+              </button>
             </>
           ) : (
             <div className="task-complete-form">
@@ -322,6 +356,14 @@ export function TaskCard({ task }: TaskCardProps) {
         <div className="task-card-actions">
           <button className="task-action-btn task-cancel-btn" onClick={handleUncomplete} style={{ opacity: 0.8 }}>
             <RotateCcw size={14} /> Segna da fare
+          </button>
+          <button 
+            className="task-action-btn" 
+            onClick={handleDelete}
+            title="Elimina definitivamente questa attività"
+            style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.25)', marginLeft: 'auto' }}
+          >
+            <Trash2 size={13} /> Elimina
           </button>
         </div>
       )}

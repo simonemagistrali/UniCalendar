@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Clock, BookOpen, Zap, Eye, Sparkles } from 'lucide-react';
+import { CheckCircle, Clock, BookOpen, Zap, Eye, Sparkles, Trash2, CheckSquare, Square, Filter } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { PriorityEngine } from '../../../core/PriorityEngine';
 import { TaskManager } from '../../../core/TaskManager';
@@ -8,7 +8,8 @@ import { TravelManager } from '../../../core/TravelManager';
 import { FutureProjectionEngine } from '../../../core/FutureProjectionEngine';
 import { TaskCard } from './TaskCard';
 import { TaskQuickAdd } from './TaskQuickAdd';
-
+import { Modal } from '../../ui/Modal';
+import { Button } from '../../ui/Button';
 
 export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }) {
   const events = useAppStore(s => s.events);
@@ -21,6 +22,8 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
   const setStudySessions = useAppStore(s => s.setStudySessions);
   const setTasks = useAppStore(s => s.setTasks);
   const cleanupDuplicates = useAppStore(s => s.cleanupDuplicates);
+  const removeTasks = useAppStore(s => s.removeTasks);
+  const removeTasksByFilter = useAppStore(s => s.removeTasksByFilter);
 
   const selectedDailyGoalValue = useAppStore(s => s.selectedDailyGoalValue);
 
@@ -38,6 +41,15 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
   const [courseFilter, setCourseFilter] = useState<string>('ALL');
   const [sortDoneBy, setSortDoneBy] = useState<'completedAt' | 'createdAt'>('completedAt');
   const [cleanupMsg, setCleanupMsg] = useState('');
+
+  // Bulk management and delete state
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [bulkCourseId, setBulkCourseId] = useState<string>('ALL');
+  const [bulkType, setBulkType] = useState<string>('ALL');
+  const [bulkStatus, setBulkStatus] = useState<string>('ALL');
+  const [bulkOnlyAi, setBulkOnlyAi] = useState<boolean>(false);
 
   const TASK_TYPES = {
     ALL: 'Tutte le tipologie',
@@ -181,6 +193,78 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
     return realTasks;
   }, [displaySortedTasks, phantomTasks, filter, typeFilter, courseFilter, sortDoneBy, dailyGoalOnly, selectedDailyGoalValue, tasksLeftForToday]);
 
+  // Matching tasks calculation for the bulk delete modal
+  const matchingBulkTasks = useMemo(() => {
+    return tasks.filter(t => {
+      if (bulkCourseId !== 'ALL' && t.courseId !== bulkCourseId) return false;
+      if (bulkStatus !== 'ALL') {
+        if (bulkStatus === 'todo' && t.status === 'done') return false;
+        if (bulkStatus === 'done' && t.status !== 'done') return false;
+      }
+      if (bulkOnlyAi) {
+        const isAi = t.isAiEnriched || 
+                     t.description?.includes('Argomento:') || 
+                     t.description?.includes('Capitoli/Libro:');
+        if (!isAi) return false;
+      }
+      if (bulkType !== 'ALL') {
+        const lower = t.title.toLowerCase();
+        const isNotes = lower.includes('appunti') || lower.includes('notes') || lower.includes('ripasso');
+        const isExercises = lower.includes('eserciz');
+        const isFollow = lower.includes('seguire') || lower.includes('recuperare');
+        if (bulkType === 'NOTES' && !isNotes) return false;
+        if (bulkType === 'EXERCISES' && !isExercises) return false;
+        if (bulkType === 'FOLLOW_LESSON' && !isFollow) return false;
+        if (bulkType === 'PROJECT' && !t.isProjectTask) return false;
+      }
+      return true;
+    });
+  }, [tasks, bulkCourseId, bulkType, bulkStatus, bulkOnlyAi]);
+
+  const handleExecuteBulkDelete = () => {
+    if (matchingBulkTasks.length === 0) return;
+    if (window.confirm(`Vuoi eliminare definitivamente i ${matchingBulkTasks.length} task selezionati dai filtri?`)) {
+      const deleted = removeTasksByFilter({
+        courseId: bulkCourseId,
+        taskType: bulkType,
+        onlyAiEnriched: bulkOnlyAi,
+        status: bulkStatus
+      });
+      setIsDeleteModalOpen(false);
+      setCleanupMsg(`✓ Eliminati ${deleted} task!`);
+      setTimeout(() => setCleanupMsg(''), 3000);
+    }
+  };
+
+  const toggleTaskSelect = (taskId: string) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+
+  const selectAllFiltered = () => {
+    const ids = filteredTasks.filter(t => !t.isPhantom).map(t => t.id);
+    setSelectedTaskIds(new Set(ids));
+  };
+
+  const deselectAll = () => {
+    setSelectedTaskIds(new Set());
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedTaskIds.size === 0) return;
+    if (window.confirm(`Vuoi eliminare definitivamente i ${selectedTaskIds.size} task selezionati?`)) {
+      removeTasks(Array.from(selectedTaskIds));
+      setSelectedTaskIds(new Set());
+      setIsSelectMode(false);
+      setCleanupMsg(`✓ Eliminati ${selectedTaskIds.size} task!`);
+      setTimeout(() => setCleanupMsg(''), 3000);
+    }
+  };
+
   const todoCount = tasks.filter(t => t.status === 'todo').length;
   const inProgressCount = tasks.filter(t => t.status === 'in_progress').length;
   const doneCount = tasks.filter(t => t.status === 'done').length;
@@ -241,37 +325,85 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
               ))}
             </select>
 
-            <button
-              className="task-action-btn"
-              onClick={() => {
-                const res = cleanupDuplicates();
-                if (res.removedTasks > 0 || res.removedEvents > 0) {
-                  setCleanupMsg(`✓ Rimossi ${res.removedTasks} duplicati!`);
-                  setTimeout(() => setCleanupMsg(''), 3500);
-                } else {
-                  setCleanupMsg('Nessun duplicato');
-                  setTimeout(() => setCleanupMsg(''), 2000);
-                }
-              }}
-              title="Rimuove automaticamente i task o eventi duplicati per la stessa data"
-              style={{
-                marginLeft: 'auto',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                fontSize: '0.8rem',
-                padding: '4px 10px',
-                borderRadius: '6px',
-                background: 'rgba(168, 85, 247, 0.1)',
-                border: '1px solid rgba(168, 85, 247, 0.25)',
-                color: '#a855f7',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Sparkles size={14} />
-              <span>{cleanupMsg || 'Ripulisci duplicati'}</span>
-            </button>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                className="task-action-btn"
+                onClick={() => {
+                  if (isSelectMode) deselectAll();
+                  setIsSelectMode(!isSelectMode);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '0.8rem',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  background: isSelectMode ? 'var(--primary, #3b82f6)' : 'var(--bg-secondary)',
+                  color: isSelectMode ? '#ffffff' : 'var(--text-primary)',
+                  border: '1px solid var(--border-color)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+                title="Attiva la selezione multipla per eliminare attività a scelta"
+              >
+                <CheckSquare size={14} />
+                <span>{isSelectMode ? 'Fine selezione' : 'Seleziona'}</span>
+              </button>
+
+              <button
+                className="task-action-btn"
+                onClick={() => setIsDeleteModalOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '0.8rem',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  color: '#ef4444',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+                title="Elimina attività per materia, tipologia o create da AI"
+              >
+                <Trash2 size={14} />
+                <span>Elimina Task...</span>
+              </button>
+
+              <button
+                className="task-action-btn"
+                onClick={() => {
+                  const res = cleanupDuplicates();
+                  if (res.removedTasks > 0 || res.removedEvents > 0) {
+                    setCleanupMsg(`✓ Rimossi ${res.removedTasks} duplicati!`);
+                    setTimeout(() => setCleanupMsg(''), 3500);
+                  } else {
+                    setCleanupMsg('Nessun duplicato');
+                    setTimeout(() => setCleanupMsg(''), 2000);
+                  }
+                }}
+                title="Rimuove automaticamente i task o eventi duplicati per la stessa data"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '0.8rem',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  background: 'rgba(168, 85, 247, 0.1)',
+                  border: '1px solid rgba(168, 85, 247, 0.25)',
+                  color: '#a855f7',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Sparkles size={14} />
+                <span>{cleanupMsg || 'Ripulisci duplicati'}</span>
+              </button>
+            </div>
 
             {filter === 'done' && (
               <button 
@@ -284,6 +416,64 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
               </button>
             )}
           </div>
+
+          {/* Selection Bar when active */}
+          {isSelectMode && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '8px 12px',
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '8px',
+              margin: '8px 0',
+              flexWrap: 'wrap'
+            }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                Selezionati: {selectedTaskIds.size}
+              </span>
+              <button 
+                type="button" 
+                className="task-action-btn" 
+                onClick={selectAllFiltered} 
+                style={{ fontSize: '0.78rem', padding: '3px 8px' }}
+              >
+                Seleziona tutti ({filteredTasks.filter(t => !t.isPhantom).length})
+              </button>
+              <button 
+                type="button" 
+                className="task-action-btn" 
+                onClick={deselectAll} 
+                style={{ fontSize: '0.78rem', padding: '3px 8px' }}
+              >
+                Deseleziona
+              </button>
+              <button 
+                type="button"
+                className="task-action-btn"
+                onClick={handleDeleteSelected}
+                disabled={selectedTaskIds.size === 0}
+                style={{
+                  marginLeft: 'auto',
+                  backgroundColor: '#ef4444',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '0.8rem',
+                  padding: '5px 14px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  opacity: selectedTaskIds.size === 0 ? 0.5 : 1,
+                  cursor: selectedTaskIds.size === 0 ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <Trash2 size={13} />
+                <span>Elimina selezionati ({selectedTaskIds.size})</span>
+              </button>
+            </div>
+          )}
           
           {filter === 'todo' && <TaskQuickAdd />}
         </>
@@ -312,7 +502,13 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
             {/* Normal rendering for other views */}
             {!dailyGoalOnly && filter !== 'todo' && (
               filteredTasks.map(task => (
-                <TaskCard key={task.id} task={task} />
+                <TaskCard 
+                  key={task.id} 
+                  task={task} 
+                  isSelectable={isSelectMode && !task.isPhantom}
+                  isSelected={selectedTaskIds.has(task.id)}
+                  onToggleSelect={() => toggleTaskSelect(task.id)}
+                />
               ))
             )}
             
@@ -338,7 +534,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
                       border: '2px solid var(--accent-color, #10b981)', 
                       borderRadius: '16px', 
                       marginBottom: '8px',
-                      background: 'rgba(16, 185, 129, 0.05)',
+                      background: 'rgba(168, 85, 129, 0.05)',
                       position: 'relative'
                     } : {}}>
                       {isTodayGoal && (selectedDailyGoalValue !== null) && (
@@ -358,7 +554,12 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
                           OBIETTIVO DI OGGI {completedTodayCount + idx + 1}/{selectedDailyGoalValue}
                         </div>
                       )}
-                      <TaskCard task={task} />
+                      <TaskCard 
+                        task={task} 
+                        isSelectable={isSelectMode && !task.isPhantom}
+                        isSelected={selectedTaskIds.has(task.id)}
+                        onToggleSelect={() => toggleTaskSelect(task.id)}
+                      />
                     </div>
                   </div>
                 );
@@ -367,6 +568,100 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
           </>
         )}
       </div>
+
+      {/* Bulk Delete Modal */}
+      <Modal 
+        isOpen={isDeleteModalOpen} 
+        onClose={() => setIsDeleteModalOpen(false)} 
+        title="Gestisci ed Elimina Attività"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+            Seleziona i criteri per eliminare le attività in blocco (ad esempio create in eccesso o di una specifica materia).
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              Materia:
+            </label>
+            <select 
+              value={bulkCourseId} 
+              onChange={e => setBulkCourseId(e.target.value)}
+              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+            >
+              <option value="ALL">Tutte le materie</option>
+              {courses.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              Tipologia Attività:
+            </label>
+            <select 
+              value={bulkType} 
+              onChange={e => setBulkType(e.target.value)}
+              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+            >
+              <option value="ALL">Tutte le tipologie</option>
+              <option value="NOTES">Solo Sistemare Appunti / Note</option>
+              <option value="EXERCISES">Solo Esercizi</option>
+              <option value="FOLLOW_LESSON">Solo Seguire / Recuperare</option>
+              <option value="PROJECT">Solo Progetto</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              Stato:
+            </label>
+            <select 
+              value={bulkStatus} 
+              onChange={e => setBulkStatus(e.target.value)}
+              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+            >
+              <option value="ALL">Tutti gli stati</option>
+              <option value="todo">Solo Da fare (todo)</option>
+              <option value="done">Solo Completati (done)</option>
+            </select>
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem' }}>
+            <input 
+              type="checkbox" 
+              checked={bulkOnlyAi} 
+              onChange={e => setBulkOnlyAi(e.target.checked)} 
+              style={{ width: '16px', height: '16px' }}
+            />
+            <span>Elimina solo attività con note/argomenti AI</span>
+          </label>
+
+          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#dc2626' }}>
+              Attività che verranno eliminate: {matchingBulkTasks.length}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Questa azione è immediata e salverà uno snapshot per eventuale ripristino.
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+            <Button variant="ghost" onClick={() => setIsDeleteModalOpen(false)}>
+              Annulla
+            </Button>
+            <Button 
+              variant="danger" 
+              onClick={handleExecuteBulkDelete}
+              disabled={matchingBulkTasks.length === 0}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Trash2 size={16} /> Elimina {matchingBulkTasks.length} attività
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

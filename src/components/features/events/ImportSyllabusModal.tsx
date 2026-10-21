@@ -141,9 +141,8 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
       const matches = matchSyllabusWithCalendar(aiResult.lessons, events, courseToUse, tasks);
       setMatchResults(matches);
       
-      const matchedEventsCount = matches.filter(m => m.matchedEvent).length;
-      // If events already exist, default createMissingEvents to false to prevent duplicate lessons!
-      setCreateMissingEvents(matchedEventsCount === 0);
+      // Default createMissingEvents to false: AI never creates duplicate events or tasks without explicit user opt-in
+      setCreateMissingEvents(false);
 
       setSummaryStats(prev => ({ ...prev, tokens: aiResult.tokensUsed }));
       setStep('review');

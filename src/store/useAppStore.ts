@@ -92,6 +92,8 @@ interface AppState {
   addTasks: (tasks: Task[]) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   removeTask: (id: string) => void;
+  removeTasks: (ids: string[]) => void;
+  removeTasksByFilter: (filter: { courseId?: string; taskType?: string; onlyAiEnriched?: boolean; status?: string }) => number;
   completeTask: (id: string, actualMinutes: number, completionMode?: 'attended' | 'recovered' | 'normal') => void;
   
   // Courses
@@ -442,10 +444,79 @@ export const useAppStore = create<AppState>((set, get) => ({
   removeTask: (id) => {
     get().saveSnapshot();
     set((s) => {
-      const next = { ...s, tasks: s.tasks.filter(t => t.id !== id) };
+      const next = { 
+        ...s, 
+        tasks: s.tasks.filter(t => t.id !== id),
+        studySessions: s.studySessions.filter(ss => ss.taskId !== id)
+      };
       persist(next as AppState);
       return next;
     });
+  },
+
+  removeTasks: (ids) => {
+    get().saveSnapshot();
+    const idSet = new Set(ids);
+    set((s) => {
+      const next = { 
+        ...s, 
+        tasks: s.tasks.filter(t => !idSet.has(t.id)),
+        studySessions: s.studySessions.filter(ss => !idSet.has(ss.taskId))
+      };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  removeTasksByFilter: (filter) => {
+    get().saveSnapshot();
+    let count = 0;
+    set((s) => {
+      const remainingTasks = s.tasks.filter(t => {
+        // Course filter
+        if (filter.courseId && filter.courseId !== 'ALL' && t.courseId !== filter.courseId) return true;
+        
+        // Status filter
+        if (filter.status && filter.status !== 'ALL') {
+          if (filter.status === 'todo' && t.status === 'done') return true;
+          if (filter.status === 'done' && t.status !== 'done') return true;
+        }
+
+        // AI enriched filter
+        if (filter.onlyAiEnriched) {
+          const isAi = t.isAiEnriched || 
+                       t.description?.includes('Argomento:') || 
+                       t.description?.includes('Capitoli/Libro:');
+          if (!isAi) return true;
+        }
+
+        // Task type filter
+        if (filter.taskType && filter.taskType !== 'ALL') {
+          const lower = t.title.toLowerCase();
+          const isNotes = lower.includes('appunti') || lower.includes('notes') || lower.includes('ripasso');
+          const isExercises = lower.includes('eserciz');
+          const isFollow = lower.includes('seguire') || lower.includes('recuperare');
+          if (filter.taskType === 'NOTES' && !isNotes) return true;
+          if (filter.taskType === 'EXERCISES' && !isExercises) return true;
+          if (filter.taskType === 'FOLLOW_LESSON' && !isFollow) return true;
+          if (filter.taskType === 'PROJECT' && !t.isProjectTask) return true;
+        }
+
+        // If it matches all criteria, remove it!
+        count++;
+        return false;
+      });
+
+      const remainingIds = new Set(remainingTasks.map(t => t.id));
+      const next = {
+        ...s,
+        tasks: remainingTasks,
+        studySessions: s.studySessions.filter(ss => remainingIds.has(ss.taskId))
+      };
+      persist(next as AppState);
+      return next;
+    });
+    return count;
   },
 
   completeTask: (id, actualMinutes, completionMode = 'normal') => {

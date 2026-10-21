@@ -45,8 +45,8 @@ export class TaskManager {
     for (let i = 0; i < updatedEvents.length; i++) {
       const event = updatedEvents[i];
 
-      // Skip if not past lesson
-      if (event.type !== 'lesson' || new Date(event.endTime).getTime() > nowMs) continue;
+      // Skip if not past lesson or already processed
+      if (event.type !== 'lesson' || new Date(event.endTime).getTime() > nowMs || event.isDone) continue;
 
       const course = courses.find(c => c.id === event.courseId);
       if (!course) {
@@ -56,44 +56,37 @@ export class TaskManager {
 
       const prefs = event.studyPreferencesOverride || course.defaultStudyPreferences;
       
-      const eventDate = new Date(event.startTime).toLocaleDateString('it-IT');
+      const eventDateIt = new Date(event.startTime).toLocaleDateString('it-IT');
+      const eventDateIso = event.startTime.split('T')[0];
       const startHM = new Date(event.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
       const endHM = new Date(event.endTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
       const timeSlot = `${startHM} - ${endHM}`;
 
-      const followTitle = `Seguire/Recuperare lezione: ${event.title} (${eventDate} ${timeSlot})`;
-      const notesTitle = `Sistemare appunti: ${event.title} (${eventDate} ${timeSlot})`;
-      const exerciseTitle = `Esercizi: ${event.title} (${eventDate} ${timeSlot})`;
+      const followTitle = `Seguire/Recuperare lezione: ${event.title} (${eventDateIt} ${timeSlot})`;
+      const notesTitle = `Sistemare appunti: ${event.title} (${eventDateIt} ${timeSlot})`;
+      const exerciseTitle = `Esercizi: ${event.title} (${eventDateIt} ${timeSlot})`;
 
       const followKey = `${course.id}-${followTitle}`;
       const notesKey = `${course.id}-${notesTitle}`;
       const exerciseKey = `${course.id}-${exerciseTitle}`;
 
-      // Check if any existing task matches this specific event or time slot
-      const hasFollowForSlot = existingTasks.some(t => 
-        t.relatedEventId === event.id || 
-        (t.courseId === course.id && isFollowTask(t) && (
-          (t.lessonDate === eventDate && t.lessonTimeSlot === timeSlot) ||
-          t.title.includes(`(${eventDate} ${timeSlot})`) ||
-          (!t.lessonTimeSlot && t.title.includes(`(${eventDate})`))
-        ))
-      );
-      const hasNotesForSlot = existingTasks.some(t => 
-        t.relatedEventId === event.id || 
-        (t.courseId === course.id && isNotesTask(t) && (
-          (t.lessonDate === eventDate && t.lessonTimeSlot === timeSlot) ||
-          t.title.includes(`(${eventDate} ${timeSlot})`) ||
-          (!t.lessonTimeSlot && t.title.includes(`(${eventDate})`))
-        ))
-      );
-      const hasExerciseForSlot = existingTasks.some(t => 
-        t.relatedEventId === event.id || 
-        (t.courseId === course.id && isExerciseTask(t) && (
-          (t.lessonDate === eventDate && t.lessonTimeSlot === timeSlot) ||
-          t.title.includes(`(${eventDate} ${timeSlot})`) ||
-          (!t.lessonTimeSlot && t.title.includes(`(${eventDate})`))
-        ))
-      );
+      // Helper to check if task matches this event slot in ANY date format
+      const matchesEventSlot = (t: Task) => {
+        if (t.relatedEventId === event.id) return true;
+        if (t.courseId !== course.id) return false;
+        const d = t.lessonDate || '';
+        const dateMatches = d === eventDateIt || d === eventDateIso || 
+                            t.title.includes(eventDateIt) || t.title.includes(eventDateIso);
+        if (!dateMatches) return false;
+        if (t.lessonTimeSlot && timeSlot) {
+          return t.lessonTimeSlot === timeSlot;
+        }
+        return true;
+      };
+
+      const hasFollowForSlot = existingTasks.some(t => isFollowTask(t) && matchesEventSlot(t));
+      const hasNotesForSlot = existingTasks.some(t => isNotesTask(t) && matchesEventSlot(t));
+      const hasExerciseForSlot = existingTasks.some(t => isExerciseTask(t) && matchesEventSlot(t));
 
       const needsFollow = !existingFollowTasks.has(event.id) && !existingFollowTaskTitles.has(followKey) && !hasFollowForSlot;
       const needsNotes = prefs.requiresNotesRevision && !existingNotesTasks.has(event.id) && !existingNotesTaskTitles.has(notesKey) && !hasNotesForSlot;

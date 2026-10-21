@@ -282,6 +282,7 @@ export function applySyllabusMatches(
             task.relatedEventId = target.id;
             task.lessonDate = eventDate;
             task.lessonTimeSlot = timeSlot;
+            task.isAiEnriched = true;
 
             // Keep standard prefixes required by TaskManager, including timeSlot
             const lowerTitle = task.title.toLowerCase();
@@ -302,7 +303,8 @@ export function applySyllabusMatches(
         }
       }
     } else if (isNewEventNeeded && createNewEvents && proposedEvent) {
-      // Add proposed event
+      // Add proposed event with isDone: true so TaskManager doesn't generate unwanted duplicate tasks
+      proposedEvent.isDone = true;
       eventsMap.set(proposedEvent.id, proposedEvent);
       newEventsCreatedCount++;
     }
