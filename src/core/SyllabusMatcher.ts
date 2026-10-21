@@ -4,39 +4,51 @@ import type { CalendarEvent, Task, ParsedLessonNote, Course } from './types';
 export interface MatchResultItem {
   syllabusLesson: ParsedLessonNote;
   matchedEvent?: CalendarEvent;
+  matchedTasks?: Task[];
   isNewEventNeeded: boolean;
   proposedEvent?: CalendarEvent;
 }
 
 /**
- * Matches extracted syllabus lessons against existing calendar events for a specific course.
+ * Returns a localized date string "YYYY-MM-DD" from an ISO string or Date.
+ */
+function toLocalDateKey(d: string | Date | undefined): string {
+  if (!d) return '';
+  const dateObj = typeof d === 'string' ? new Date(d) : d;
+  if (isNaN(dateObj.getTime())) {
+    return String(d).substring(0, 10);
+  }
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Matches extracted syllabus lessons against existing calendar events and tasks.
  */
 export function matchSyllabusWithCalendar(
   syllabusLessons: ParsedLessonNote[],
   existingEvents: CalendarEvent[],
-  course: Course
+  course: Course,
+  existingTasks: Task[] = []
 ): MatchResultItem[] {
-  // Filter events belonging to this course (or lesson events in general)
-  const courseEvents = existingEvents.filter(e => e.courseId === course.id);
+  // Filter events belonging to this course (by id or course title if unassigned)
+  const courseEvents = existingEvents.filter(e => 
+    e.courseId === course.id || 
+    (!e.courseId && e.title && course.name && e.title.toLowerCase().includes(course.name.toLowerCase()))
+  );
 
   return syllabusLessons.map(lesson => {
-    if (lesson.isCancelled) {
-      // If syllabus says NO CLASS, find if there is an event scheduled there that should perhaps be cancelled/flagged
-      const matched = courseEvents.find(e => {
-        const evDate = e.startTime.substring(0, 10);
-        return evDate === lesson.parsedDate;
-      });
-      return {
-        syllabusLesson: lesson,
-        matchedEvent: matched,
-        isNewEventNeeded: false,
-      };
-    }
+    const lessonDateKey = toLocalDateKey(lesson.parsedDate);
+    const lessonMonthDay = lessonDateKey.length >= 10 ? lessonDateKey.substring(5) : '';
 
-    // Try matching by exact date
-    const dayMatches = courseEvents.filter(e => {
-      const evDate = e.startTime.substring(0, 10);
-      return evDate === lesson.parsedDate;
+    // Match by exact date key YYYY-MM-DD or MM-DD (if academic year differs slightly)
+    let dayMatches = courseEvents.filter(e => {
+      const evDateKey = toLocalDateKey(e.startTime);
+      if (evDateKey === lessonDateKey) return true;
+      if (lessonMonthDay && evDateKey.substring(5) === lessonMonthDay) return true;
+      return false;
     });
 
     let matched: CalendarEvent | undefined = undefined;
@@ -52,10 +64,31 @@ export function matchSyllabusWithCalendar(
       }) || dayMatches[0];
     }
 
+    // Find any existing tasks associated with this event or date
+    const lessonDateIt = lesson.parsedDate ? new Date(lesson.parsedDate).toLocaleDateString('it-IT') : '';
+    const matchedTasks = existingTasks.filter(t => {
+      if (matched && t.relatedEventId === matched.id) return true;
+      if (t.courseId === course.id) {
+        if (lessonDateIt && t.title.includes(`(${lessonDateIt})`)) return true;
+        if (lesson.rawDate && t.title.includes(lesson.rawDate)) return true;
+      }
+      return false;
+    });
+
+    if (lesson.isCancelled) {
+      return {
+        syllabusLesson: lesson,
+        matchedEvent: matched,
+        matchedTasks,
+        isNewEventNeeded: false,
+      };
+    }
+
     if (matched) {
       return {
         syllabusLesson: lesson,
         matchedEvent: matched,
+        matchedTasks,
         isNewEventNeeded: false,
       };
     }
@@ -91,6 +124,7 @@ export function matchSyllabusWithCalendar(
 
     return {
       syllabusLesson: lesson,
+      matchedTasks,
       isNewEventNeeded: true,
       proposedEvent: proposed,
     };
@@ -98,25 +132,82 @@ export function matchSyllabusWithCalendar(
 }
 
 /**
+ * Cleanly removes duplicate tasks that may have accumulated for a course,
+ * merging descriptions into the canonical task.
+ */
+export function deduplicateCourseTasks(tasks: Task[], courseId: string): Task[] {
+  const seenNotes = new Map<string, Task>();
+  const seenExercises = new Map<string, Task>();
+  const seenFollow = new Map<string, Task>();
+  const result: Task[] = [];
+
+  for (const t of tasks) {
+    if (t.courseId !== courseId) {
+      result.push(t);
+      continue;
+    }
+
+    // Extract date from title e.g. "(15/09/2026)"
+    const dateMatch = t.title.match(/\((\d{1,2}\/\d{1,2}(?:\/\d{4})?)\)/);
+    const dateKey = dateMatch ? dateMatch[1] : (t.relatedEventId || t.id);
+
+    const isNotes = t.title.toLowerCase().includes('appunti') || t.title.toLowerCase().includes('ripasso') || t.title.toLowerCase().includes('notes');
+    const isExercise = t.title.toLowerCase().includes('eserciz');
+    const isFollow = t.title.toLowerCase().includes('seguire') || t.title.toLowerCase().includes('recuperare');
+
+    if (isNotes) {
+      if (seenNotes.has(dateKey)) {
+        const existing = seenNotes.get(dateKey)!;
+        if (!existing.description && t.description) {
+          existing.description = t.description;
+        }
+        continue; // drop duplicate
+      }
+      seenNotes.set(dateKey, t);
+      result.push(t);
+    } else if (isExercise) {
+      if (seenExercises.has(dateKey)) {
+        continue; // drop duplicate
+      }
+      seenExercises.set(dateKey, t);
+      result.push(t);
+    } else if (isFollow) {
+      if (seenFollow.has(dateKey)) {
+        continue; // drop duplicate
+      }
+      seenFollow.set(dateKey, t);
+      result.push(t);
+    } else {
+      result.push(t);
+    }
+  }
+
+  return result;
+}
+
+/**
  * Applies matched syllabus items to enrich events and corresponding study tasks.
+ * Does NOT generate duplicate tasks; instead updates existing tasks and aligns titles.
  */
 export function applySyllabusMatches(
   matchResults: MatchResultItem[],
   currentEvents: CalendarEvent[],
   currentTasks: Task[],
   course: Course,
-  createNewEvents = true
+  createNewEvents = false
 ): {
   updatedEvents: CalendarEvent[];
   updatedTasks: Task[];
   newEventsCreatedCount: number;
   eventsEnrichedCount: number;
+  tasksUpdatedCount: number;
 } {
   const eventsMap = new Map<string, CalendarEvent>(currentEvents.map(e => [e.id, { ...e }]));
   const tasksMap = new Map<string, Task>(currentTasks.map(t => [t.id, { ...t }]));
 
   let newEventsCreatedCount = 0;
   let eventsEnrichedCount = 0;
+  let tasksUpdatedCount = 0;
 
   for (const item of matchResults) {
     const { syllabusLesson, matchedEvent, isNewEventNeeded, proposedEvent } = item;
@@ -125,6 +216,11 @@ export function applySyllabusMatches(
       // Enrich existing event
       const target = eventsMap.get(matchedEvent.id);
       if (target) {
+        // Ensure courseId is assigned if it was missing
+        if (!target.courseId) {
+          target.courseId = course.id;
+        }
+
         target.topic = syllabusLesson.topic || target.topic;
         target.lessonType = syllabusLesson.lessonType || target.lessonType;
         if (syllabusLesson.lecturer) target.lecturer = syllabusLesson.lecturer;
@@ -138,27 +234,50 @@ export function applySyllabusMatches(
 
         eventsEnrichedCount++;
 
-        // Update corresponding Task(s) for this event
+        const eventDate = new Date(target.startTime).toLocaleDateString('it-IT');
+
+        // Build rich description
+        const descParts: string[] = [];
+        if (syllabusLesson.topic) {
+          descParts.push(`Argomento: ${syllabusLesson.topic}`);
+        }
+        if (syllabusLesson.sectionsOrChapters) {
+          descParts.push(`Capitoli/Libro: ${syllabusLesson.sectionsOrChapters}`);
+        }
+        if (syllabusLesson.lecturer) {
+          descParts.push(`Docente: ${syllabusLesson.lecturer}`);
+        }
+        if (syllabusLesson.readingsOrLinks && syllabusLesson.readingsOrLinks.length > 0) {
+          descParts.push(`Materiali e Link:\n${syllabusLesson.readingsOrLinks.join('\n')}`);
+        }
+        const formattedDesc = descParts.join('\n');
+
+        // Update corresponding Task(s) for this event (matching by relatedEventId or course + date)
         for (const task of tasksMap.values()) {
-          if (task.relatedEventId === target.id || (task.courseId === course.id && task.createdAt.startsWith(target.startTime.substring(0, 10)))) {
-            // Enrich task title and description with exact topic and textbook sections
-            if (syllabusLesson.topic) {
-              const prefix = syllabusLesson.lessonType === 'exercise' ? 'Esercizi' : 'Ripasso';
-              task.title = `${prefix}: ${syllabusLesson.topic}`;
+          const isDirectEventMatch = task.relatedEventId === target.id;
+          const isCourseDateMatch = task.courseId === course.id && task.title.includes(`(${eventDate})`);
+
+          if (isDirectEventMatch || isCourseDateMatch) {
+            // Attach relatedEventId if missing
+            if (!task.relatedEventId) {
+              task.relatedEventId = target.id;
             }
-            const descParts: string[] = [];
-            if (syllabusLesson.sectionsOrChapters) {
-              descParts.push(`Capitoli/Libro: ${syllabusLesson.sectionsOrChapters}`);
+
+            // Keep standard prefixes required by TaskManager
+            const lowerTitle = task.title.toLowerCase();
+            if (lowerTitle.includes('appunti') || lowerTitle.includes('ripasso')) {
+              task.title = `Sistemare appunti: ${course.name} - ${syllabusLesson.topic} (${eventDate})`;
+            } else if (lowerTitle.includes('eserciz')) {
+              task.title = `Esercizi: ${course.name} - ${syllabusLesson.topic} (${eventDate})`;
+            } else if (lowerTitle.includes('seguire') || lowerTitle.includes('recuperare')) {
+              task.title = `Seguire/Recuperare lezione: ${course.name} - ${syllabusLesson.topic} (${eventDate})`;
             }
-            if (syllabusLesson.lecturer) {
-              descParts.push(`Docente: ${syllabusLesson.lecturer}`);
+
+            if (formattedDesc) {
+              task.description = formattedDesc;
             }
-            if (syllabusLesson.readingsOrLinks && syllabusLesson.readingsOrLinks.length > 0) {
-              descParts.push(`Materiali/Link: \n${syllabusLesson.readingsOrLinks.join('\n')}`);
-            }
-            if (descParts.length > 0) {
-              task.description = descParts.join('\n');
-            }
+
+            tasksUpdatedCount++;
           }
         }
       }
@@ -169,10 +288,14 @@ export function applySyllabusMatches(
     }
   }
 
+  // Deduplicate tasks to ensure no multiple copies remain
+  const cleanedTasks = deduplicateCourseTasks(Array.from(tasksMap.values()), course.id);
+
   return {
     updatedEvents: Array.from(eventsMap.values()),
-    updatedTasks: Array.from(tasksMap.values()),
+    updatedTasks: cleanedTasks,
     newEventsCreatedCount,
     eventsEnrichedCount,
+    tasksUpdatedCount,
   };
 }

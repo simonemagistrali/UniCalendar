@@ -49,11 +49,10 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
   const [statusMessage, setStatusMessage] = useState('');
   const [error, setError] = useState('');
   
-  // Result State
   const [extractedLessons, setExtractedLessons] = useState<ParsedLessonNote[]>([]);
   const [matchResults, setMatchResults] = useState<MatchResultItem[]>([]);
-  const [createMissingEvents, setCreateMissingEvents] = useState(true);
-  const [summaryStats, setSummaryStats] = useState<{ updated: number; created: number; tokens?: number }>({ updated: 0, created: 0 });
+  const [createMissingEvents, setCreateMissingEvents] = useState(false);
+  const [summaryStats, setSummaryStats] = useState<{ updated: number; created: number; tasksUpdated?: number; tokens?: number }>({ updated: 0, created: 0, tasksUpdated: 0 });
 
   const activeCourse: Course | undefined = courses.find(c => c.id === selectedCourseId);
 
@@ -138,9 +137,14 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
 
       setExtractedLessons(aiResult.lessons);
 
-      // Match against calendar
-      const matches = matchSyllabusWithCalendar(aiResult.lessons, events, courseToUse);
+      // Match against calendar events and tasks
+      const matches = matchSyllabusWithCalendar(aiResult.lessons, events, courseToUse, tasks);
       setMatchResults(matches);
+      
+      const matchedEventsCount = matches.filter(m => m.matchedEvent).length;
+      // If events already exist, default createMissingEvents to false to prevent duplicate lessons!
+      setCreateMissingEvents(matchedEventsCount === 0);
+
       setSummaryStats(prev => ({ ...prev, tokens: aiResult.tokensUsed }));
       setStep('review');
     } catch (err: any) {
@@ -158,7 +162,7 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
 
     saveSnapshot(); // Enable Undo
 
-    const { updatedEvents, updatedTasks, newEventsCreatedCount, eventsEnrichedCount } = applySyllabusMatches(
+    const { updatedEvents, updatedTasks, newEventsCreatedCount, eventsEnrichedCount, tasksUpdatedCount } = applySyllabusMatches(
       matchResults,
       events,
       tasks,
@@ -171,6 +175,7 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
     setSummaryStats({
       updated: eventsEnrichedCount,
       created: newEventsCreatedCount,
+      tasksUpdated: tasksUpdatedCount,
       tokens: summaryStats.tokens,
     });
     setStep('success');
@@ -364,15 +369,22 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
             </div>
 
             {/* Checkbox for creating new events */}
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.88rem', color: 'var(--text-primary)', cursor: 'pointer', padding: '0 4px' }}>
-              <input
-                type="checkbox"
-                checked={createMissingEvents}
-                onChange={e => setCreateMissingEvents(e.target.checked)}
-                style={{ width: '18px', height: '18px', accentColor: '#a855f7' }}
-              />
-              <span>Crea automaticamente nel calendario le lezioni non ancora presenti</span>
-            </label>
+            <div style={{ background: 'var(--bg-secondary)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.88rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={createMissingEvents}
+                  onChange={e => setCreateMissingEvents(e.target.checked)}
+                  style={{ width: '18px', height: '18px', accentColor: '#a855f7' }}
+                />
+                <span style={{ fontWeight: 600 }}>Crea lezioni nel calendario per date non ancora presenti</span>
+              </label>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: '28px', marginTop: '2px' }}>
+                {createMissingEvents 
+                  ? 'Verranno aggiunte a calendario nuove lezioni per le date mancanti.' 
+                  : 'Consigliato: aggiorna solo le lezioni e i task già esistenti, evitando duplicati.'}
+              </div>
+            </div>
 
             {/* List of Extracted Lessons */}
             <div style={{ overflowY: 'auto', maxHeight: '42vh', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
@@ -497,11 +509,11 @@ export function ImportSyllabusModal({ isOpen, onClose }: ImportSyllabusModalProp
               <CheckCircle2 size={36} />
             </div>
             <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)' }}>
-              Syllabus Importato con Successo!
+              Aggiornamento Completato!
             </h3>
             <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.92rem', maxWidth: '420px', lineHeight: 1.5 }}>
-              Abbiamo aggiornato <strong>{summaryStats.updated}</strong> lezioni e creato <strong>{summaryStats.created}</strong> nuove sessioni.
-              Tutti i task di studio e ripasso ora contengono gli argomenti e i capitoli del libro.
+              Abbiamo aggiornato <strong>{summaryStats.updated}</strong> lezioni e <strong>{summaryStats.tasksUpdated || summaryStats.updated}</strong> task di studio con i dettagli del syllabus. Eventuali task duplicati sono stati ripuliti.
+              {summaryStats.created > 0 && <span> Sono state inoltre create <strong>{summaryStats.created}</strong> nuove lezioni.</span>}
             </p>
             <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
               <Button variant="primary" onClick={onClose}>

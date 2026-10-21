@@ -20,13 +20,27 @@ export class TaskManager {
     const nowMs = Date.now();
     const newTasks: Task[] = [];
     const updatedEvents = [...events];
-    const existingFollowTasks = new Set(existingTasks.filter(t => t.title.startsWith('Seguire/Recuperare lezione')).map(t => t.relatedEventId).filter(Boolean));
-    const existingNotesTasks = new Set(existingTasks.filter(t => t.title.startsWith('Sistemare appunti')).map(t => t.relatedEventId).filter(Boolean));
-    const existingExerciseTasks = new Set(existingTasks.filter(t => t.title.startsWith('Esercizi')).map(t => t.relatedEventId).filter(Boolean));
 
-    const existingFollowTaskTitles = new Set(existingTasks.filter(t => t.title.startsWith('Seguire/Recuperare lezione')).map(t => `${t.courseId}-${t.title}`));
-    const existingNotesTaskTitles = new Set(existingTasks.filter(t => t.title.startsWith('Sistemare appunti')).map(t => `${t.courseId}-${t.title}`));
-    const existingExerciseTaskTitles = new Set(existingTasks.filter(t => t.title.startsWith('Esercizi')).map(t => `${t.courseId}-${t.title}`));
+    const isNotesTask = (t: Task) =>
+      t.title.toLowerCase().startsWith('sistemare appunti') ||
+      t.title.toLowerCase().includes('appunti:') ||
+      t.title.toLowerCase().startsWith('ripasso:');
+
+    const isExerciseTask = (t: Task) =>
+      t.title.toLowerCase().startsWith('esercizi') ||
+      t.title.toLowerCase().includes('esercizi:');
+
+    const isFollowTask = (t: Task) =>
+      t.title.toLowerCase().startsWith('seguire/recuperare') ||
+      t.title.toLowerCase().includes('recuperare:');
+
+    const existingFollowTasks = new Set(existingTasks.filter(isFollowTask).map(t => t.relatedEventId).filter(Boolean));
+    const existingNotesTasks = new Set(existingTasks.filter(isNotesTask).map(t => t.relatedEventId).filter(Boolean));
+    const existingExerciseTasks = new Set(existingTasks.filter(isExerciseTask).map(t => t.relatedEventId).filter(Boolean));
+
+    const existingFollowTaskTitles = new Set(existingTasks.filter(isFollowTask).map(t => `${t.courseId}-${t.title}`));
+    const existingNotesTaskTitles = new Set(existingTasks.filter(isNotesTask).map(t => `${t.courseId}-${t.title}`));
+    const existingExerciseTaskTitles = new Set(existingTasks.filter(isExerciseTask).map(t => `${t.courseId}-${t.title}`));
 
     for (let i = 0; i < updatedEvents.length; i++) {
       const event = updatedEvents[i];
@@ -51,9 +65,14 @@ export class TaskManager {
       const notesKey = `${course.id}-${notesTitle}`;
       const exerciseKey = `${course.id}-${exerciseTitle}`;
 
-      const needsFollow = !existingFollowTasks.has(event.id) && !existingFollowTaskTitles.has(followKey);
-      const needsNotes = prefs.requiresNotesRevision && !existingNotesTasks.has(event.id) && !existingNotesTaskTitles.has(notesKey);
-      const needsExercises = prefs.requiresExercises && !existingExerciseTasks.has(event.id) && !existingExerciseTaskTitles.has(exerciseKey);
+      // Also check if any existing task for this course already targets this date
+      const hasFollowForDate = existingTasks.some(t => t.courseId === course.id && isFollowTask(t) && t.title.includes(`(${eventDate})`));
+      const hasNotesForDate = existingTasks.some(t => t.courseId === course.id && isNotesTask(t) && t.title.includes(`(${eventDate})`));
+      const hasExerciseForDate = existingTasks.some(t => t.courseId === course.id && isExerciseTask(t) && t.title.includes(`(${eventDate})`));
+
+      const needsFollow = !existingFollowTasks.has(event.id) && !existingFollowTaskTitles.has(followKey) && !hasFollowForDate;
+      const needsNotes = prefs.requiresNotesRevision && !existingNotesTasks.has(event.id) && !existingNotesTaskTitles.has(notesKey) && !hasNotesForDate;
+      const needsExercises = prefs.requiresExercises && !existingExerciseTasks.has(event.id) && !existingExerciseTaskTitles.has(exerciseKey) && !hasExerciseForDate;
 
       if (!needsFollow && !needsNotes && !needsExercises) {
         if (!event.isDone) updatedEvents[i] = { ...event, isDone: true };
