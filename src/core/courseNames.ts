@@ -194,21 +194,33 @@ export function findCourseForTitle(title: string, courses: Course[]): Course | u
   let found = courses.find(c => normalizeCourseName(c.name) === target);
   if (found) return found;
 
+  // 1b. Corrispondenza esatta con eventuale nome originale del corso
+  found = courses.find(c => c.originalName && normalizeCourseName(c.originalName) === target);
+  if (found) return found;
+
   // 2. Corrispondenza col nome normalizzato estratto del corso
   found = courses.find(c => normalizeCourseName(courseNameFromTitle(c.name)) === target);
+  if (found) return found;
+
+  // 2b. Corrispondenza col nome normalizzato estratto dell'originalName
+  found = courses.find(c => c.originalName && normalizeCourseName(courseNameFromTitle(c.originalName)) === target);
   if (found) return found;
 
   // 3. Match prefisso: se il corso salvato ha un nome breve (es. "Analisi") e il titolo è "Analisi Matematica 1"
   const prefixMatches = courses.filter(c => {
     const cn = normalizeCourseName(c.name);
-    return cn && (target === cn || target.startsWith(cn + ' '));
+    const on = c.originalName ? normalizeCourseName(c.originalName) : '';
+    return (cn && (target === cn || target.startsWith(cn + ' '))) ||
+           (on && (target === on || target.startsWith(on + ' ')));
   });
   if (prefixMatches.length === 1) return prefixMatches[0];
 
   // 4. Match inverso: se il corso è "Analisi Matematica 1" e il titolo dell'evento è "Analisi"
   const reverseMatches = courses.filter(c => {
     const cn = normalizeCourseName(c.name);
-    return cn && cn.startsWith(target + ' ');
+    const on = c.originalName ? normalizeCourseName(c.originalName) : '';
+    return (cn && cn.startsWith(target + ' ')) ||
+           (on && on.startsWith(target + ' '));
   });
   if (reverseMatches.length === 1) return reverseMatches[0];
 
@@ -307,6 +319,7 @@ function scoreCandidate(name: string, origCourseName: string, eventCount: number
 
 /** Punteggio di qualità del corso per determinare il nome canonico da preservare nel cluster */
 function scoreCourseQuality(c: Course, eventCount: number): number {
+  if (c.isCustomName) return 1000000; // Priorità massima ai corsi con nome personalizzato o confermato a mano
   const norm = normalizeCourseName(c.name);
   const words = norm.split(/\s+/).filter(Boolean).length;
   let score = words > 1 ? 1000 + words * 50 : 10;
@@ -335,6 +348,7 @@ interface RepairResult extends RepairInput {
  * 3. Rimuove prefissi universitari come "Didattica - " o "Didattica".
  * 4. Risolve bug di ripetizione (es. "STATISTICS STATISTICS...").
  * 5. Deduplica e unifica tutti i corsi doppioni in modo trasparente.
+ * 6. Preserva rigorosamente come predefiniti i corsi i cui nomi sono stati modificati a mano dall'utente.
  */
 export function repairCourseNames(input: RepairInput): RepairResult {
   let changed = false;
@@ -351,7 +365,7 @@ export function repairCourseNames(input: RepairInput): RepairResult {
 
   for (const course of courses) {
     const isTaskName = TASK_ACTION_PREFIX.test(course.name.trim());
-    if (isTaskName) {
+    if (isTaskName && !course.isCustomName) {
       prunedTaskCourseIds.add(course.id);
       changed = true;
       repairedCount++;
@@ -364,6 +378,24 @@ export function repairCourseNames(input: RepairInput): RepairResult {
 
   // 2. Ripara il nome di ciascun corso basandosi ESCLUSIVAMENTE sugli eventi del calendario
   for (const course of courses) {
+    // Se il nome è stato modificato a mano (isCustomName), è predefinito: NON toccare course.name all'apertura!
+    if (course.isCustomName) {
+      const linkedEvents = events.filter(e => e.courseId === course.id);
+      for (const e of linkedEvents) {
+        eventCourseOverride.set(e.id, course.id);
+      }
+      for (const e of events) {
+        if (!e.courseId && (e.type === 'lesson' || e.type === 'generic' || !e.type)) {
+          const match = findCourseForTitle(e.title, [course]);
+          if (match) {
+            eventCourseOverride.set(e.id, course.id);
+            changed = true;
+          }
+        }
+      }
+      continue;
+    }
+
     const cleanedInitial = cleanCourseName(course.name);
     if (cleanedInitial && cleanedInitial !== course.name) {
       course.name = cleanedInitial;
@@ -472,15 +504,25 @@ export function repairCourseNames(input: RepairInput): RepairResult {
 
   for (const course of courses) {
     const norm = normalizeCourseName(course.name);
-    // Elimina etichette riservate o vuote
-    if (BOGUS_COURSE_NAMES.has(norm) || /^\d+$/.test(norm) || TASK_ACTION_PREFIX.test(course.name)) {
+    // Elimina etichette riservate o vuote solo se non è un corso personalizzato a mano
+    if (!course.isCustomName && (BOGUS_COURSE_NAMES.has(norm) || /^\d+$/.test(norm) || TASK_ACTION_PREFIX.test(course.name))) {
       changed = true;
       continue;
     }
 
     let matchedCluster: Course[] | null = null;
     for (const cluster of clusters) {
-      if (cluster.some(existing => areSameCourse(existing.name, course.name))) {
+      // Due corsi entrambi impostati/creati a mano dall'utente non devono essere unificati forzatamente
+      const hasCustom = cluster.some(c => c.isCustomName);
+      if (course.isCustomName && hasCustom) {
+        continue;
+      }
+
+      if (cluster.some(existing => (
+        areSameCourse(existing.name, course.name) ||
+        (existing.originalName && areSameCourse(existing.originalName, course.name)) ||
+        (course.originalName && areSameCourse(existing.name, course.originalName))
+      ))) {
         matchedCluster = cluster;
         break;
       }
@@ -497,12 +539,22 @@ export function repairCourseNames(input: RepairInput): RepairResult {
 
   for (const cluster of clusters) {
     cluster.sort((a, b) => {
+      // Un corso personalizzato o confermato a mano ha priorità assoluta come canonico
+      if (a.isCustomName && !b.isCustomName) return -1;
+      if (!a.isCustomName && b.isCustomName) return 1;
       const sa = scoreCourseQuality(a, courseEventCounts.get(a.id) || 0);
       const sb = scoreCourseQuality(b, courseEventCounts.get(b.id) || 0);
       return sb - sa;
     });
 
     const canonical = cluster[0];
+    // Se unifichiamo un duplicato verso un corso custom, assicuriamoci che conservi l'originalName se assente
+    if (cluster.length > 1 && canonical.isCustomName && !canonical.originalName) {
+      const nonCustom = cluster.find(c => !c.isCustomName && c.name);
+      if (nonCustom) {
+        canonical.originalName = nonCustom.name;
+      }
+    }
     uniqueCourses.push(canonical);
 
     if (cluster.length > 1) {
@@ -534,11 +586,16 @@ export function repairCourseNames(input: RepairInput): RepairResult {
       const targetCourse = uniqueCourses.find(c => c.id === newCourseId);
       if (targetCourse) {
         const cleanTitleStr = cleanCourseName(updatedTitle);
+        const matchesOriginal = Boolean(targetCourse.originalName && (
+          normalizeCourseName(updatedTitle) === normalizeCourseName(targetCourse.originalName) ||
+          normalizeCourseName(cleanTitleStr) === normalizeCourseName(targetCourse.originalName)
+        ));
         if (
           updatedTitle.trim().split(/\s+/).length <= 2 ||
           SSD_CODE.test(updatedTitle) ||
           NUMERIC_CODE.test(updatedTitle) ||
-          normalizeCourseName(updatedTitle) === normalizeCourseName(targetCourse.name)
+          normalizeCourseName(updatedTitle) === normalizeCourseName(targetCourse.name) ||
+          matchesOriginal
         ) {
           updatedTitle = targetCourse.name;
         } else if (cleanTitleStr && cleanTitleStr !== updatedTitle && cleanTitleStr.split(/\s+/).length >= 2) {

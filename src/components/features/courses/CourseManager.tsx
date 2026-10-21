@@ -41,6 +41,7 @@ export function CourseManager({ isOpen, onClose }: CourseManagerProps) {
   const [notesRevision, setNotesRevision] = useState(true);
   const [exercises, setExercises] = useState(false);
   const [revisionTime, setRevisionTime] = useState('45');
+  const [isCustomName, setIsCustomName] = useState(true);
 
   const resetForm = () => {
     setName('');
@@ -49,12 +50,17 @@ export function CourseManager({ isOpen, onClose }: CourseManagerProps) {
     setNotesRevision(true);
     setExercises(false);
     setRevisionTime('45');
+    setIsCustomName(true);
     setIsAdding(false);
     setEditingId(null);
   };
 
   const handleSave = () => {
     if (!name.trim()) return;
+
+    const existing = editingId ? courses.find(c => c.id === editingId) : undefined;
+    const nameChanged = existing && existing.name !== name.trim();
+    const originalName = existing?.originalName || (nameChanged ? existing?.name : undefined);
 
     const courseData = {
       name: name.trim(),
@@ -65,6 +71,8 @@ export function CourseManager({ isOpen, onClose }: CourseManagerProps) {
         requiresExercises: exercises,
         estimatedRevisionTimePerLesson: parseInt(revisionTime) || 45,
       },
+      isCustomName,
+      originalName,
     };
 
     if (editingId) {
@@ -83,6 +91,7 @@ export function CourseManager({ isOpen, onClose }: CourseManagerProps) {
     setNotesRevision(course.defaultStudyPreferences.requiresNotesRevision);
     setExercises(course.defaultStudyPreferences.requiresExercises);
     setRevisionTime(course.defaultStudyPreferences.estimatedRevisionTimePerLesson.toString());
+    setIsCustomName(course.isCustomName ?? true);
     setIsAdding(true);
   };
 
@@ -101,15 +110,37 @@ export function CourseManager({ isOpen, onClose }: CourseManagerProps) {
               <div className="course-item-left">
                 <span className="course-dot" style={{ backgroundColor: c.color }} />
                 <div>
-                  <span className="course-name">{c.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="course-name">{c.name}</span>
+                    {c.isCustomName && (
+                      <span
+                        className="course-custom-badge"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          fontSize: '0.68rem',
+                          padding: '1px 6px',
+                          borderRadius: '8px',
+                          backgroundColor: 'rgba(26, 115, 232, 0.12)',
+                          color: '#1a73e8',
+                          fontWeight: 600,
+                          border: '1px solid rgba(26, 115, 232, 0.25)',
+                        }}
+                        title="Nome predefinito impostato a mano. Protetto da modifiche automatiche all'apertura."
+                      >
+                        <Check size={10} /> Predefinito
+                      </span>
+                    )}
+                  </div>
                   <span className="course-detail">Difficoltà: {c.difficulty}/10 · Revisione: {c.defaultStudyPreferences.estimatedRevisionTimePerLesson} min</span>
                 </div>
               </div>
               <div className="course-item-actions">
-                <button onClick={() => startEdit(c)} className="course-action-btn">
+                <button onClick={() => startEdit(c)} className="course-action-btn" title="Modifica corso">
                   <Edit2 size={14} />
                 </button>
-                <button onClick={() => removeCourse(c.id)} className="course-action-btn course-delete-btn">
+                <button onClick={() => removeCourse(c.id)} className="course-action-btn course-delete-btn" title="Elimina corso">
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -124,6 +155,51 @@ export function CourseManager({ isOpen, onClose }: CourseManagerProps) {
               <div className="course-form-field" style={{ flex: 2 }}>
                 <label>Nome Corso</label>
                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Es: Analisi Matematica I" />
+                <label
+                  className="course-checkbox"
+                  style={{
+                    marginTop: '6px',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary, #5f6368)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isCustomName}
+                    onChange={e => setIsCustomName(e.target.checked)}
+                  />
+                  <span>Salva come predefinito (blocca modifiche automatiche all'apertura)</span>
+                </label>
+                {editingId && (() => {
+                  const orig = courses.find(c => c.id === editingId)?.originalName;
+                  if (orig && orig !== name) {
+                    return (
+                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>Nome rilevato: <em>{orig}</em></span>
+                        <button
+                          type="button"
+                          onClick={() => { setName(orig); setIsCustomName(false); }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#1a73e8',
+                            cursor: 'pointer',
+                            padding: 0,
+                            textDecoration: 'underline',
+                            fontSize: '0.76rem',
+                          }}
+                        >
+                          Ripristina nome rilevato
+                        </button>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
               <div className="course-form-field">
                 <label>Difficoltà (1-10)</label>

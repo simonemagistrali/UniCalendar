@@ -1,6 +1,6 @@
 import type { CalendarEvent, Course, Task } from './types';
 import { v4 as uuidv4 } from 'uuid';
-import { courseNameFromTitle, normalizeCourseName, BOGUS_COURSE_NAMES } from './courseNames';
+import { courseNameFromTitle, normalizeCourseName, BOGUS_COURSE_NAMES, findCourseForTitle } from './courseNames';
 
 /**
  * TaskManager — Scans past events and generates tasks automatically.
@@ -286,7 +286,10 @@ export class TaskManager {
    * Auto-detect courses from imported events by grouping by title prefix.
    */
   static detectCoursesFromEvents(events: CalendarEvent[], existingCourses: Course[]): Course[] {
-    const existingNames = new Set(existingCourses.map(c => normalizeCourseName(c.name)));
+    const existingNames = new Set([
+      ...existingCourses.map(c => normalizeCourseName(c.name)),
+      ...existingCourses.filter(c => c.originalName).map(c => normalizeCourseName(c.originalName!)),
+    ]);
     const titleCounts = new Map<string, { name: string; count: number }>();
 
     for (const e of events) {
@@ -294,7 +297,13 @@ export class TaskManager {
       // Nome completo del corso (senza prefissi tipo "Lezione di" e info accessorie)
       const name = courseNameFromTitle(e.title);
       const key = normalizeCourseName(name);
-      if (key && !existingNames.has(key) && !BOGUS_COURSE_NAMES.has(key) && !/^\d+$/.test(key)) {
+      if (
+        key &&
+        !existingNames.has(key) &&
+        !BOGUS_COURSE_NAMES.has(key) &&
+        !/^\d+$/.test(key) &&
+        !findCourseForTitle(name, existingCourses)
+      ) {
         const entry = titleCounts.get(key);
         if (entry) entry.count++;
         else titleCounts.set(key, { name, count: 1 });

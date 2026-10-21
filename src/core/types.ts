@@ -17,6 +17,8 @@ export interface Course {
   difficulty: number; // 1-10
   color: string;
   defaultStudyPreferences: StudyPreferences;
+  isCustomName?: boolean; // Se true, il nome è stato modificato o creato a mano ed è predefinito (protetto da riparazioni automatiche)
+  originalName?: string;   // Nome originario rilevato dal calendario prima della modifica a mano
 }
 
 export interface StudyPreferences {

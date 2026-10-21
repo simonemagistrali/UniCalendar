@@ -559,7 +559,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   addCourse: (course) => {
     get().saveSnapshot();
     set((s) => {
-      const next = { ...s, courses: [...s.courses, course] };
+      const newCourse: Course = {
+        ...course,
+        isCustomName: course.isCustomName ?? true,
+      };
+      const next = { ...s, courses: [...s.courses, newCourse] };
       persist(next as AppState);
       return next;
     });
@@ -568,7 +572,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateCourse: (id, updates) => {
     get().saveSnapshot();
     set((s) => {
-      const next = { ...s, courses: s.courses.map(c => c.id === id ? { ...c, ...updates } : c) };
+      const nextCourses = s.courses.map(c => {
+        if (c.id !== id) return c;
+        const nameChanged = updates.name !== undefined && updates.name.trim() !== c.name;
+        const isCustom = updates.isCustomName !== undefined
+          ? updates.isCustomName
+          : (nameChanged ? true : (c.isCustomName ?? false));
+        const originalName = c.originalName || (nameChanged ? c.name : undefined);
+
+        return {
+          ...c,
+          ...updates,
+          name: updates.name ? updates.name.trim() : c.name,
+          isCustomName: isCustom,
+          originalName: originalName || c.originalName,
+        };
+      });
+
+      const next = { ...s, courses: nextCourses };
       persist(next as AppState);
       return next;
     });
