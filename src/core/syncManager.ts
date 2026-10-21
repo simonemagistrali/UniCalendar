@@ -2,7 +2,7 @@ import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from "firebase/fires
 import { db } from "./firebase";
 import { loadState, saveState } from "./persistence";
 import { encryptData, decryptData, isEncryptedFormat } from "./crypto";
-import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord } from "./types";
+import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord, AnkiDaySnapshot } from "./types";
 
 export interface UserSyncData {
   tasks?: Task[];
@@ -11,6 +11,7 @@ export interface UserSyncData {
   preferences?: UserPreferences;
   studySessions?: StudySession[];
   performanceHistory?: PerformanceRecord[];
+  ankiHistory?: AnkiDaySnapshot[];
 }
 
 /**
@@ -50,7 +51,7 @@ function validateSyncData(data: UserSyncData): UserSyncData | null {
     }
 
     // Controlla che gli array non superino il limite massimo
-    const arrayFields: (keyof UserSyncData)[] = ['tasks', 'events', 'courses', 'studySessions', 'performanceHistory'];
+    const arrayFields: (keyof UserSyncData)[] = ['tasks', 'events', 'courses', 'studySessions', 'performanceHistory', 'ankiHistory'];
     for (const key of arrayFields) {
       const arr = data[key];
       if (Array.isArray(arr) && arr.length > MAX_ARRAY_LENGTH) {

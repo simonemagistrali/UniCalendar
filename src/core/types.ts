@@ -125,6 +125,34 @@ export interface UserPreferences {
   ankiAverageTimeSeconds?: number; // Average time to review a single Anki card
 }
 
+/* ─── Anki History (salvata localmente + cloud, disponibile anche offline) ─── */
+export interface AnkiDaySnapshot {
+  date: string;              // "YYYY-MM-DD" (giorno Anki)
+  updatedAt: string;         // ISO dell'ultimo aggiornamento
+  /** Carte in ripasso dovute oggi (review) */
+  reviewDue?: number;
+  /** Carte in apprendimento dovute oggi */
+  learnDue?: number;
+  /** Carte nuove ancora da introdurre oggi (rispetta il limite giornaliero dei mazzi) */
+  newToday?: number;
+  /** Totale carte nuove nella collezione */
+  newTotal?: number;
+  /** Carte rimaste da fare oggi = reviewDue + learnDue + newToday */
+  remaining?: number;
+  /** Carte studiate (risposte date) oggi */
+  studied: number;
+  /** Tempo totale di studio in minuti */
+  studyMinutes?: number;
+  /** Velocità media di oggi in secondi per carta */
+  avgSecondsPerCard?: number;
+  /** Tempo stimato per finire le carte rimaste (minuti) */
+  estimatedMinutes?: number;
+  /** Tempo medio di risposta dell'intera collezione (statistiche Anki), usato come fallback */
+  collectionAvgSeconds?: number;
+  /** true se il giorno è stato ricostruito dallo storico Anki (solo conteggio studiate) */
+  backfilled?: boolean;
+}
+
 /* ─── Phantom Task (Future Projection) ─── */
 export type PhantomTaskType = 'follow_recover' | 'notes' | 'exercises';
 

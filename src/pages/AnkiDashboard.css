@@ -7,7 +7,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     flex-wrap: wrap;
     gap: 1rem;
 }
@@ -51,12 +51,13 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 12px;
+    padding: 6px 14px;
     border-radius: 20px;
     font-size: 0.85rem;
     font-weight: 600;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
+    transition: all 0.2s ease;
 }
 
 .connection-badge .dot {
@@ -66,7 +67,8 @@
 }
 
 .connection-badge.online .dot { background: #10b981; box-shadow: 0 0 8px #10b981; }
-.connection-badge.offline .dot { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+.connection-badge.offline .dot { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+.connection-badge.checking .dot { background: #64748b; }
 
 .refresh-button {
     display: flex;
@@ -92,6 +94,21 @@
     cursor: not-allowed;
 }
 
+/* ─── Offline Notice Banner ─── */
+.anki-offline-notice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #fbbf24;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
 .anki-state-message {
     display: flex;
     flex-direction: column;
@@ -112,7 +129,8 @@
 .anki-stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1.5rem;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
 }
 
 .stat-card {
@@ -160,13 +178,16 @@
 .accent-green .stat-icon-wrapper { background: rgba(16, 185, 129, 0.15); color: #10b981; }
 .accent-green::before { background: #10b981; }
 
+.accent-teal .stat-icon-wrapper { background: rgba(20, 184, 166, 0.15); color: #14b8a6; }
+.accent-teal::before { background: #14b8a6; }
+
 .stat-content {
     display: flex;
     flex-direction: column;
 }
 
 .stat-value {
-    font-size: 2.5rem;
+    font-size: 2.4rem;
     font-weight: 800;
     color: var(--text-primary);
     line-height: 1;
@@ -181,6 +202,220 @@
 }
 
 .stat-sublabel {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* ─── Today Full Banner ─── */
+.anki-today-banner {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.75rem !important;
+}
+
+.today-banner-left {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+.banner-icon {
+    margin-bottom: 0 !important;
+    width: 52px;
+    height: 52px;
+}
+
+.banner-title {
+    margin: 0 0 4px 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.banner-description {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.today-banner-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.today-studied-count {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #10b981;
+    line-height: 1;
+}
+
+.today-studied-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ─── Andamento / Trends Section ─── */
+.anki-trends-section {
+    margin-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.trends-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.trends-title {
+    margin: 0 0 4px 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.range-pills {
+    display: flex;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+
+.range-pill {
+    background: transparent;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.range-pill:hover {
+    color: var(--text-primary);
+}
+
+.range-pill.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* ─── Trends KPI Grid ─── */
+.trends-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.trend-kpi-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.trend-kpi-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.trend-kpi-val {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.trend-kpi-sub {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.trend-kpi-trend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.trend-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.trend-badge.positive {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.trend-badge.neutral {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+}
+
+/* ─── Chart Tab Bar ─── */
+.chart-tabs-bar {
+    display: flex;
+    gap: 8px;
+}
+
+.chart-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.chart-tab-btn:hover {
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.chart-tab-btn.active {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border-color: #3b82f6;
+}
+
+.anki-chart-panel {
+    padding: 1.5rem !important;
+}
+
+.chart-caption {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
     font-size: 0.85rem;
     color: var(--text-muted);
 }
@@ -216,5 +451,28 @@
     .refresh-button {
         min-height: 44px;
         flex: 1;
+    }
+    .anki-today-banner {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 1rem;
+    }
+    .today-banner-right {
+        align-items: flex-start;
+    }
+    .chart-tabs-bar {
+        flex-direction: column;
+    }
+    .trends-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .range-pills {
+        width: 100%;
+        justify-content: space-between;
+    }
+    .range-pill {
+        flex: 1;
+        text-align: center;
     }
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2, TrendingUp, MoreHorizontal, CheckSquare, BarChart3, Brain } from "lucide-react";
+import { CalendarIcon, Plus, Upload, Settings, Home as HomeIcon, LogOut, GraduationCap, Menu, X, Undo2, TrendingUp, CheckSquare, BarChart3, Brain } from "lucide-react";
 
 import { Calendar } from '../components/features/calendar/Calendar';
 
@@ -14,8 +14,10 @@ import { StatisticsDashboard } from '../components/features/dashboard/Statistics
 import { AnkiDashboard } from '../pages/AnkiDashboard';
 import { authService } from '../core/mockBackend';
 import { Tutorial } from '../components/ui/Tutorial';
+import { useAnkiSync } from '../hooks/useAnkiSync';
 
 export function Home() {
+  useAnkiSync();
   const navigate = useNavigate();
   const user = useAppStore(s => s.user);
   const undo = useAppStore(s => s.undo);

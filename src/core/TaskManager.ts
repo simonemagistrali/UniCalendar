@@ -1,5 +1,6 @@
 import type { CalendarEvent, Course, Task } from './types';
 import { v4 as uuidv4 } from 'uuid';
+import { courseNameFromTitle, normalizeCourseName } from './courseNames';
 
 /**
  * TaskManager — Scans past events and generates tasks automatically.
@@ -241,15 +242,18 @@ export class TaskManager {
    * Auto-detect courses from imported events by grouping by title prefix.
    */
   static detectCoursesFromEvents(events: CalendarEvent[], existingCourses: Course[]): Course[] {
-    const existingNames = new Set(existingCourses.map(c => c.name.toLowerCase()));
-    const titleCounts = new Map<string, number>();
+    const existingNames = new Set(existingCourses.map(c => normalizeCourseName(c.name)));
+    const titleCounts = new Map<string, { name: string; count: number }>();
 
     for (const e of events) {
-      if (e.type !== 'lesson') continue;
-      // Use first 3 words as course name
-      const name = e.title.split(/[\s-–]+/).slice(0, 3).join(' ').trim();
-      if (name && !existingNames.has(name.toLowerCase())) {
-        titleCounts.set(name, (titleCounts.get(name) || 0) + 1);
+      if (e.type === 'exam' || e.type === 'sport' || e.type === 'travel' || e.type === 'meal') continue;
+      // Nome completo del corso (senza prefissi tipo "Lezione di" e info accessorie)
+      const name = courseNameFromTitle(e.title);
+      const key = normalizeCourseName(name);
+      if (key && !existingNames.has(key)) {
+        const entry = titleCounts.get(key);
+        if (entry) entry.count++;
+        else titleCounts.set(key, { name, count: 1 });
       }
     }
 
@@ -257,7 +261,7 @@ export class TaskManager {
     let colorIdx = 0;
 
     const newCourses: Course[] = [];
-    for (const [name, count] of titleCounts) {
+    for (const { name, count } of titleCounts.values()) {
       if (count >= 1) { // At least 1 occurrence
         newCourses.push({
           id: uuidv4(),

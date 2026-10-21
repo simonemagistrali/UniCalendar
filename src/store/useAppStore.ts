@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord, AppUser, DayStudyHours } from '../core/types';
+import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord, AppUser, DayStudyHours, AnkiDaySnapshot } from '../core/types';
 import { saveState, loadState } from '../core/persistence';
 import { TaskManager } from '../core/TaskManager';
 import { PriorityEngine } from '../core/PriorityEngine';
@@ -8,6 +8,8 @@ import { TravelManager } from '../core/TravelManager';
 import { MealManager } from '../core/MealManager';
 import { FutureProjectionEngine } from '../core/FutureProjectionEngine';
 import { persistState, loadFromCloud, subscribeToCloud } from '../core/syncManager';
+import { repairCourseNames } from '../core/courseNames';
+import { mergeAnkiHistory, unionAnkiHistory, isSameSnapshot } from '../core/ankiStats';
 
 /* ─── Default per-day study hours ─── */
 function defaultDailyHours(): Record<number, DayStudyHours> {
@@ -67,8 +69,7 @@ interface AppState {
   preferences: UserPreferences;
   studySessions: StudySession[];
   performanceHistory: PerformanceRecord[];
-
-  // User Actions
+  ankiHistory: AnkiDaySnapshot[];
   setUser: (user: AppUser | null) => void;
   initializeUser: (user: AppUser) => Promise<void>;
   
@@ -104,6 +105,9 @@ interface AppState {
   
   // Preferences
   updatePreferences: (prefs: Partial<UserPreferences>) => void;
+
+  // Anki
+  recordAnkiSync: (today: AnkiDaySnapshot, reviewsByDay: Record<string, number>) => void;
   
   // Bulk
   setEvents: (events: CalendarEvent[]) => void;
@@ -127,7 +131,19 @@ function persist(state: AppState) {
     preferences: state.preferences,
     performanceHistory: state.performanceHistory,
     studySessions: state.studySessions,
+    ankiHistory: state.ankiHistory,
   }, state.user?.id || null);
+}
+
+/* ─── Course name repair (migrazione nomi corso troncati) ─── */
+function withRepairedCourses<T extends { courses: Course[]; events: CalendarEvent[]; tasks: Task[]; performanceHistory: PerformanceRecord[] }>(data: T): { data: T; changed: boolean } {
+  const result = repairCourseNames(data);
+  if (!result.changed) return { data, changed: false };
+  console.log('[Courses] Nomi dei corsi riparati');
+  return {
+    data: { ...data, courses: result.courses, events: result.events, tasks: result.tasks, performanceHistory: result.performanceHistory },
+    changed: true,
+  };
 }
 
 /* ─── Deduplicate Tasks Helper ─── */
@@ -184,14 +200,25 @@ function deduplicateEventsList(events: CalendarEvent[]): CalendarEvent[] {
 /* ─── Load initial state ─── */
 const saved = loadState();
 
-export const useAppStore = create<AppState>((set, get) => ({
-  user: null,
+const initialRepair = withRepairedCourses({
   events: deduplicateEventsList((saved?.events as CalendarEvent[]) || []),
   tasks: deduplicateTasks((saved?.tasks as Task[]) || []),
   courses: (saved?.courses as Course[]) || [],
+  performanceHistory: (saved?.performanceHistory as PerformanceRecord[]) || [],
+});
+if (initialRepair.changed && saved) {
+  saveState({ ...saved, ...initialRepair.data });
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
+  user: null,
+  events: initialRepair.data.events,
+  tasks: initialRepair.data.tasks,
+  courses: initialRepair.data.courses,
   preferences: mergePreferences(saved?.preferences),
   studySessions: (saved?.studySessions as StudySession[]) || [],
-  performanceHistory: (saved?.performanceHistory as PerformanceRecord[]) || [],
+  performanceHistory: initialRepair.data.performanceHistory,
+  ankiHistory: (saved?.ankiHistory as AnkiDaySnapshot[]) || [],
   pastStates: [],
 
   selectedDailyGoalType: null,
@@ -211,16 +238,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.log("[Sync] Dati ricevuti dal cloud:", cloudData);
       
       const updateFromCloud = (data: any) => {
+        let needsCloudWrite = false;
         set((s) => {
-          const next = {
-            ...s,
+          const repaired = withRepairedCourses({
             events: deduplicateEventsList(data.events || s.events),
             tasks: deduplicateTasks(data.tasks || s.tasks),
             courses: data.courses || s.courses,
+            performanceHistory: data.performanceHistory || s.performanceHistory,
+          });
+          const ankiHistory = unionAnkiHistory(s.ankiHistory, data.ankiHistory || []);
+          const next = {
+            ...s,
+            ...repaired.data,
             preferences: mergePreferences(data.preferences || s.preferences),
             studySessions: data.studySessions || s.studySessions,
-            performanceHistory: data.performanceHistory || s.performanceHistory,
+            ankiHistory,
           };
+          // Riscrivi sul cloud solo se abbiamo riparato i corsi o se il locale
+          // aveva giorni Anki che il cloud non conosceva ancora
+          needsCloudWrite = repaired.changed || ankiHistory.length !== (data.ankiHistory || []).length;
           
           // Salva solo in cache locale: NON ri-caricare sul cloud, altrimenti si
           // cancellerebbe un eventuale salvataggio locale in attesa (debounce).
@@ -231,9 +267,11 @@ export const useAppStore = create<AppState>((set, get) => ({
             preferences: next.preferences,
             performanceHistory: next.performanceHistory,
             studySessions: next.studySessions,
+            ankiHistory: next.ankiHistory,
           });
           return next;
         });
+        if (needsCloudWrite) persist(get());
       };
 
       if (cloudData) {
@@ -444,6 +482,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   updatePreferences: (prefs) => {
     set((s) => {
       const next = { ...s, preferences: { ...s.preferences, ...prefs } };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  // ── Anki ──
+  recordAnkiSync: (today, reviewsByDay) => {
+    set((s) => {
+      const previous = s.ankiHistory.find(h => h.date === today.date);
+      const merged = mergeAnkiHistory(s.ankiHistory, today, reviewsByDay);
+      const nothingNew = isSameSnapshot(previous, merged.find(h => h.date === today.date)!)
+        && merged.length === s.ankiHistory.length;
+      if (nothingNew) return s; // Evita scritture inutili su cloud
+      const next = { ...s, ankiHistory: merged };
       persist(next as AppState);
       return next;
     });

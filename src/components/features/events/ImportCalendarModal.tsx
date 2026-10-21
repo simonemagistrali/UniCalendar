@@ -4,6 +4,7 @@ import { Button } from '../../ui/Button';
 import { useAppStore } from '../../../store/useAppStore';
 import { parseICS, parseCSV, fetchCalendarFromURL } from '../../../core/ICSParser';
 import { TaskManager } from '../../../core/TaskManager';
+import { findCourseForTitle } from '../../../core/courseNames';
 import { Upload, Link, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface ImportCalendarModalProps {
@@ -37,10 +38,9 @@ export function ImportCalendarModal({ isOpen, onClose }: ImportCalendarModalProp
     // Map detected courses to events
     const allCourses = [...courses, ...detectedCourses];
     const enriched = events.map(e => {
-      if (e.type === 'lesson' && !e.courseId) {
-        const titlePrefix = e.title.split(/[\s-–]+/).slice(0, 3).join(' ').trim().toLowerCase();
-        const match = allCourses.find(c => c.name.toLowerCase() === titlePrefix);
-        if (match) return { ...e, courseId: match.id };
+      if ((e.type === 'lesson' || e.type === 'generic' || !e.type) && !e.courseId) {
+        const match = findCourseForTitle(e.title, allCourses);
+        if (match) return { ...e, courseId: match.id, type: 'lesson' as const };
       }
       return e;
     });
