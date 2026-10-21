@@ -46,14 +46,14 @@ const LEADING_INSTRUCTOR = /^\s*(?:prof\.?|prof\.ssa|docente|dott\.?|dott\.ssa|i
 const LEADING_ACADEMIC_YEAR = /^\s*(?:(?:1|2|i|ii)[°^]?\s*(?:semestre|sem\.?|anno|periodo)|a\.?a\.?\s*\d{2,4}[/-]\d{2,4})\s*[-–—|:]\s*/i;
 
 /** Segmenti che indicano chiaramente metadati/informazioni accessorie (aula, docente, canale, modalità, ecc.) */
-const ACCESSORY_SEGMENT = /^(?:aula|room|edificio|sede|plesso|piano|prof\.?|prof\.ssa|docente|dott\.?|dott\.ssa|ing\.?|canale|gruppo|sez\.?|sezione|telematico|online|in presenza|presenza|remoto|zoom|teams|meet|cfu|crediti|semestre|anno|lezione|lez\.?|lecture|lesson|esercitazione|eserc\.?|laboratorio|lab\.?|teoria|n\.?\s*\d+|#\d+)\b/i;
+const ACCESSORY_SEGMENT = /^(?:aula|room|edificio|sede|plesso|piano|prof\.?|prof\.ssa|docente|dott\.?|dott\.ssa|ing\.?|canale|gruppo|sez\.?|sezione|student\s+group|group|telematico|online|in presenza|presenza|remoto|zoom|teams|meet|cfu|crediti|semestre|anno|lezione|lez\.?|lecture|lesson|esercitazione|eserc\.?|exe\b|exer\b|exercises?|laboratorio|lab\.?|teoria|n\.?\s*\d+|#\d+)\b/i;
 
 /** Code accessorie da ripulire in fondo al nome */
 const TRAILING_NOISE = [
   /[\s,]+(?:aula|room|edificio|sede|plesso|prof\.?|prof\.ssa|docente|dott\.?|ing\.?)\b.*$/i,
-  /[\s,]+(?:canale|gruppo|sez\.?|sezione)\s+[A-Za-z0-9]+$/i,
-  /[\s,]+(?:lezione|lez\.?|lecture|lesson)\s*(?:n\.?\s*)?#?\d*\s*$/i,
-  /[\s,]+(?:esercitazione|esercitazioni|teoria|laboratorio|lab\.?)\s*$/i,
+  /[\s,]+(?:canale|gruppo|sez\.?|sezione|student\s+group|group)\b.*$/i,
+  /[\s,]+(?:lezione|lez\.?|lecture|lesson)\b.*$/i,
+  /[\s,]+(?:esercitazione|esercitazioni|teoria|laboratorio|lab\.?|exe|exer|exercises?)\b.*$/i,
   /[\s,]+(?:cfu|crediti)\s*\d+\s*$/i,
   /[\s,]+(?:n\.?\s*|#)\d+\s*$/i,
   /[\s:,.\-–—|/]+$/,
@@ -125,6 +125,9 @@ export function cleanCourseName(title: string): string {
   // 1. Rimuovi prefissi iniziali (didattica, tipo lezione, SSD, codici numerici, docente iniziale)
   cur = stripPrefixes(cur);
 
+  // 1.5 Rimuovi suffissi accessori di esercitazione, laboratori e gruppi studenti anche se non preceduti da trattino
+  cur = cur.replace(/\s+(?:EXE|EXER|EXERCISES?|ESERCITAZIONE|ESERCITAZIONI|LAB|LABORATORIO|STUDENT\s+GROUP|GROUP)\b.*$/i, '').trim();
+
   // 2. Rimuovi informazioni accessorie tra parentesi tonde o quadre
   cur = cur.replace(/\s*\((?:prof\.?|prof\.ssa|docente|aula|room|edificio|canale|gruppo|sez\.?|sezione|sede|ore|cfu|crediti|teoria|esercitazione|lab\.?|laboratorio|online|remoto|presenza|[a-z]-[a-z]|\d+)[^)]*\)/gi, '');
   cur = cur.replace(/\s*\[(?:prof\.?|prof\.ssa|docente|aula|room|edificio|canale|gruppo|sez\.?|sezione|sede|ore|cfu|crediti|teoria|esercitazione|lab\.?|laboratorio|online|remoto|presenza|[a-z]-[a-z]|\d+)[^\]]*\]/gi, '');
@@ -143,7 +146,7 @@ export function cleanCourseName(title: string): string {
     // Se incontriamo un segmento accessorio, interrompi
     if (ACCESSORY_SEGMENT.test(seg)) break;
 
-    const cleaned = seg.replace(/[\s,]+(?:aula|room|edificio|sede|prof\.?|prof\.ssa|docente|dott\.?|ing\.?|canale|gruppo)\b.*$/i, '').trim();
+    const cleaned = seg.replace(/[\s,]+(?:aula|room|edificio|sede|prof\.?|prof\.ssa|docente|dott\.?|ing\.?|canale|gruppo|student\s+group|group|exe|exer|exercises?)\b.*$/i, '').trim();
     if (cleaned) keptSegments.push(cleaned);
     if (cleaned !== seg) break;
   }
@@ -361,6 +364,12 @@ export function repairCourseNames(input: RepairInput): RepairResult {
 
   // 2. Ripara il nome di ciascun corso basandosi ESCLUSIVAMENTE sugli eventi del calendario
   for (const course of courses) {
+    const cleanedInitial = cleanCourseName(course.name);
+    if (cleanedInitial && cleanedInitial !== course.name) {
+      course.name = cleanedInitial;
+      changed = true;
+    }
+
     const courseNorm = normalizeCourseName(course.name);
     const wordCount = course.name.trim().split(/\s+/).length;
     const isBogusName = BOGUS_COURSE_NAMES.has(courseNorm) || /^\d+$/.test(courseNorm);
