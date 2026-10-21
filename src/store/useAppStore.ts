@@ -252,6 +252,7 @@ function deduplicateEventsList(events: CalendarEvent[]): CalendarEvent[] {
 }
 
 /* ─── Load initial state ─── */
+const saved = loadState();
 const savedEvents = deduplicateEventsList((saved?.events as CalendarEvent[]) || []);
 const initialRepair = withRepairedCourses({
   events: savedEvents,
