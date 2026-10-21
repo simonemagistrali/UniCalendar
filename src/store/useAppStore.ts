@@ -119,6 +119,9 @@ interface AppState {
   // Sync
   syncAndSchedule: () => void;
 
+  // Cleanup
+  cleanupDuplicates: () => { removedTasks: number; removedEvents: number };
+
   // History
   pastStates: string[];
   saveSnapshot: () => void;
@@ -150,21 +153,54 @@ function withRepairedCourses<T extends { courses: Course[]; events: CalendarEven
 }
 
 /* ─── Deduplicate Tasks Helper ─── */
-function deduplicateTasks(tasks: Task[]): Task[] {
-  const uniqueMap = new Map<string, Task>();
+function deduplicateTasks(tasks: Task[], events: CalendarEvent[] = []): Task[] {
+  const eventsMap = new Map<string, CalendarEvent>(events.map(e => [e.id, e]));
+  const groupMap = new Map<string, Task>();
+
   for (const t of tasks) {
-    const key = t.id;
-    if (uniqueMap.has(key)) {
-      const existing = uniqueMap.get(key)!;
+    // Determine category
+    const titleLower = t.title.toLowerCase();
+    let category = 'other';
+    if (t.isProjectTask) category = 'project';
+    else if (titleLower.includes('seguire') || titleLower.includes('recuperare')) category = 'follow';
+    else if (titleLower.includes('appunti') || titleLower.includes('ripasso') || titleLower.includes('notes')) category = 'notes';
+    else if (titleLower.includes('eserciz')) category = 'exercise';
+
+    // Extract target date from title (DD/MM/YYYY) or related event
+    const dateMatch = t.title.match(/\((\d{1,2}\/\d{1,2}(?:\/\d{4})?)\)/);
+    let dateKey = dateMatch ? dateMatch[1] : '';
+    if (!dateKey && t.relatedEventId && eventsMap.has(t.relatedEventId)) {
+      dateKey = new Date(eventsMap.get(t.relatedEventId)!.startTime).toLocaleDateString('it-IT');
+    }
+    if (!dateKey) {
+      dateKey = t.id; // Fallback: preserve unique task if date cannot be resolved
+    }
+
+    const key = `${t.courseId || 'nocourse'}::${category}::${dateKey}`;
+
+    if (groupMap.has(key)) {
+      const existing = groupMap.get(key)!;
       // Prefer keeping 'done' tasks over 'todo'
       if (existing.status !== 'done' && t.status === 'done') {
-        uniqueMap.set(key, t);
+        if (!t.description && existing.description) {
+          t.description = existing.description;
+        }
+        groupMap.set(key, t);
+      } else {
+        // Keep existing, merge description if candidate has more info
+        if (!existing.description && t.description) {
+          existing.description = t.description;
+        }
+        if (!existing.relatedEventId && t.relatedEventId) {
+          existing.relatedEventId = t.relatedEventId;
+        }
       }
     } else {
-      uniqueMap.set(key, t);
+      groupMap.set(key, t);
     }
   }
-  return Array.from(uniqueMap.values());
+
+  return Array.from(groupMap.values());
 }
 
 /* ─── Deduplicate Events Helper ─── */
@@ -201,11 +237,10 @@ function deduplicateEventsList(events: CalendarEvent[]): CalendarEvent[] {
 }
 
 /* ─── Load initial state ─── */
-const saved = loadState();
-
+const savedEvents = deduplicateEventsList((saved?.events as CalendarEvent[]) || []);
 const initialRepair = withRepairedCourses({
-  events: deduplicateEventsList((saved?.events as CalendarEvent[]) || []),
-  tasks: deduplicateTasks((saved?.tasks as Task[]) || []),
+  events: savedEvents,
+  tasks: deduplicateTasks((saved?.tasks as Task[]) || [], savedEvents),
   courses: (saved?.courses as Course[]) || [],
   performanceHistory: (saved?.performanceHistory as PerformanceRecord[]) || [],
 });
@@ -471,13 +506,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       tasks: s.tasks,
       performanceHistory: s.performanceHistory,
     });
-    if (result.changed) {
-      console.log(`[repairCourses] ${result.repairedCount} corsi riparati`);
+
+    const deduplicatedTasks = deduplicateTasks(result.tasks, result.events);
+    const tasksChanged = deduplicatedTasks.length !== s.tasks.length;
+
+    if (result.changed || tasksChanged) {
       const next = {
         ...s,
         courses: result.courses,
         events: result.events,
-        tasks: result.tasks,
+        tasks: deduplicatedTasks,
         performanceHistory: result.performanceHistory,
       };
       set(next);
@@ -492,7 +530,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       persist(next as AppState);
     }
-    return { changed: result.changed, count: result.repairedCount };
+    return { changed: result.changed || tasksChanged, count: result.repairedCount };
   },
 
   // ── Sessions ──
@@ -596,5 +634,37 @@ export const useAppStore = create<AppState>((set, get) => ({
       persist(next as AppState);
       return next;
     });
+  },
+
+  // ── Cleanup Duplicates ──
+  cleanupDuplicates: () => {
+    get().saveSnapshot();
+    const state = get();
+    const cleanedTasks = deduplicateTasks(state.tasks, state.events);
+    const cleanedEvents = deduplicateEventsList(state.events);
+    const removedTasks = state.tasks.length - cleanedTasks.length;
+    const removedEvents = state.events.length - cleanedEvents.length;
+
+    if (removedTasks > 0 || removedEvents > 0) {
+      set((s) => {
+        const next = {
+          ...s,
+          tasks: cleanedTasks,
+          events: cleanedEvents,
+        };
+        saveState({
+          events: next.events,
+          tasks: next.tasks,
+          courses: next.courses,
+          preferences: next.preferences,
+          performanceHistory: next.performanceHistory,
+          studySessions: next.studySessions,
+          ankiHistory: next.ankiHistory,
+        });
+        persist(next as AppState);
+        return next;
+      });
+    }
+    return { removedTasks, removedEvents };
   },
 }));

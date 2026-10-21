@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Clock, BookOpen, Zap, Eye } from 'lucide-react';
+import { CheckCircle, Clock, BookOpen, Zap, Eye, Sparkles } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { PriorityEngine } from '../../../core/PriorityEngine';
 import { TaskManager } from '../../../core/TaskManager';
@@ -20,6 +20,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
   const setEvents = useAppStore(s => s.setEvents);
   const setStudySessions = useAppStore(s => s.setStudySessions);
   const setTasks = useAppStore(s => s.setTasks);
+  const cleanupDuplicates = useAppStore(s => s.cleanupDuplicates);
 
   const selectedDailyGoalValue = useAppStore(s => s.selectedDailyGoalValue);
 
@@ -36,6 +37,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [courseFilter, setCourseFilter] = useState<string>('ALL');
   const [sortDoneBy, setSortDoneBy] = useState<'completedAt' | 'createdAt'>('completedAt');
+  const [cleanupMsg, setCleanupMsg] = useState('');
 
   const TASK_TYPES = {
     ALL: 'Tutte le tipologie',
@@ -239,11 +241,43 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
               ))}
             </select>
 
+            <button
+              className="task-action-btn"
+              onClick={() => {
+                const res = cleanupDuplicates();
+                if (res.removedTasks > 0 || res.removedEvents > 0) {
+                  setCleanupMsg(`✓ Rimossi ${res.removedTasks} duplicati!`);
+                  setTimeout(() => setCleanupMsg(''), 3500);
+                } else {
+                  setCleanupMsg('Nessun duplicato');
+                  setTimeout(() => setCleanupMsg(''), 2000);
+                }
+              }}
+              title="Rimuove automaticamente i task o eventi duplicati per la stessa data"
+              style={{
+                marginLeft: 'auto',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '0.8rem',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                background: 'rgba(168, 85, 247, 0.1)',
+                border: '1px solid rgba(168, 85, 247, 0.25)',
+                color: '#a855f7',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Sparkles size={14} />
+              <span>{cleanupMsg || 'Ripulisci duplicati'}</span>
+            </button>
+
             {filter === 'done' && (
               <button 
                 className="task-action-btn" 
                 onClick={() => setSortDoneBy(s => s === 'completedAt' ? 'createdAt' : 'completedAt')}
-                style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', padding: '4px 12px' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', padding: '4px 12px' }}
               >
                 <Clock size={14} />
                 {sortDoneBy === 'completedAt' ? 'Ordina: Data Completamento' : 'Ordina: Data Creazione'}
