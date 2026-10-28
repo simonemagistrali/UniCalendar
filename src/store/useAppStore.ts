@@ -557,28 +557,98 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   completeTask: (id, actualMinutes, completionMode = 'normal') => {
     get().saveSnapshot();
-    const state = get();
-    const task = state.tasks.find(t => t.id === id);
-    if (!task) return;
+    set((s) => {
+      const task = s.tasks.find(t => t.id === id);
+      if (!task) return s;
 
-    const now = new Date().toISOString();
+      const nowDate = new Date();
+      const now = nowDate.toISOString();
+      const nowMs = nowDate.getTime();
 
-    // Record performance
-    if (task.courseId) {
-      state.addPerformanceRecord({
-        courseId: task.courseId,
-        taskId: id,
-        estimatedMinutes: task.estimatedDuration,
-        actualMinutes,
-        completedAt: now,
+      // Rilevamento automatico dei rinvii (Implicit Skip Detection):
+      // Se l'utente completa un task più in basso nella lista ignorando i task
+      // proposti in cima (negli obiettivi di oggi o con sessioni già passate oggi),
+      // incrementa automaticamente `postponedCount` sui task saltati.
+      const coursesMap = new Map(s.courses.map(c => [c.id, c]));
+      const activeTasks = s.tasks.filter(t => t.status !== 'done' && !t.isPhantom);
+      const sortedActive = PriorityEngine.sortTasks(
+        activeTasks,
+        coursesMap,
+        s.events,
+        s.preferences,
+        s.performanceHistory
+      );
+
+      const completedIdx = sortedActive.findIndex(t => t.id === id);
+      const skippedIds = new Set<string>();
+
+      if (completedIdx > 0) {
+        const doneIds = new Set(s.tasks.filter(t => t.status === 'done').map(t => t.id));
+        const completedToday = s.tasks.filter(
+          t => t.status === 'done' && t.completedAt && new Date(t.completedAt).toDateString() === nowDate.toDateString()
+        ).length;
+        const effectiveGoal = Math.max(1, s.selectedDailyGoalValue ?? s.preferences.dailyTaskGoal ?? 3);
+        const remainingGoalSlots = Math.max(1, effectiveGoal - completedToday);
+
+        const overdueScheduledIds = new Set(
+          s.studySessions
+            .filter(ss => !ss.isBuffer && new Date(ss.endTime).getTime() <= nowMs)
+            .map(ss => ss.taskId)
+        );
+
+        for (let i = 0; i < completedIdx; i++) {
+          const candidate = sortedActive[i];
+          if (candidate.status !== 'todo') continue; // Non penalizzare task già "in_progress"
+          const depsResolved = candidate.dependencies.every(depId => doneIds.has(depId));
+          if (!depsResolved) continue;
+
+          if (i < remainingGoalSlots || overdueScheduledIds.has(candidate.id)) {
+            skippedIds.add(candidate.id);
+          }
+        }
+      }
+
+      const nextTasks = s.tasks.map(t => {
+        if (t.id === id) {
+          return {
+            ...t,
+            status: 'done' as const,
+            actualDuration: actualMinutes,
+            completedAt: now,
+            completionMode,
+            startedAt: undefined,
+            accumulatedTime: 0,
+          };
+        }
+        if (skippedIds.has(t.id)) {
+          return {
+            ...t,
+            postponedCount: (t.postponedCount || 0) + 1,
+          };
+        }
+        return t;
       });
-    }
 
-    state.updateTask(id, {
-      status: 'done',
-      actualDuration: actualMinutes,
-      completedAt: now,
-      completionMode,
+      const nextPerformanceHistory = task.courseId
+        ? [
+            ...s.performanceHistory,
+            {
+              courseId: task.courseId,
+              taskId: id,
+              estimatedMinutes: task.estimatedDuration,
+              actualMinutes,
+              completedAt: now,
+            },
+          ]
+        : s.performanceHistory;
+
+      const next = {
+        ...s,
+        tasks: nextTasks,
+        performanceHistory: nextPerformanceHistory,
+      };
+      persist(next as AppState);
+      return next;
     });
   },
 

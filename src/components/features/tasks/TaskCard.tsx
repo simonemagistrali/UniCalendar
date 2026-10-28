@@ -130,7 +130,6 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
   // ─── Normal Task Rendering ───
   const handleComplete = () => {
     completeTask(task.id, parseInt(actualTime) || task.estimatedDuration, completeMode || 'normal');
-    updateTask(task.id, { startedAt: undefined, accumulatedTime: 0 }); // Clean up
     setCompleteMode(null);
   };
 
@@ -153,10 +152,6 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
     } else {
       setActualTime(task.estimatedDuration.toString());
     }
-  };
-
-  const handlePostpone = () => {
-    updateTask(task.id, { postponedCount: task.postponedCount + 1 });
   };
 
   const handleUncomplete = () => {
@@ -236,7 +231,7 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
                     if (days >= 0 && days <= 21) reasons.push(`Esame tra ${days}g`);
                   }
                 }
-                if (task.postponedCount > 0) reasons.push(`Rimandato ${task.postponedCount}×`);
+                if (task.postponedCount > 0) reasons.push(`Saltata ${task.postponedCount}×`);
                 const ageDays = Math.floor((nowMs - new Date(task.createdAt).getTime()) / 86400000);
                 if (ageDays >= 5 && reasons.length < 2) reasons.push(`Da ${ageDays}g`);
                 return reasons.length > 0 ? reasons.slice(0, 2).join(' · ') : `P: ${task.priorityScore}`;
@@ -302,9 +297,9 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
           </div>
         )}
         {task.postponedCount > 0 && !isDone && (
-          <div className="task-meta-item task-postponed">
+          <div className="task-meta-item task-postponed" title="Attività in cima alla lista saltata per farne altre">
             <SkipForward size={12} />
-            <span>Rimandato {task.postponedCount}x</span>
+            <span>Saltata {task.postponedCount}x</span>
           </div>
         )}
         {course && <span className="task-course-name">{course.name}</span>}
@@ -345,9 +340,6 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
                   <Check size={14} /> Concludi
                 </button>
               )}
-              <button className="task-action-btn task-postpone-btn" onClick={handlePostpone}>
-                <SkipForward size={14} /> Rimanda
-              </button>
               <button 
                 className="task-action-btn" 
                 onClick={handleDelete}
