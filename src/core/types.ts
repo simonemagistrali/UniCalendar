@@ -98,6 +98,9 @@ export interface Task {
   pauseCount?: number; // Quante volte il task è stato messo in pausa (indice di frammentazione)
   inferredStartTime?: string; // Orario di inizio ricostruito (4 livelli di confidenza)
   timeConfidence?: number; // Peso di affidabilità oraria w in [0, 1]
+  durationConfidence?: number; // Peso di affidabilità della durata in [0, 1] (0 se "Non ricordo")
+  wasDistracted?: boolean; // True se lo sforamento è dovuto a distrazione e non a difficoltà del corso
+  isMultiDay?: boolean; // True se svolta in più giorni/sessioni (spalma il carico giornaliero)
   wasScheduledSlotHit?: boolean; // True se completato nel giorno/fascia pianificati dallo scheduler
 }
 
@@ -120,6 +123,9 @@ export interface PerformanceRecord {
   taskKind?: string;
   inferredStartTime?: string;
   timeConfidence?: number;
+  durationConfidence?: number;
+  wasDistracted?: boolean;
+  isMultiDay?: boolean;
   pauseCount?: number;
 }
 

@@ -101,6 +101,8 @@ export interface ReconstructedTimeWindow {
   inferredStartTime: string;
   completedAt: string;
   timeConfidence: number; // w in [0, 1]
+  durationConfidence: number; // c_d in [0, 1]
+  isMultiDay: boolean;
   tier: 'attended_event' | 'explicit_timer' | 'single_backcalc' | 'batch_checkoff';
   wasScheduledSlotHit: boolean;
 }
@@ -135,11 +137,30 @@ export class HabitAnalysisEngine {
     completedAtIso: string,
     allTasks: Task[],
     events: CalendarEvent[],
-    studySessions: StudySession[]
+    studySessions: StudySession[],
+    opts?: { durationConfidence?: number; wasDistracted?: boolean; isMultiDay?: boolean }
   ): ReconstructedTimeWindow {
     const completedMs = new Date(completedAtIso).getTime();
     const safeMinutes = Math.max(1, actualMinutes || task.estimatedDuration || 30);
     const durationMs = safeMinutes * 60000;
+
+    // Anticorpo 1: Calcolo confidenza della durata (Default-Click Decay & Multi-Day)
+    const createdMs = new Date(task.createdAt).getTime();
+    const ageDays = Math.max(0, (completedMs - createdMs) / DAY_MS);
+    const isUnchangedDefault = safeMinutes === task.estimatedDuration && !task.startedAt && !(task.accumulatedTime && task.accumulatedTime > 0);
+
+    let durationConfidence = opts?.durationConfidence ?? 1.0;
+    if (opts?.durationConfidence === undefined) {
+      if (ageDays > 4 && isUnchangedDefault && completionMode !== 'attended') {
+        // L'utente ha chiuso un task vecchio di >4 giorni senza timer e lasciando il valore precompilato:
+        // probabilmente non ricordava la durata esatta ("Conferma pigro")
+        durationConfidence = 0.2;
+      }
+    }
+
+    const isMultiDay =
+      opts?.isMultiDay ??
+      (durationConfidence === 0 || ((task.pauseCount || 0) >= 2 && ageDays >= 1.5));
 
     // Controlla se questo task aveva una sessione pianificata oggi
     const todayStr = new Date(completedMs).toDateString();
@@ -147,6 +168,19 @@ export class HabitAnalysisEngine {
       s => s.taskId === task.id && !s.isBuffer && new Date(s.startTime).toDateString() === todayStr
     );
     const wasScheduledSlotHit = plannedToday.length > 0;
+
+    // Se è stato svolto in più giorni o l'utente ha cliccato "Non ricordo", azzera confidenza oraria
+    if (isMultiDay || durationConfidence === 0) {
+      return {
+        inferredStartTime: new Date(completedMs - durationMs).toISOString(),
+        completedAt: completedAtIso,
+        timeConfidence: 0,
+        durationConfidence,
+        isMultiDay: true,
+        tier: 'batch_checkoff',
+        wasScheduledSlotHit,
+      };
+    }
 
     // LIVELLO 1: Lezione segnata come "Seguita" (attended) -> usa l'orario reale della lezione!
     if (completionMode === 'attended' && task.relatedEventId) {
@@ -156,6 +190,8 @@ export class HabitAnalysisEngine {
           inferredStartTime: ev.startTime,
           completedAt: ev.endTime,
           timeConfidence: 1.0,
+          durationConfidence,
+          isMultiDay: false,
           tier: 'attended_event',
           wasScheduledSlotHit: true,
         };
@@ -179,6 +215,8 @@ export class HabitAnalysisEngine {
           inferredStartTime: plannedToday[0].startTime,
           completedAt: completedAtIso,
           timeConfidence: 0.35,
+          durationConfidence,
+          isMultiDay: false,
           tier: 'batch_checkoff',
           wasScheduledSlotHit: true,
         };
@@ -186,7 +224,9 @@ export class HabitAnalysisEngine {
       return {
         inferredStartTime: new Date(completedMs - durationMs).toISOString(),
         completedAt: completedAtIso,
-        timeConfidence: 0.1, // Peso quasi nullo sulla curva oraria, 100% valido per durate/corsi
+        timeConfidence: 0.1, // Peso quasi nullo sulla curva oraria, valido per durate/corsi secondo durationConfidence
+        durationConfidence,
+        isMultiDay: false,
         tier: 'batch_checkoff',
         wasScheduledSlotHit,
       };
@@ -202,6 +242,8 @@ export class HabitAnalysisEngine {
           inferredStartTime: task.startedAt,
           completedAt: completedAtIso,
           timeConfidence: 1.0,
+          durationConfidence,
+          isMultiDay: false,
           tier: 'explicit_timer',
           wasScheduledSlotHit,
         };
@@ -214,6 +256,8 @@ export class HabitAnalysisEngine {
       inferredStartTime: new Date(backCalcStartMs).toISOString(),
       completedAt: completedAtIso,
       timeConfidence: 0.85,
+      durationConfidence,
+      isMultiDay: false,
       tier: 'single_backcalc',
       wasScheduledSlotHit,
     };
@@ -235,20 +279,43 @@ export class HabitAnalysisEngine {
     history: PerformanceRecord[],
     events: CalendarEvent[] = []
   ): number {
+    // Anticorpo 1 & 2: Escludi i task in cui l'utente ha dichiarato "Non ricordo" (durationConfidence === 0)
+    // o "Mi sono distratto" (wasDistracted === true) per non falsare la difficoltà/durata del corso!
     const doneTasks = tasks.filter(
-      t => t.status === 'done' && !t.isPhantom && t.actualDuration && t.actualDuration > 0 && t.estimatedDuration > 0
+      t =>
+        t.status === 'done' &&
+        !t.isPhantom &&
+        t.actualDuration &&
+        t.actualDuration > 0 &&
+        t.estimatedDuration > 0 &&
+        !t.wasDistracted &&
+        (t.durationConfidence === undefined || t.durationConfidence > 0.05)
     );
 
-    // Calcola il rapporto reale/nominale di un task
-    const getRatio = (t: Task): number => {
+    // Calcola il rapporto reale/nominale di un task e il suo peso di confidenza
+    const getWeightedObservation = (t: Task): { ratio: number; weight: number } => {
+      let weight = t.durationConfidence ?? 1.0;
+      if (t.durationConfidence === undefined && t.completedAt) {
+        const ageDays = (new Date(t.completedAt).getTime() - new Date(t.createdAt).getTime()) / DAY_MS;
+        if (ageDays > 4 && t.actualDuration === t.estimatedDuration && !t.startedAt) {
+          weight = 0.2; // Default-click decay automatico per task storici
+        }
+      }
+
       if (getTaskKind(t) === 'FOLLOW_LESSON' && t.relatedEventId) {
         const ev = events.find(e => e.id === t.relatedEventId);
         if (ev) {
           const nominal = Math.max(15, Math.round((new Date(ev.endTime).getTime() - new Date(ev.startTime).getTime()) / 60000));
-          return Math.max(0.4, Math.min(3.0, (t.actualDuration || nominal) / nominal));
+          return {
+            ratio: Math.max(0.4, Math.min(3.0, (t.actualDuration || nominal) / nominal)),
+            weight,
+          };
         }
       }
-      return Math.max(0.4, Math.min(3.0, (t.actualDuration || t.estimatedDuration) / t.estimatedDuration));
+      return {
+        ratio: Math.max(0.4, Math.min(3.0, (t.actualDuration || t.estimatedDuration) / t.estimatedDuration)),
+        weight,
+      };
     };
 
     // Ordina cronologicamente per EWMA
@@ -256,41 +323,61 @@ export class HabitAnalysisEngine {
       (a, b) => new Date(a.completedAt || a.createdAt).getTime() - new Date(b.completedAt || b.createdAt).getTime()
     );
 
-    const computeEwma = (ratios: number[], alpha = 0.35): number => {
-      if (ratios.length === 0) return 1.0;
-      let ewma = ratios[0];
-      for (let i = 1; i < ratios.length; i++) {
-        ewma = alpha * ratios[i] + (1 - alpha) * ewma;
+    // Anticorpo 2: EWMA pesata per confidenza con filtro Huber / Winsorized anti-outlier
+    const computeRobustWeightedEwma = (obs: { ratio: number; weight: number }[], baseAlpha = 0.35): number => {
+      if (obs.length === 0) return 1.0;
+      let ewma = obs[0].ratio;
+      const HUBER_DELTA = 0.6; // Soglia oltre cui un singolo picco anomalo viene smorzato
+      for (let i = 1; i < obs.length; i++) {
+        const { ratio, weight } = obs[i];
+        const diff = ratio - ewma;
+        // Huber soft-clipping: se una singola sessione sfora in modo anomalo, ammortizza l'eccesso
+        const robustRatio =
+          Math.abs(diff) > HUBER_DELTA
+            ? ewma + Math.sign(diff) * (HUBER_DELTA + (Math.abs(diff) - HUBER_DELTA) * 0.35)
+            : ratio;
+        const effectiveAlpha = Math.max(0.05, Math.min(0.6, baseAlpha * weight));
+        ewma = effectiveAlpha * robustRatio + (1 - effectiveAlpha) * ewma;
       }
       return ewma;
     };
 
     // Prior globale per questo TaskKind
-    const globalKindRatios = sortedDone.filter(t => getTaskKind(t) === kind).map(getRatio);
-    const globalPrior = globalKindRatios.length > 0 ? computeEwma(globalKindRatios, 0.25) : 1.0;
+    const globalKindObs = sortedDone.filter(t => getTaskKind(t) === kind).map(getWeightedObservation);
+    const globalPrior = globalKindObs.length > 0 ? computeRobustWeightedEwma(globalKindObs, 0.25) : 1.0;
 
     if (!courseId) return globalPrior;
 
     // Osservazioni specifiche per (courseId, kind)
-    const courseKindRatios = sortedDone
+    const courseKindObs = sortedDone
       .filter(t => t.courseId === courseId && getTaskKind(t) === kind)
-      .map(getRatio);
+      .map(getWeightedObservation);
 
     // Fallback su history del corso se i task sono stati archiviati in semestri chiusi
-    if (courseKindRatios.length === 0) {
-      const courseHist = history.filter(h => h.courseId === courseId && h.estimatedMinutes > 0 && h.actualMinutes > 0);
+    if (courseKindObs.length === 0) {
+      const courseHist = history.filter(
+        h =>
+          h.courseId === courseId &&
+          h.estimatedMinutes > 0 &&
+          h.actualMinutes > 0 &&
+          !h.wasDistracted &&
+          (h.durationConfidence === undefined || h.durationConfidence > 0.05)
+      );
       if (courseHist.length === 0) return globalPrior;
-      const histRatios = courseHist.map(h => Math.max(0.4, Math.min(3.0, h.actualMinutes / h.estimatedMinutes)));
-      const courseEwma = computeEwma(histRatios, 0.3);
-      const n = histRatios.length;
+      const histObs = courseHist.map(h => ({
+        ratio: Math.max(0.4, Math.min(3.0, h.actualMinutes / h.estimatedMinutes)),
+        weight: h.durationConfidence ?? 1.0,
+      }));
+      const courseEwma = computeRobustWeightedEwma(histObs, 0.3);
+      const effectiveN = histObs.reduce((s, o) => s + o.weight, 0);
       const m = 3; // Peso del prior
-      return (n / (n + m)) * courseEwma + (m / (n + m)) * globalPrior;
+      return (effectiveN / (effectiveN + m)) * courseEwma + (m / (effectiveN + m)) * globalPrior;
     }
 
-    const courseKindEwma = computeEwma(courseKindRatios, 0.35);
-    const n = courseKindRatios.length;
+    const courseKindEwma = computeRobustWeightedEwma(courseKindObs, 0.35);
+    const effectiveN = courseKindObs.reduce((s, o) => s + o.weight, 0);
     const m = 3; // Costante di shrinkage Bayesiano
-    const shrunk = (n / (n + m)) * courseKindEwma + (m / (n + m)) * globalPrior;
+    const shrunk = (effectiveN / (effectiveN + m)) * courseKindEwma + (m / (effectiveN + m)) * globalPrior;
 
     return Math.max(0.5, Math.min(2.8, shrunk));
   }
@@ -370,8 +457,8 @@ export class HabitAnalysisEngine {
         confidence = rec.timeConfidence;
       }
 
-      // Ignora le lezioni seguite in aula per la curva di focus dello studio autonomo
-      if (t.completionMode === 'attended') continue;
+      // Ignora le lezioni seguite in aula, i task multi-giorno e quelli con "Non ricordo" per la curva oraria
+      if (t.completionMode === 'attended' || t.isMultiDay || t.durationConfidence === 0) continue;
       if (confidence <= 0.15) continue; // Esclude i Batch Check-off serali dalla statistica oraria!
 
       const startDate = new Date(startIso);
@@ -379,7 +466,11 @@ export class HabitAnalysisEngine {
       const bandId = this.getBandForDate(midDate);
       const entry = acc.get(bandId)!;
 
-      const eff = Math.max(0.5, Math.min(1.5, est / Math.max(1, actual)));
+      // Se l'utente ha segnalato distrazione in quella fascia oraria, registra l'abbassamento di focus nella fascia
+      // (senza aver penalizzato il corso!)
+      const eff = t.wasDistracted
+        ? 0.6
+        : Math.max(0.5, Math.min(1.5, est / Math.max(1, actual)));
       entry.weightedMins += actual * confidence;
       entry.count += 1;
       entry.effWeightedSum += eff * confidence;
@@ -750,6 +841,51 @@ export class HabitAnalysisEngine {
    * 7. SIMULAZIONE MONTE CARLO SCADENZE & RILEVAMENTO BURNOUT / SPORT
    * ═══════════════════════════════════════════════════════════════════════════ */
 
+  /**
+   * Anticorpo 3: Spalmatura Multi-Giorno (Multi-Day Load Spreading).
+   * Se un'attività è stata svolta in più giorni (`isMultiDay`, `durationConfidence === 0` o task lungo chiuso dopo molti giorni),
+   * spalma i minuti su 3 giorni invece di concentrarli tutti sul giorno del clic, evitando falsi picchi di Burnout.
+   */
+  private static buildSpreadDailyMinutesMap(tasks: Task[], nowMs: number, daysBack: number = 21): Map<string, number> {
+    const dailyMinutesMap = new Map<string, number>();
+    for (let i = 0; i <= daysBack; i++) {
+      const dKey = new Date(nowMs - i * DAY_MS).toLocaleDateString('sv-SE');
+      dailyMinutesMap.set(dKey, 0);
+    }
+
+    const doneTasks = tasks.filter(t => t.status === 'done' && !t.isPhantom && t.completedAt);
+    for (const t of doneTasks) {
+      const compMs = new Date(t.completedAt!).getTime();
+      const createdMs = new Date(t.createdAt).getTime();
+      const ageDays = Math.max(0, (compMs - createdMs) / DAY_MS);
+      const mins = t.actualDuration || t.estimatedDuration || 0;
+
+      const shouldSpread =
+        t.isMultiDay ||
+        t.durationConfidence === 0 ||
+        ((t.pauseCount || 0) >= 2 && ageDays >= 1.5) ||
+        (mins >= 110 && ageDays >= 3 && !t.startedAt);
+
+      if (shouldSpread && ageDays >= 1) {
+        const span = Math.min(3, Math.max(2, Math.floor(ageDays)));
+        const chunk = Math.round(mins / span);
+        for (let k = 0; k < span; k++) {
+          const dKey = new Date(compMs - k * DAY_MS).toLocaleDateString('sv-SE');
+          if (dailyMinutesMap.has(dKey)) {
+            dailyMinutesMap.set(dKey, (dailyMinutesMap.get(dKey) || 0) + chunk);
+          }
+        }
+      } else {
+        const dKey = new Date(compMs).toLocaleDateString('sv-SE');
+        if (dailyMinutesMap.has(dKey)) {
+          dailyMinutesMap.set(dKey, (dailyMinutesMap.get(dKey) || 0) + mins);
+        }
+      }
+    }
+
+    return dailyMinutesMap;
+  }
+
   static simulateMonteCarlo(
     tasks: Task[],
     events: CalendarEvent[],
@@ -778,22 +914,11 @@ export class HabitAnalysisEngine {
     const scaledFutureMinutes = Math.round((futureProjectedMinutes14d / 14) * horizonDays);
     const totalTargetMinutes = pendingMinutes + scaledFutureMinutes;
 
-    // Costruisci la distribuzione empirica degli ultimi 21 giorni
-    const dailyMinutesMap = new Map<string, number>();
-    for (let i = 1; i <= 21; i++) {
-      const dKey = new Date(nowMs - i * DAY_MS).toLocaleDateString('sv-SE');
-      dailyMinutesMap.set(dKey, 0);
-    }
-
-    const doneTasks = tasks.filter(t => t.status === 'done' && !t.isPhantom && t.completedAt);
-    for (const t of doneTasks) {
-      const dKey = new Date(t.completedAt!).toLocaleDateString('sv-SE');
-      if (dailyMinutesMap.has(dKey)) {
-        dailyMinutesMap.set(dKey, (dailyMinutesMap.get(dKey) || 0) + (t.actualDuration || t.estimatedDuration || 0));
-      }
-    }
-
-    const historicalSample = Array.from(dailyMinutesMap.values());
+    // Costruisci la distribuzione empirica degli ultimi 21 giorni (con Multi-Day Load Spreading)
+    const spreadMap = this.buildSpreadDailyMinutesMap(tasks, nowMs, 21);
+    const todayKey = new Date(nowMs).toLocaleDateString('sv-SE');
+    spreadMap.delete(todayKey); // Usa i 21 giorni conclusi
+    const historicalSample = Array.from(spreadMap.values());
     const nonZeroDays = historicalSample.filter(m => m > 0);
     // Se l'utente ha appena installato l'app o ha meno di 3 giorni attivi, usa una distribuzione prior ragionevole
     const empiricalPool =
@@ -879,13 +1004,14 @@ export class HabitAnalysisEngine {
     );
 
     const doneTasks = tasks.filter(t => t.status === 'done' && !t.isPhantom && t.completedAt);
+    const spreadMap = this.buildSpreadDailyMinutesMap(tasks, nowMs, 20);
 
     for (let i = 20; i >= 0; i--) {
       const dKey = new Date(nowMs - i * DAY_MS).toLocaleDateString('sv-SE');
       const dayDone = doneTasks.filter(t => new Date(t.completedAt!).toLocaleDateString('sv-SE') === dKey);
-      const mins = dayDone.reduce((s, t) => s + (t.actualDuration || t.estimatedDuration || 0), 0);
+      const mins = spreadMap.get(dKey) || 0;
       const effs = dayDone
-        .filter(t => t.actualDuration && t.estimatedDuration)
+        .filter(t => t.actualDuration && t.estimatedDuration && !t.wasDistracted && t.durationConfidence !== 0)
         .map(t => t.estimatedDuration / Math.max(1, t.actualDuration!));
       const avgEff = effs.length > 0 ? effs.reduce((a, b) => a + b, 0) / effs.length : 1.0;
 
@@ -1005,3 +1131,4 @@ export class HabitAnalysisEngine {
     };
   }
 }
+

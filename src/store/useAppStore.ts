@@ -115,7 +115,12 @@ interface AppState {
   removeTask: (id: string) => void;
   removeTasks: (ids: string[]) => void;
   removeTasksByFilter: (filter: { courseId?: string; taskType?: string; onlyAiEnriched?: boolean; status?: string }) => number;
-  completeTask: (id: string, actualMinutes: number, completionMode?: 'attended' | 'recovered' | 'normal') => void;
+  completeTask: (
+    id: string,
+    actualMinutes: number,
+    completionMode?: 'attended' | 'recovered' | 'normal',
+    opts?: { durationConfidence?: number; wasDistracted?: boolean; isMultiDay?: boolean }
+  ) => void;
   
   // Courses
   addCourse: (course: Course) => void;
@@ -556,7 +561,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     return count;
   },
 
-  completeTask: (id, actualMinutes, completionMode = 'normal') => {
+  completeTask: (id, actualMinutes, completionMode = 'normal', opts) => {
     get().saveSnapshot();
     set((s) => {
       const task = s.tasks.find(t => t.id === id);
@@ -617,7 +622,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         now,
         s.tasks,
         s.events,
-        s.studySessions
+        s.studySessions,
+        opts
       );
 
       const nextTasks = s.tasks.map(t => {
@@ -632,6 +638,9 @@ export const useAppStore = create<AppState>((set, get) => ({
             accumulatedTime: 0,
             inferredStartTime: timeWindow.inferredStartTime,
             timeConfidence: timeWindow.timeConfidence,
+            durationConfidence: timeWindow.durationConfidence,
+            wasDistracted: opts?.wasDistracted || false,
+            isMultiDay: timeWindow.isMultiDay,
             wasScheduledSlotHit: timeWindow.wasScheduledSlotHit,
           };
         }
@@ -656,6 +665,9 @@ export const useAppStore = create<AppState>((set, get) => ({
               taskKind: getTaskKind(task),
               inferredStartTime: timeWindow.inferredStartTime,
               timeConfidence: timeWindow.timeConfidence,
+              durationConfidence: timeWindow.durationConfidence,
+              wasDistracted: opts?.wasDistracted || false,
+              isMultiDay: timeWindow.isMultiDay,
               pauseCount: task.pauseCount || 0,
             },
           ]

@@ -18,6 +18,8 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
   const events = useAppStore(s => s.events);
   const [completeMode, setCompleteMode] = useState<'attended' | 'recovered' | 'normal' | null>(null);
   const [actualTime, setActualTime] = useState(task.estimatedDuration.toString());
+  const [wasDistracted, setWasDistracted] = useState(false);
+  const [isMultiDay, setIsMultiDay] = useState(false);
   const [nowMs] = useState(() => Date.now());
 
   const course = courses.find(c => c.id === task.courseId);
@@ -128,9 +130,16 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
   }
 
   // ─── Normal Task Rendering ───
-  const handleComplete = () => {
-    completeTask(task.id, parseInt(actualTime) || task.estimatedDuration, completeMode || 'normal');
+  const handleComplete = (customMinutes?: number, customOpts?: { durationConfidence?: number; wasDistracted?: boolean; isMultiDay?: boolean }) => {
+    const finalMins = customMinutes ?? (parseInt(actualTime) || task.estimatedDuration);
+    completeTask(task.id, finalMins, completeMode || 'normal', {
+      durationConfidence: customOpts?.durationConfidence,
+      wasDistracted: customOpts?.wasDistracted ?? wasDistracted,
+      isMultiDay: customOpts?.isMultiDay ?? isMultiDay,
+    });
     setCompleteMode(null);
+    setWasDistracted(false);
+    setIsMultiDay(false);
   };
 
   const handleStart = () => {
@@ -148,6 +157,8 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
 
   const handleOpenComplete = (mode: 'attended' | 'recovered' | 'normal') => {
     setCompleteMode(mode);
+    setWasDistracted(false);
+    setIsMultiDay(false);
     if (isInProgress || task.accumulatedTime) {
       setActualTime(Math.max(1, Math.round(getTotalAccumulated())).toString());
     } else {
@@ -160,7 +171,10 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
       status: 'todo', 
       actualDuration: undefined, 
       completedAt: undefined, 
-      completionMode: undefined 
+      completionMode: undefined,
+      durationConfidence: undefined,
+      wasDistracted: undefined,
+      isMultiDay: undefined,
     });
   };
 
@@ -351,21 +365,113 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
               </button>
             </>
           ) : (
-            <div className="task-complete-form">
-              <label className="task-complete-label">Tempo effettivo (min):</label>
-              <input
-                type="number"
-                value={actualTime}
-                onChange={(e) => setActualTime(e.target.value)}
-                className="task-complete-input"
-                min="1"
-              />
-              <button className="task-action-btn task-confirm-btn" onClick={handleComplete}>
-                <Check size={14} /> Conferma
-              </button>
-              <button className="task-action-btn task-cancel-btn" onClick={() => setCompleteMode(null)}>
-                Annulla
-              </button>
+            <div className="task-complete-form" style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+              {/* Scelte rapide qualitative (1 clic) per quando non si ricorda il minuto esatto */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginRight: '2px' }}>Com'è andata?</span>
+                <button
+                  type="button"
+                  className="task-action-btn"
+                  onClick={() =>
+                    handleComplete(Math.max(10, Math.round((task.estimatedDuration * 0.75) / 5) * 5), {
+                      durationConfidence: 0.85,
+                    })
+                  }
+                  title="Completa subito: circa il 25% più veloce del previsto"
+                  style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                >
+                  ⚡ Più veloce (~{Math.max(10, Math.round((task.estimatedDuration * 0.75) / 5) * 5)}m)
+                </button>
+                <button
+                  type="button"
+                  className="task-action-btn"
+                  onClick={() => handleComplete(task.estimatedDuration, { durationConfidence: 0.9 })}
+                  title="Completa subito: durata in linea con la stima"
+                  style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                >
+                  👌 Come previsto ({task.estimatedDuration}m)
+                </button>
+                <button
+                  type="button"
+                  className="task-action-btn"
+                  onClick={() =>
+                    handleComplete(Math.round((task.estimatedDuration * 1.35) / 5) * 5, {
+                      durationConfidence: 0.85,
+                    })
+                  }
+                  title="Completa subito: circa il 35% più lungo del previsto"
+                  style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                >
+                  🐢 Più lungo (~{Math.round((task.estimatedDuration * 1.35) / 5) * 5}m)
+                </button>
+                <button
+                  type="button"
+                  className="task-action-btn"
+                  onClick={() =>
+                    handleComplete(task.estimatedDuration, {
+                      durationConfidence: 0,
+                      isMultiDay: true,
+                    })
+                  }
+                  title="Chiude l'attività senza alterare le stime dei tempi o la curva degli orari"
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '4px 8px',
+                    backgroundColor: 'rgba(107, 114, 128, 0.12)',
+                    border: '1px solid rgba(107, 114, 128, 0.3)',
+                  }}
+                >
+                  🤷 Non ricordo / Più giorni
+                </button>
+              </div>
+
+              {/* Input preciso + opzioni distrazione/multi-giorno */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                <label className="task-complete-label">Oppure minuti esatti:</label>
+                <input
+                  type="number"
+                  value={actualTime}
+                  onChange={(e) => setActualTime(e.target.value)}
+                  className="task-complete-input"
+                  min="1"
+                />
+                <button
+                  type="button"
+                  className="task-action-btn"
+                  onClick={() => setWasDistracted(v => !v)}
+                  title="Se ti sei distratto, il tempo extra NON aumenterà la difficoltà della materia"
+                  style={{
+                    fontSize: '0.74rem',
+                    padding: '4px 8px',
+                    backgroundColor: wasDistracted ? 'rgba(245, 158, 11, 0.18)' : 'transparent',
+                    border: wasDistracted ? '1px solid #f59e0b' : '1px solid var(--border-color, rgba(0,0,0,0.15))',
+                    color: wasDistracted ? '#d97706' : 'var(--text-secondary)',
+                  }}
+                >
+                  📱 Distratto
+                </button>
+                <button
+                  type="button"
+                  className="task-action-btn"
+                  onClick={() => setIsMultiDay(v => !v)}
+                  title="Se l'hai svolta in più giorni/sessioni, spalma il carico evitando falsi picchi"
+                  style={{
+                    fontSize: '0.74rem',
+                    padding: '4px 8px',
+                    backgroundColor: isMultiDay ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                    border: isMultiDay ? '1px solid #3b82f6' : '1px solid var(--border-color, rgba(0,0,0,0.15))',
+                    color: isMultiDay ? '#2563eb' : 'var(--text-secondary)',
+                  }}
+                >
+                  📅 Più sessioni/giorni
+                </button>
+                <button className="task-action-btn task-confirm-btn" onClick={() => handleComplete()}>
+                  <Check size={14} /> Conferma
+                </button>
+                <button className="task-action-btn task-cancel-btn" onClick={() => setCompleteMode(null)}>
+                  Annulla
+                </button>
+              </div>
             </div>
           )}
         </div>
