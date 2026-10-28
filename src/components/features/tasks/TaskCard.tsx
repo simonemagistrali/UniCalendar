@@ -18,6 +18,7 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
   const events = useAppStore(s => s.events);
   const [completeMode, setCompleteMode] = useState<'attended' | 'recovered' | 'normal' | null>(null);
   const [actualTime, setActualTime] = useState(task.estimatedDuration.toString());
+  const [nowMs] = useState(() => Date.now());
 
   const course = courses.find(c => c.id === task.courseId);
   const isUrgent = task.priorityScore >= 100;
@@ -215,8 +216,31 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
             </span>
           )}
           {!isDone && !isUrgent && (
-            <span className="task-badge task-badge-normal">
-              P: {task.priorityScore}
+            <span
+              className="task-badge task-badge-normal"
+              title={`Punteggio priorità: ${task.priorityScore}`}
+            >
+              {(() => {
+                const reasons: string[] = [];
+                if (task.assessmentPrep) {
+                  const phaseLabels = { review: 'Ripasso', exercises: 'Esercizi prep', mock: 'Simulazione', final: 'Ripasso finale' };
+                  reasons.push(task.assessmentPhase ? phaseLabels[task.assessmentPhase] : 'Prep. verifica');
+                }
+                if (task.deadline) {
+                  const days = Math.ceil((new Date(task.deadline).getTime() - nowMs) / 86400000);
+                  if (days >= 0 && days <= 14) reasons.push(`Scade tra ${days}g`);
+                } else if (course) {
+                  const nextExam = events.find(e => e.courseId === course.id && (e.type === 'exam' || e.type === 'quiz') && new Date(e.startTime).getTime() > nowMs);
+                  if (nextExam) {
+                    const days = Math.ceil((new Date(nextExam.startTime).getTime() - nowMs) / 86400000);
+                    if (days >= 0 && days <= 21) reasons.push(`Esame tra ${days}g`);
+                  }
+                }
+                if (task.postponedCount > 0) reasons.push(`Rimandato ${task.postponedCount}×`);
+                const ageDays = Math.floor((nowMs - new Date(task.createdAt).getTime()) / 86400000);
+                if (ageDays >= 5 && reasons.length < 2) reasons.push(`Da ${ageDays}g`);
+                return reasons.length > 0 ? reasons.slice(0, 2).join(' · ') : `P: ${task.priorityScore}`;
+              })()}
             </span>
           )}
         </div>

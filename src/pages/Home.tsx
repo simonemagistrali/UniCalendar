@@ -217,7 +217,7 @@ export function Home() {
           <span>Statistiche</span>
         </button>
         <button
-          className={`mobile-nav-item hide-on-mobile ${activeTab === 'anki' ? 'active' : ''}`}
+          className={`mobile-nav-item ${activeTab === 'anki' ? 'active' : ''}`}
           onClick={() => setActiveTab('anki')}
         >
           <span className="mobile-nav-icon"><Brain size={22} /></span>

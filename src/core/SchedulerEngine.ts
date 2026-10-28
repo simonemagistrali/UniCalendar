@@ -1,9 +1,11 @@
 import type { Task, StudySession, UserPreferences, CalendarEvent, PerformanceRecord, FutureWorkloadProjection } from './types';
 import { v4 as uuidv4 } from 'uuid';
+import { getTaskKind } from './taskKind';
 
 /**
  * SchedulerEngine — Generates study sessions dynamically filling empty calendar gaps.
- * Features: per-day hours, adaptive buffer from history, collision avoidance, max 2h blocks.
+ * Features: per-day hours, adaptive buffer from history, collision avoidance,
+ * configurable block duration, and support for "weekdays theory, weekend exercises" study distribution.
  */
 export class SchedulerEngine {
 
@@ -20,23 +22,47 @@ export class SchedulerEngine {
     const todoTasks = tasks.filter(t => t.status !== 'done');
     if (todoTasks.length === 0) return sessions;
 
-    let currentTime = new Date(startDate);
-    let taskIdx = 0;
-    let remainingTime = todoTasks[0]?.estimatedDuration || 0;
+    const remainingDuration = new Map<string, number>(todoTasks.map(t => [t.id, t.estimatedDuration]));
+    const isTaskDoneInSchedule = (taskId: string) => (remainingDuration.get(taskId) || 0) <= 0;
 
+    let currentTime = new Date(startDate);
     const endScheduleDate = new Date(startDate);
     endScheduleDate.setDate(endScheduleDate.getDate() + daysToSchedule);
 
-    // Track minutes used per day for reservation enforcement
+    // Track minutes used per day
     const minutesUsedPerDay: Record<string, number> = {};
 
-    // Safety counter to prevent infinite loops
     let iterations = 0;
-    const maxIterations = daysToSchedule * 100;
+    const maxIterations = daysToSchedule * 120;
 
-    while (taskIdx < todoTasks.length && currentTime < endScheduleDate && iterations < maxIterations) {
+    const maxBlockMinutes = Math.max(20, prefs.maxStudyBlockMinutes || 120);
+    const minBlockMinutes = Math.max(10, prefs.minStudyBlockMinutes || 15);
+    const distributeMode = prefs.studyDistributionPreference;
+
+    // Helper to pick candidate task for current slot
+    const pickNextTask = (isWeekend: boolean): Task | undefined => {
+      const candidates = todoTasks.filter(t => !isTaskDoneInSchedule(t.id));
+      if (candidates.length === 0) return undefined;
+
+      if (distributeMode === 'weekdays_theory_weekend_exercises') {
+        if (isWeekend) {
+          // Weekend: prefer exercises
+          const exerciseTask = candidates.find(t => getTaskKind(t) === 'EXERCISES');
+          if (exerciseTask) return exerciseTask;
+        } else {
+          // Weekdays: prefer theory / notes / lessons
+          const theoryTask = candidates.find(t => getTaskKind(t) !== 'EXERCISES');
+          if (theoryTask) return theoryTask;
+        }
+      }
+
+      return candidates[0];
+    };
+
+    while (currentTime < endScheduleDate && iterations < maxIterations) {
       iterations++;
       const dayOfWeek = currentTime.getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
       const dayConfig = prefs.dailyStudyHours ? prefs.dailyStudyHours[dayOfWeek] : undefined;
 
       // Skip disabled days
@@ -44,6 +70,13 @@ export class SchedulerEngine {
         currentTime = this.nextDay(currentTime);
         continue;
       }
+
+      // Check if all tasks are completed
+      const task = pickNextTask(isWeekend);
+      if (!task) break;
+
+      let remainingTime = remainingDuration.get(task.id) || 0;
+      if (remainingTime <= 0) continue;
 
       // Parse day bounds
       const [startH, startM] = dayConfig.start.split(':').map(Number);
@@ -83,10 +116,8 @@ export class SchedulerEngine {
         continue;
       }
 
-      // Check if current time is inside an existing event — if so, skip past it
+      // Check overlapping events
       const overlapping = this.findOverlappingEvent(currentTime, existingEvents);
-      const task = todoTasks[taskIdx];
-
       if (overlapping) {
         const isProductiveTravel = overlapping.type === 'travel' && overlapping.isTravelStudyTime;
         const isTaskCompatible = task.isTravelCompatible;
@@ -98,44 +129,35 @@ export class SchedulerEngine {
         }
       }
 
-      // Find next collision (event that starts after current time)
+      // Find next collision
       const collision = this.findNextCollision(currentTime, existingEvents, dayEnd, task);
-
-      // If collision starts within 15 min, skip over it
       if (collision) {
         const collisionStart = new Date(collision.startTime);
         const gapMinutes = (collisionStart.getTime() - currentTime.getTime()) / 60000;
-        if (gapMinutes < 15) {
+        if (gapMinutes < minBlockMinutes) {
           currentTime = new Date(collisionStart);
           continue;
         }
       }
 
-
-
       // Schedule a study block
-      // (task is already defined above)
-      const maxBlock = Math.min(remainingTime, 120); // Max 2h per block
+      const maxBlock = Math.min(remainingTime, maxBlockMinutes);
       let blockEnd = new Date(currentTime.getTime() + maxBlock * 60000);
 
-      // Truncate at collision
       if (collision) {
         const cs = new Date(collision.startTime);
         if (blockEnd > cs) blockEnd = new Date(cs);
       }
 
-      // Truncate at day end
       if (blockEnd > dayEnd) blockEnd = new Date(dayEnd);
 
-      // Truncate at lunch break
       if (breakStart && blockEnd > breakStart && currentTime < breakStart) {
         blockEnd = new Date(breakStart);
       }
 
       const actualMinutes = Math.round((blockEnd.getTime() - currentTime.getTime()) / 60000);
 
-      if (actualMinutes >= 15 || (actualMinutes > 0 && remainingTime < 15)) { // Minimum 15 min session, unless it's the final chunk
-        // Track minutes used today for reservation enforcement
+      if (actualMinutes >= minBlockMinutes || (actualMinutes > 0 && remainingTime < minBlockMinutes)) {
         const todayKey = currentTime.toISOString().split('T')[0];
         minutesUsedPerDay[todayKey] = (minutesUsedPerDay[todayKey] || 0) + actualMinutes;
 
@@ -146,18 +168,18 @@ export class SchedulerEngine {
           endTime: blockEnd.toISOString(),
           isBuffer: false,
         });
+
         remainingTime -= actualMinutes;
+        remainingDuration.set(task.id, Math.max(0, remainingTime));
       }
 
       currentTime = new Date(blockEnd);
 
-      // Task completed → move to next
-      if (remainingTime <= 0) {
-        // Add dynamic buffer
-        const bufferMin = this.getDynamicBuffer(task, history);
+      // Task chunk or completion buffer
+      if (remainingDuration.get(task.id)! <= 0) {
+        const bufferMin = this.getDynamicBuffer(task, history, prefs);
         if (bufferMin > 0) {
           const bufferEnd = new Date(currentTime.getTime() + bufferMin * 60000);
-          // Only add buffer if it fits within the day
           if (bufferEnd <= dayEnd) {
             sessions.push({
               id: uuidv4(),
@@ -169,11 +191,6 @@ export class SchedulerEngine {
             currentTime = bufferEnd;
           }
         }
-
-        taskIdx++;
-        if (taskIdx < todoTasks.length) {
-          remainingTime = todoTasks[taskIdx].estimatedDuration;
-        }
       }
     }
 
@@ -181,28 +198,24 @@ export class SchedulerEngine {
   }
 
   /**
-   * Adaptive buffer: base 10 min, increases if the user historically overruns for this course.
+   * Adaptive buffer: configured base (default 10 min), increases if user historically overruns.
    */
-  private static getDynamicBuffer(task: Task, history: PerformanceRecord[]): number {
-    let buffer = 10;
+  private static getDynamicBuffer(task: Task, history: PerformanceRecord[], prefs: UserPreferences): number {
+    let buffer = prefs.bufferMinutes ?? 10;
 
     if (task.courseId && history.length > 0) {
       const courseHist = history.filter(h => h.courseId === task.courseId);
       if (courseHist.length >= 2) {
         const avgOverrun = courseHist.reduce((a, h) => a + Math.max(0, h.actualMinutes - h.estimatedMinutes), 0) / courseHist.length;
-        buffer += Math.min(Math.round(avgOverrun * 0.5), 30); // Max +30 min extra buffer
+        buffer += Math.min(Math.round(avgOverrun * 0.5), 30);
       }
     }
 
-    // High priority tasks get extra buffer
     if (task.priorityScore > 80) buffer += 5;
 
     return buffer;
   }
 
-  /**
-   * Find an event that the current time falls inside of.
-   */
   private static findOverlappingEvent(time: Date, events: CalendarEvent[]): CalendarEvent | undefined {
     const t = time.getTime();
     for (const e of events) {
@@ -215,18 +228,15 @@ export class SchedulerEngine {
     return undefined;
   }
 
-  /**
-   * Find the next event that starts after the given time (and before dayEnd).
-   */
   private static findNextCollision(time: Date, events: CalendarEvent[], dayEnd: Date, task: Task): CalendarEvent | undefined {
     let nearest: CalendarEvent | undefined;
-    let nearestTime = dayEnd.getTime(); // Don't look beyond day end
+    let nearestTime = dayEnd.getTime();
 
     for (const e of events) {
       const eStart = new Date(e.startTime).getTime();
       if (eStart > time.getTime() && eStart < nearestTime) {
         if (e.type === 'travel' && e.isTravelStudyTime && task.isTravelCompatible) {
-          continue; // Not a collision for this task
+          continue;
         }
         nearest = e;
         nearestTime = eStart;

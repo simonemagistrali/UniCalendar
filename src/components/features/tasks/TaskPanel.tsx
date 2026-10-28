@@ -146,7 +146,8 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
   const filteredTasks = useMemo(() => {
     if (dailyGoalOnly) {
       const realTasks = displaySortedTasks.filter(t => t.status === 'todo' && !t.isPhantom);
-      const limit = selectedDailyGoalValue !== null ? (tasksLeftForToday || 0) : 3;
+      const effectiveGoal = selectedDailyGoalValue ?? preferences.dailyTaskGoal ?? 3;
+      const limit = Math.max(0, effectiveGoal - completedTodayCount);
       return realTasks.slice(0, limit);
     }
 
@@ -193,7 +194,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
     }
 
     return realTasks;
-  }, [displaySortedTasks, phantomTasks, filter, typeFilter, courseFilter, sortDoneBy, dailyGoalOnly, selectedDailyGoalValue, tasksLeftForToday]);
+  }, [displaySortedTasks, phantomTasks, filter, typeFilter, courseFilter, sortDoneBy, dailyGoalOnly, selectedDailyGoalValue, preferences.dailyTaskGoal, completedTodayCount]);
 
   // Matching tasks calculation for the bulk delete modal
   const matchingBulkTasks = useMemo(() => {
@@ -209,16 +210,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
                      t.description?.includes('Capitoli/Libro:');
         if (!isAi) return false;
       }
-      if (bulkType !== 'ALL') {
-        const lower = t.title.toLowerCase();
-        const isNotes = lower.includes('appunti') || lower.includes('notes') || lower.includes('ripasso');
-        const isExercises = lower.includes('eserciz');
-        const isFollow = lower.includes('seguire') || lower.includes('recuperare');
-        if (bulkType === 'NOTES' && !isNotes) return false;
-        if (bulkType === 'EXERCISES' && !isExercises) return false;
-        if (bulkType === 'FOLLOW_LESSON' && !isFollow) return false;
-        if (bulkType === 'PROJECT' && !t.isProjectTask) return false;
-      }
+      if (bulkType !== 'ALL' && getTaskKind(t) !== bulkType) return false;
       return true;
     });
   }, [tasks, bulkCourseId, bulkType, bulkStatus, bulkOnlyAi]);
@@ -362,21 +354,21 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
                       setMoreOpen(false);
                     }}
                   >
-                    <CheckSquare size={15} /> {isSelectMode ? 'Fine selezione' : 'Seleziona piÃ¹ attivitÃ '}
+                    <CheckSquare size={15} /> {isSelectMode ? 'Fine selezione' : 'Seleziona più attività'}
                   </button>
                   <button
                     role="menuitem"
                     className="task-more-item danger"
                     onClick={() => { setIsDeleteModalOpen(true); setMoreOpen(false); }}
                   >
-                    <Trash2 size={15} /> Elimina in bloccoâ€¦
+                    <Trash2 size={15} /> Elimina in blocco…
                   </button>
                   <button
                     role="menuitem"
                     className="task-more-item"
                     onClick={() => {
                       const res = cleanupDuplicates();
-                      setCleanupMsg(res.removedTasks > 0 || res.removedEvents > 0 ? `âœ“ Rimossi ${res.removedTasks} duplicati` : 'Nessun duplicato');
+                      setCleanupMsg(res.removedTasks > 0 || res.removedEvents > 0 ? `✓ Rimossi ${res.removedTasks} duplicati` : 'Nessun duplicato');
                       setTimeout(() => setCleanupMsg(''), 3000);
                       setMoreOpen(false);
                     }}
@@ -593,6 +585,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
               <option value="EXERCISES">Solo Esercizi</option>
               <option value="FOLLOW_LESSON">Solo Seguire / Recuperare</option>
               <option value="PROJECT">Solo Progetto</option>
+              <option value="PREP">Solo Preparazione Esami / Quiz</option>
             </select>
           </div>
 

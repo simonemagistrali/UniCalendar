@@ -13,6 +13,7 @@ export interface PersistedState {
   performanceHistory: unknown[];
   studySessions: unknown[];
   ankiHistory?: unknown[];
+  semesters?: unknown[];
 }
 
 export function saveState(state: PersistedState): void {

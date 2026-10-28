@@ -18,6 +18,12 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // Coda invio email (estensione Firebase Trigger Email from Firestore)
+    match /mail/{mailId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if false;
+    }
+
     // Blocca tutto il resto — nessun altro documento è accessibile
     match /{document=**} {
       allow read, write: if false;

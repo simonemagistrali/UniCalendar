@@ -1,7 +1,9 @@
 import { create } from 'zustand';
-import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord, AppUser, DayStudyHours, AnkiDaySnapshot } from '../core/types';
+import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord, AppUser, DayStudyHours, AnkiDaySnapshot, Semester } from '../core/types';
+import { SemesterManager, type CloseSemesterOptions, type CloseSemesterResult } from '../core/SemesterManager';
 import { saveState, loadState } from '../core/persistence';
 import { TaskManager } from '../core/TaskManager';
+import { getTaskKind } from '../core/taskKind';
 import { PriorityEngine } from '../core/PriorityEngine';
 import { SchedulerEngine } from '../core/SchedulerEngine';
 import { TravelManager } from '../core/TravelManager';
@@ -28,6 +30,14 @@ const defaultPreferences: UserPreferences = {
   dailyStudyHours: defaultDailyHours(),
   daysBeforeExamToIncreasePriority: 14,
   taskSortMode: 'oldest',
+  studyDistributionPreference: 'balanced',
+  autoQuizPrep: true,
+  examPrepDays: 21,
+  dailyTaskGoal: 3,
+  maxStudyBlockMinutes: 120,
+  minStudyBlockMinutes: 15,
+  bufferMinutes: 10,
+  weeklySummary: { emailEnabled: false, day: 0, hour: 20 },
   defaultCommuteTimeMinutes: 45,
   isCommuteProductive: false,
   ankiAverageTimeSeconds: 15,
@@ -55,6 +65,14 @@ function mergePreferences(saved: unknown): UserPreferences {
     dailyStudyHours: merged,
     daysBeforeExamToIncreasePriority: p.daysBeforeExamToIncreasePriority ?? 14,
     taskSortMode: p.taskSortMode ?? 'oldest',
+    studyDistributionPreference: p.studyDistributionPreference ?? 'balanced',
+    autoQuizPrep: p.autoQuizPrep ?? true,
+    examPrepDays: p.examPrepDays ?? 21,
+    dailyTaskGoal: p.dailyTaskGoal ?? 3,
+    maxStudyBlockMinutes: p.maxStudyBlockMinutes ?? 120,
+    minStudyBlockMinutes: p.minStudyBlockMinutes ?? 15,
+    bufferMinutes: p.bufferMinutes ?? 10,
+    weeklySummary: p.weeklySummary ?? { emailEnabled: false, day: 0, hour: 20 },
     defaultHomeAddress: p.defaultHomeAddress,
     defaultCommuteTimeMinutes: p.defaultCommuteTimeMinutes ?? 45,
     isCommuteProductive: p.isCommuteProductive ?? false,
@@ -126,6 +144,12 @@ interface AppState {
   // Cleanup
   cleanupDuplicates: () => { removedTasks: number; removedEvents: number };
 
+  // Semesters
+  semesters: Semester[];
+  addSemester: (name: string) => void;
+  closeActiveSemester: (opts: CloseSemesterOptions) => CloseSemesterResult;
+  setSemesters: (semesters: Semester[]) => void;
+
   // History
   pastStates: string[];
   saveSnapshot: () => void;
@@ -142,6 +166,7 @@ function persist(state: AppState) {
     performanceHistory: state.performanceHistory,
     studySessions: state.studySessions,
     ankiHistory: state.ankiHistory,
+    semesters: state.semesters,
   }, state.user?.id || null);
 }
 
@@ -281,11 +306,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   studySessions: (saved?.studySessions as StudySession[]) || [],
   performanceHistory: initialRepair.data.performanceHistory,
   ankiHistory: (saved?.ankiHistory as AnkiDaySnapshot[]) || [],
+  semesters: (saved?.semesters as Semester[]) || [],
   pastStates: [],
 
   selectedDailyGoalType: null,
-  selectedDailyGoalValue: null,
-  setDailyGoal: (type, value) => set({ selectedDailyGoalType: type, selectedDailyGoalValue: value }),
+  selectedDailyGoalValue: mergePreferences(saved?.preferences).dailyTaskGoal ?? null,
+  setDailyGoal: (type, value) => {
+    set({ selectedDailyGoalType: type, selectedDailyGoalValue: value });
+    if (value !== null) {
+      get().updatePreferences({ dailyTaskGoal: value });
+    }
+  },
 
   setUser: (user) => {
     set({ user });
@@ -315,6 +346,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             preferences: mergePreferences(data.preferences || s.preferences),
             studySessions: data.studySessions || s.studySessions,
             ankiHistory,
+            semesters: data.semesters || s.semesters,
           };
           // Riscrivi sul cloud solo se abbiamo riparato i corsi o se il locale
           // aveva giorni Anki che il cloud non conosceva ancora
@@ -330,6 +362,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             performanceHistory: next.performanceHistory,
             studySessions: next.studySessions,
             ankiHistory: next.ankiHistory,
+            semesters: next.semesters,
           });
           return next;
         });
@@ -358,6 +391,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       courses: state.courses,
       preferences: state.preferences,
       studySessions: state.studySessions,
+      semesters: state.semesters,
     });
     set((s) => ({ ...s, pastStates: [...s.pastStates, snap].slice(-10) }));
   },
@@ -501,14 +535,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         // Task type filter
         if (filter.taskType && filter.taskType !== 'ALL') {
-          const lower = t.title.toLowerCase();
-          const isNotes = lower.includes('appunti') || lower.includes('notes') || lower.includes('ripasso');
-          const isExercises = lower.includes('eserciz');
-          const isFollow = lower.includes('seguire') || lower.includes('recuperare');
-          if (filter.taskType === 'NOTES' && !isNotes) return true;
-          if (filter.taskType === 'EXERCISES' && !isExercises) return true;
-          if (filter.taskType === 'FOLLOW_LESSON' && !isFollow) return true;
-          if (filter.taskType === 'PROJECT' && !t.isProjectTask) return true;
+          if (getTaskKind(t) !== filter.taskType) return true;
         }
 
         // If it matches all criteria, remove it!
@@ -781,4 +808,77 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     return { removedTasks, removedEvents };
   },
+  // ── Semesters ──
+  addSemester: (name) => {
+    get().saveSnapshot();
+    set((s) => {
+      const newSem = SemesterManager.createInitial(name);
+      const updated = s.semesters.map(sm => sm.status === 'active' ? { ...sm, status: 'archived' as const } : sm);
+      const next = { ...s, semesters: [...updated, newSem] };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  closeActiveSemester: (opts) => {
+    get().saveSnapshot();
+    const state = get();
+    const active = SemesterManager.getActive(state.semesters);
+    const res = SemesterManager.close(
+      state.courses,
+      state.events,
+      state.tasks,
+      state.studySessions,
+      opts
+    );
+
+    set((s) => {
+      let foundActive = false;
+      const updatedSemesters = s.semesters.map(sm => {
+        if (sm.status === 'active' || (active && sm.id === active.id)) {
+          foundActive = true;
+          return {
+            ...sm,
+            status: 'archived' as const,
+            endDate: new Date().toISOString(),
+            archive: res.archive
+          };
+        }
+        return sm;
+      });
+
+      if (!foundActive) {
+        updatedSemesters.push({
+          id: (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? crypto.randomUUID() : String(Date.now()),
+          name: SemesterManager.suggestName(),
+          startDate: new Date(Date.now() - 90 * 86400000).toISOString(),
+          endDate: new Date().toISOString(),
+          status: 'archived',
+          archive: res.archive
+        });
+      }
+
+      const next = {
+        ...s,
+        courses: res.courses,
+        events: res.events,
+        tasks: res.tasks,
+        studySessions: res.studySessions,
+        semesters: updatedSemesters
+      };
+      persist(next as AppState);
+      return next;
+    });
+
+    return res;
+  },
+
+  setSemesters: (semesters) => {
+    set((s) => {
+      const next = { ...s, semesters };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
 }));

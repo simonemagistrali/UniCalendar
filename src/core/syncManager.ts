@@ -2,7 +2,7 @@ import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from "firebase/fires
 import { db } from "./firebase";
 import { saveState } from "./persistence";
 import { encryptData, decryptData, isEncryptedFormat } from "./crypto";
-import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord, AnkiDaySnapshot } from "./types";
+import type { Task, Course, CalendarEvent, UserPreferences, StudySession, PerformanceRecord, AnkiDaySnapshot, Semester } from "./types";
 
 export interface UserSyncData {
   tasks?: Task[];
@@ -12,6 +12,7 @@ export interface UserSyncData {
   studySessions?: StudySession[];
   performanceHistory?: PerformanceRecord[];
   ankiHistory?: AnkiDaySnapshot[];
+  semesters?: Semester[];
 }
 
 /**
@@ -51,7 +52,7 @@ function validateSyncData(data: UserSyncData): UserSyncData | null {
     }
 
     // Controlla che gli array non superino il limite massimo
-    const arrayFields: (keyof UserSyncData)[] = ['tasks', 'events', 'courses', 'studySessions', 'performanceHistory', 'ankiHistory'];
+    const arrayFields: (keyof UserSyncData)[] = ['tasks', 'events', 'courses', 'studySessions', 'performanceHistory', 'ankiHistory', 'semesters'];
     for (const key of arrayFields) {
       const arr = data[key];
       if (Array.isArray(arr) && arr.length > MAX_ARRAY_LENGTH) {
@@ -205,6 +206,7 @@ export function persistState(data: UserSyncData, userId: string | null) {
     performanceHistory: data.performanceHistory || [],
     studySessions: data.studySessions || [],
     ankiHistory: data.ankiHistory || [],
+    semesters: data.semesters || [],
   });
   
   // Se utente loggato, salva nel cloud asincronamente con debounce

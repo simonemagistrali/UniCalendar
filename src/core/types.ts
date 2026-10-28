@@ -136,6 +136,8 @@ export interface WeeklySummaryPrefs {
   timeZone?: string;    // es. Europe/Rome
 }
 
+export type { CloseSemesterOptions, CloseSemesterResult } from './SemesterManager';
+
 /* ─── Semester ─── */
 export interface Semester {
   id: string;
@@ -154,12 +156,15 @@ export interface SemesterArchive {
   courses: { id: string; name: string; minutes: number; tasksCompleted: number; topics: string[] }[];
 }
 
+export type StudyDistributionPreference = 'balanced' | 'weekdays_theory_weekend_exercises';
+
 /* ─── User Preferences ─── */
 export interface UserPreferences {
   // Per-day study hours (0=Sunday, 1=Monday, ... 6=Saturday)
   dailyStudyHours: Record<number, DayStudyHours>;
   daysBeforeExamToIncreasePriority: number;
   taskSortMode?: TaskSortMode; // default: 'oldest'
+  studyDistributionPreference?: StudyDistributionPreference;
   autoQuizPrep?: boolean; // Genera un ripasso leggero per ogni quiz (default true)
   examPrepDays?: number; // Finestra di preparazione agli esami (default 21)
   dailyTaskGoal?: number; // Obiettivo giornaliero (n. attività), persistito
