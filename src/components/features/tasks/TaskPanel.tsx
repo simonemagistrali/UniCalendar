@@ -11,12 +11,14 @@ import { TaskQuickAdd } from './TaskQuickAdd';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { getTaskKind } from '../../../core/taskKind';
+import type { TaskSortMode } from '../../../core/types';
 
 export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }) {
   const events = useAppStore(s => s.events);
   const tasks = useAppStore(s => s.tasks);
   const courses = useAppStore(s => s.courses);
   const preferences = useAppStore(s => s.preferences);
+  const updatePreferences = useAppStore(s => s.updatePreferences);
   const performanceHistory = useAppStore(s => s.performanceHistory);
   const addTasks = useAppStore(s => s.addTasks);
   const setEvents = useAppStore(s => s.setEvents);
@@ -302,6 +304,20 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
               {courses.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
+            </select>
+
+            <select
+              className="task-type-select"
+              value={preferences.taskSortMode || 'oldest'}
+              onChange={(e) => updatePreferences({ taskSortMode: e.target.value as TaskSortMode })}
+              title="Come ordinare le attività da fare"
+              aria-label="Ordina per"
+            >
+              <option value="oldest">Ordina: più vecchi prima</option>
+              <option value="smart">Ordina: intelligente</option>
+              <option value="deadline">Ordina: scadenza</option>
+              <option value="shortest">Ordina: più brevi prima</option>
+              <option value="course">Ordina: per materia</option>
             </select>
 
             <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>

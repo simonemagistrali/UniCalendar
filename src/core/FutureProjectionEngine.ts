@@ -6,6 +6,7 @@ import type {
   PhantomTask,
   FutureWorkloadProjection,
 } from './types';
+import { lessonTaskNeeds } from './taskKind';
 
 /**
  * FutureProjectionEngine — Projects future workload by simulating what tasks
@@ -94,7 +95,8 @@ export class FutureProjectionEngine {
       const revisionTime = course.defaultStudyPreferences.estimatedRevisionTimePerLesson || 45;
 
       // --- Phantom Task 2: Notes revision (if required by course prefs) ---
-      if (prefs.requiresNotesRevision) {
+      const wants = lessonTaskNeeds(lesson.lessonType, prefs, !!lesson.studyPreferencesOverride);
+      if (wants.notes) {
         const notesDuration = Math.round(revisionTime * reservationFactor);
         const notesPhantom: PhantomTask = {
           courseId: course.id,
@@ -111,7 +113,7 @@ export class FutureProjectionEngine {
       }
 
       // --- Phantom Task 3: Exercises (if required by course prefs) ---
-      if (prefs.requiresExercises) {
+      if (wants.exercises) {
         const exerciseDuration = Math.round(
           revisionTime * 1.5 * reservationFactor
         );

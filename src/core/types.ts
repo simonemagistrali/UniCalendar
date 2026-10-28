@@ -3,6 +3,7 @@ export type EventType = 'generic' | 'lesson' | 'exam' | 'travel' | 'sport' | 'pr
 export type LessonType = 'theory' | 'exercise' | 'theory_exercise' | 'lab';
 export type LocationType = 'in_person' | 'remote';
 export type TaskStatus = 'todo' | 'in_progress' | 'done';
+export type TaskSortMode = 'oldest' | 'smart' | 'deadline' | 'shortest' | 'course';
 
 /* ─── Location ─── */
 export interface Location {
@@ -129,6 +130,7 @@ export interface UserPreferences {
   // Per-day study hours (0=Sunday, 1=Monday, ... 6=Saturday)
   dailyStudyHours: Record<number, DayStudyHours>;
   daysBeforeExamToIncreasePriority: number;
+  taskSortMode?: TaskSortMode; // default: 'oldest'
   defaultHomeAddress?: string; // To detect travel needs
   defaultCommuteTimeMinutes?: number; // Estimated commute time in minutes
   isCommuteProductive?: boolean; // True if commute is by train/bus and can be used for study

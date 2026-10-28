@@ -27,6 +27,7 @@ function defaultDailyHours(): Record<number, DayStudyHours> {
 const defaultPreferences: UserPreferences = {
   dailyStudyHours: defaultDailyHours(),
   daysBeforeExamToIncreasePriority: 14,
+  taskSortMode: 'oldest',
   defaultCommuteTimeMinutes: 45,
   isCommuteProductive: false,
   ankiAverageTimeSeconds: 15,
@@ -53,6 +54,7 @@ function mergePreferences(saved: unknown): UserPreferences {
   return {
     dailyStudyHours: merged,
     daysBeforeExamToIncreasePriority: p.daysBeforeExamToIncreasePriority ?? 14,
+    taskSortMode: p.taskSortMode ?? 'oldest',
     defaultHomeAddress: p.defaultHomeAddress,
     defaultCommuteTimeMinutes: p.defaultCommuteTimeMinutes ?? 45,
     isCommuteProductive: p.isCommuteProductive ?? false,

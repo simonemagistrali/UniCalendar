@@ -1,4 +1,27 @@
-import type { Task } from './types';
+import type { Task, LessonType } from './types';
+
+/**
+ * Quali task di studio genera una lezione, in base al suo tipo:
+ * - teoria            → appunti (se il corso li prevede), mai esercizi
+ * - esercitazione/lab → esercizi (a meno che l'evento li disattivi esplicitamente), mai appunti
+ * - teoria+esercizi   → secondo le preferenze del corso
+ * - tipo sconosciuto  → comportamento storico (preferenze del corso)
+ */
+export function lessonTaskNeeds(
+  lessonType: LessonType | undefined,
+  prefs: { requiresNotesRevision: boolean; requiresExercises: boolean },
+  hasEventOverride: boolean = false
+): { notes: boolean; exercises: boolean } {
+  switch (lessonType) {
+    case 'theory':
+      return { notes: prefs.requiresNotesRevision, exercises: false };
+    case 'exercise':
+    case 'lab':
+      return { notes: false, exercises: hasEventOverride ? prefs.requiresExercises : true };
+    default:
+      return { notes: prefs.requiresNotesRevision, exercises: prefs.requiresExercises };
+  }
+}
 
 /**
  * Tipologia di un task. Unico punto in cui il tipo viene dedotto

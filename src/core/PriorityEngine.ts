@@ -1,4 +1,4 @@
-import type { Task, Course, CalendarEvent, UserPreferences, PerformanceRecord, FutureWorkloadProjection } from './types';
+import type { Task, Course, CalendarEvent, UserPreferences, PerformanceRecord, FutureWorkloadProjection, TaskSortMode } from './types';
 import { isLessonRecoveryTask } from './taskKind';
 
 /**
@@ -162,19 +162,49 @@ export class PriorityEngine {
       };
     });
 
-    // Sort by score descending; in-progress first, then lesson recoveries (tipo da helper unico).
     // Questo è l'UNICO ordinamento: UI e Scheduler lo usano entrambi.
+    // "In corso" è sempre in cima; poi vale la modalità scelta dall'utente.
+    const mode: TaskSortMode = prefs.taskSortMode || 'oldest';
+    const created = (t: Task) => new Date(t.createdAt).getTime();
+    const dueTime = (t: Task): number => {
+      const candidates: number[] = [];
+      if (t.deadline) candidates.push(new Date(t.deadline).getTime());
+      const exam = t.courseId ? examsByCourse.get(t.courseId) : undefined;
+      if (exam) candidates.push(new Date(exam.startTime).getTime());
+      return candidates.length ? Math.min(...candidates) : Number.POSITIVE_INFINITY;
+    };
+
     scored.sort((a, b) => {
       if (a.status === 'in_progress' && b.status !== 'in_progress') return -1;
       if (a.status !== 'in_progress' && b.status === 'in_progress') return 1;
 
-      const aIsRecovery = isLessonRecoveryTask(a);
-      const bIsRecovery = isLessonRecoveryTask(b);
-      
-      if (aIsRecovery && !bIsRecovery) return -1;
-      if (!aIsRecovery && bIsRecovery) return 1;
-      
-      return b.priorityScore - a.priorityScore;
+      switch (mode) {
+        case 'smart': {
+          const aIsRecovery = isLessonRecoveryTask(a);
+          const bIsRecovery = isLessonRecoveryTask(b);
+          if (aIsRecovery && !bIsRecovery) return -1;
+          if (!aIsRecovery && bIsRecovery) return 1;
+          return b.priorityScore - a.priorityScore || created(a) - created(b);
+        }
+        case 'deadline': {
+          const da = dueTime(a);
+          const db = dueTime(b);
+          if (da !== db) return da < db ? -1 : 1;
+          return b.priorityScore - a.priorityScore || created(a) - created(b);
+        }
+        case 'shortest':
+          return a.estimatedDuration - b.estimatedDuration || created(a) - created(b);
+        case 'course': {
+          const da = dueTime({ ...a, deadline: undefined });
+          const db = dueTime({ ...b, deadline: undefined });
+          if (da !== db) return da < db ? -1 : 1;
+          if ((a.courseId || '') !== (b.courseId || '')) return (a.courseId || '') < (b.courseId || '') ? -1 : 1;
+          return created(a) - created(b);
+        }
+        case 'oldest':
+        default:
+          return created(a) - created(b) || b.priorityScore - a.priorityScore;
+      }
     });
 
     // Topological sort respecting dependencies

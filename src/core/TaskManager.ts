@@ -1,6 +1,7 @@
 import type { CalendarEvent, Course, Task } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { courseNameFromTitle, normalizeCourseName, BOGUS_COURSE_NAMES, findCourseForTitle } from './courseNames';
+import { lessonTaskNeeds } from './taskKind';
 
 /**
  * TaskManager — Scans past events and generates tasks automatically.
@@ -88,9 +89,10 @@ export class TaskManager {
       const hasNotesForSlot = existingTasks.some(t => isNotesTask(t) && matchesEventSlot(t));
       const hasExerciseForSlot = existingTasks.some(t => isExerciseTask(t) && matchesEventSlot(t));
 
+      const wants = lessonTaskNeeds(event.lessonType, prefs, !!event.studyPreferencesOverride);
       const needsFollow = !existingFollowTasks.has(event.id) && !existingFollowTaskTitles.has(followKey) && !hasFollowForSlot;
-      const needsNotes = prefs.requiresNotesRevision && !existingNotesTasks.has(event.id) && !existingNotesTaskTitles.has(notesKey) && !hasNotesForSlot;
-      const needsExercises = prefs.requiresExercises && !existingExerciseTasks.has(event.id) && !existingExerciseTaskTitles.has(exerciseKey) && !hasExerciseForSlot;
+      const needsNotes = wants.notes && !existingNotesTasks.has(event.id) && !existingNotesTaskTitles.has(notesKey) && !hasNotesForSlot;
+      const needsExercises = wants.exercises && !existingExerciseTasks.has(event.id) && !existingExerciseTaskTitles.has(exerciseKey) && !hasExerciseForSlot;
 
       if (!needsFollow && !needsNotes && !needsExercises) {
         if (!event.isDone) updatedEvents[i] = { ...event, isDone: true };
