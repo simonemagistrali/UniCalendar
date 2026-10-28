@@ -1,0 +1,91 @@
+/* ─── Pulizia UI: menu "Nuovo", menu azioni attività, leggibilità ─── */
+
+.sidebar-actions { position: relative; }
+
+.new-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  animation: new-menu-in 0.14s ease-out;
+}
+
+@keyframes new-menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.new-menu-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary, inherit);
+  text-align: left;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.new-menu-item:hover { background: rgba(127, 127, 255, 0.14); }
+.new-menu-item svg { margin-top: 2px; flex-shrink: 0; }
+.new-menu-item span { display: flex; flex-direction: column; font-weight: 600; }
+.new-menu-item small { font-weight: 400; font-size: 0.75rem; color: var(--text-secondary, #888); }
+
+/* Menu "⋯" nella lista attività */
+.task-more { position: relative; margin-left: auto; }
+.task-more-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 10px; border-radius: 8px; cursor: pointer;
+  background: var(--bg-secondary); color: var(--text-primary);
+  border: 1px solid var(--border-color); font-size: 0.85rem;
+}
+.task-more-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30;
+  min-width: 230px; padding: 6px; border-radius: 12px;
+  background: var(--bg-primary, #1b1b24); border: 1px solid var(--border-color);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.task-more-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border: none; border-radius: 8px; background: transparent;
+  color: var(--text-primary); font-size: 0.88rem; cursor: pointer; text-align: left;
+}
+.task-more-item:hover { background: rgba(127, 127, 255, 0.14); }
+.task-more-item.danger { color: #ef4444; }
+
+/* Leggibilità: niente testi sotto ~13px nei controlli principali */
+.task-type-select, .task-filter-btn, .task-count-badge { font-size: 0.85rem; }
+.task-type-filter-bar { flex-wrap: wrap; row-gap: 8px; }
+.task-type-select { max-width: 100%; min-width: 0; }
+
+@media (max-width: 640px) {
+  .task-type-filter-bar { flex-direction: column; align-items: stretch; }
+  .task-more { margin-left: 0; }
+  .task-more-menu { left: 0; right: auto; }
+}
+
+/* Riepilogo settimanale */
+.weekly-summary { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
+.weekly-summary-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.weekly-summary-head h2 { margin: 0; font-size: 1.15rem; }
+.weekly-summary-sub { color: var(--text-secondary); font-size: 0.85rem; }
+.weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.weekly-card {
+  padding: 14px; border-radius: 14px; border: 1px solid var(--border-color);
+  background: var(--bg-secondary); display: flex; flex-direction: column; gap: 4px;
+}
+.weekly-card-label { font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.weekly-card-value { font-size: 1.6rem; font-weight: 700; }
+.weekly-card-delta { font-size: 0.8rem; }
+.weekly-card-delta.up { color: #22c55e; }
+.weekly-card-delta.down { color: #ef4444; }
+.weekly-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
+.weekly-actions { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -43,7 +43,6 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
   const [isTravelStudyTime, setIsTravelStudyTime] = useState(false);
 
   // Lesson overrides
-  const [overrideNotesRevision, setOverrideNotesRevision] = useState<boolean | null>(null);
   const [overrideExercises, setOverrideExercises] = useState<boolean | null>(null);
 
   const resetForm = () => {
@@ -51,7 +50,7 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
     setCourseId(''); setLessonType('theory'); setLocationType('in_person');
     setAddress(''); setSportType(''); setProjectTotalHours('10');
     setProjectFrequency('3'); setProjectImportance('5'); setIsTravelStudyTime(false);
-    setOverrideNotesRevision(null); setOverrideExercises(null);
+    setOverrideExercises(null);
   };
 
   useEffect(() => {
@@ -72,7 +71,6 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
       setProjectFrequency(initialEvent.projectScheduleFrequencyDays?.toString() || '3');
       setProjectImportance(initialEvent.projectImportance?.toString() || '5');
       setIsTravelStudyTime(initialEvent.isTravelStudyTime || false);
-      setOverrideNotesRevision(initialEvent.studyPreferencesOverride?.requiresNotesRevision ?? null);
       setOverrideExercises(initialEvent.studyPreferencesOverride?.requiresExercises ?? null);
     } else if (isOpen && !initialEvent) {
       resetForm();
@@ -112,12 +110,12 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
     };
 
     const selectedCourse = courses.find(c => c.id === courseId);
-    if (type === 'lesson' && (lessonType === 'exercise' || lessonType === 'lab') && selectedCourse && (overrideNotesRevision !== null || overrideExercises !== null)) {
+    if (type === 'lesson' && (lessonType === 'exercise' || lessonType === 'lab') && selectedCourse && overrideExercises === false) {
       (eventData as any).studyPreferencesOverride = {
-        requiresNotesRevision: overrideNotesRevision !== null ? overrideNotesRevision : selectedCourse.defaultStudyPreferences.requiresNotesRevision,
-        requiresExercises: overrideExercises !== null ? overrideExercises : selectedCourse.defaultStudyPreferences.requiresExercises,
+        requiresNotesRevision: false,
+        requiresExercises: false,
       };
-    } else if (initialEvent?.studyPreferencesOverride && (type !== 'lesson' || (lessonType !== 'exercise' && lessonType !== 'lab'))) {
+    } else if (initialEvent?.studyPreferencesOverride) {
        // if we changed type, clear the override
        (eventData as any).studyPreferencesOverride = undefined;
     }
@@ -176,8 +174,7 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
 
   const selectedCourseUI = courses.find(c => c.id === courseId);
   const showOverrides = type === 'lesson' && (lessonType === 'exercise' || lessonType === 'lab') && selectedCourseUI;
-  const currentNotesRevision = overrideNotesRevision !== null ? overrideNotesRevision : (selectedCourseUI?.defaultStudyPreferences.requiresNotesRevision ?? true);
-  const currentExercises = overrideExercises !== null ? overrideExercises : (selectedCourseUI?.defaultStudyPreferences.requiresExercises ?? false);
+  const currentExercises = overrideExercises !== null ? overrideExercises : true;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={initialEvent ? "Modifica Evento" : "Nuovo Evento"}>
@@ -193,7 +190,8 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
             <label>Tipo Evento</label>
             <select value={type} onChange={e => setType(e.target.value as EventType)}>
               <option value="lesson">Lezione</option>
-              <option value="exam">Esame</option>
+              <option value="exam">Esame / Prova intermedia</option>
+              <option value="quiz">Quiz</option>
               <option value="generic">Generico</option>
               <option value="sport">Sport</option>
               <option value="travel">Viaggio/Spostamento</option>
@@ -241,14 +239,6 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
         {showOverrides && (
           <div className="form-field" style={{ marginTop: '10px', padding: '10px', backgroundColor: 'rgba(0,0,0,0.03)', borderRadius: '6px' }}>
             <label style={{ marginBottom: '8px', fontWeight: '500' }}>Generazione Task per questa sessione:</label>
-            <label className="form-checkbox" style={{ marginBottom: '4px' }}>
-              <input 
-                type="checkbox" 
-                checked={currentNotesRevision} 
-                onChange={e => setOverrideNotesRevision(e.target.checked)} 
-              />
-              Sistemazione appunti
-            </label>
             <label className="form-checkbox">
               <input 
                 type="checkbox" 
@@ -261,7 +251,7 @@ export function EventFormModal({ isOpen, onClose, onEventAdded, initialEvent }: 
         )}
 
         {/* Exam-specific */}
-        {type === 'exam' && (
+        {(type === 'exam' || type === 'quiz') && (
           <div className="form-field">
             <label>Corso</label>
             <select value={courseId} onChange={e => setCourseId(e.target.value)}>

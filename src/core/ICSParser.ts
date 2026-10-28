@@ -45,7 +45,8 @@ export function parseICS(raw: string): CalendarEvent[] {
       // Determine type from title heuristics
       const title = (current.title || '').toLowerCase();
       if (!current.type) {
-        if (title.includes('esame') || title.includes('exam')) current.type = 'exam';
+        if (/\bquiz\b|verifica|test in itinere/.test(title)) current.type = 'quiz';
+        else if (title.includes('esame') || title.includes('exam') || title.includes('compitino') || title.includes('prova intermedia') || title.includes('midterm')) current.type = 'exam';
         else if (title.includes('lezione') || title.includes('lecture') || title.includes('lesson')) current.type = 'lesson';
         else current.type = 'generic';
       }
@@ -133,7 +134,8 @@ export function parseCSV(raw: string): CalendarEvent[] {
 
     const titleLower = title.toLowerCase();
     let type: CalendarEvent['type'] = 'generic';
-    if (titleLower.includes('esame') || titleLower.includes('exam')) type = 'exam';
+    if (/\bquiz\b|verifica/.test(titleLower)) type = 'quiz';
+    else if (titleLower.includes('esame') || titleLower.includes('exam') || titleLower.includes('compitino') || titleLower.includes('midterm')) type = 'exam';
     else if (titleLower.includes('lezione') || titleLower.includes('lecture')) type = 'lesson';
 
     events.push({

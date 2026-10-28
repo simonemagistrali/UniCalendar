@@ -437,7 +437,7 @@ export function repairCourseNames(input: RepairInput): RepairResult {
     // Se il nome è a una sola parola o bogus, cerca tra gli eventi del calendario che menzionano il corso
     if (wordCount === 1 || isBogusName || linkedEvents.length === 0) {
       for (const e of events) {
-        if (e.type === 'exam' || e.type === 'sport' || e.type === 'travel' || e.type === 'meal') continue;
+        if (e.type === 'exam' || e.type === 'quiz' || e.type === 'sport' || e.type === 'travel' || e.type === 'meal') continue;
         const eCand = cleanCourseName(e.title);
         const eNorm = normalizeCourseName(eCand);
         if (!eNorm) continue;
@@ -574,7 +574,7 @@ export function repairCourseNames(input: RepairInput): RepairResult {
       newCourseId = courseIdRemap.get(newCourseId);
     }
 
-    if (!newCourseId && e.type !== 'exam' && e.type !== 'sport' && e.type !== 'travel' && e.type !== 'meal') {
+    if (!newCourseId && e.type !== 'exam' && e.type !== 'quiz' && e.type !== 'sport' && e.type !== 'travel' && e.type !== 'meal') {
       const match = findCourseForTitle(e.title, uniqueCourses);
       if (match) {
         newCourseId = match.id;

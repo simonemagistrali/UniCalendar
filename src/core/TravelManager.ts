@@ -10,7 +10,7 @@ export class TravelManager {
     
     // Filter only in-person events
     const inPersonEvents = events.filter(e => 
-      (e.type === 'lesson' || e.type === 'exam') && e.location?.type === 'in_person'
+      (e.type === 'lesson' || e.type === 'exam' || e.type === 'quiz') && e.location?.type === 'in_person'
     );
     
     // Sort by start time

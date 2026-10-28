@@ -16,6 +16,7 @@ import { AnkiDashboard } from '../pages/AnkiDashboard';
 import { authService } from '../core/mockBackend';
 import { Tutorial } from '../components/ui/Tutorial';
 import { useAnkiSync } from '../hooks/useAnkiSync';
+import '../cleanup.css';
 
 export function Home() {
   useAnkiSync();
@@ -41,6 +42,7 @@ export function Home() {
   }, [activeTab]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showSnackbar, setShowSnackbar] = useState(false);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
   const prevStatesLength = useRef(pastStates.length);
 
   useEffect(() => {
@@ -84,30 +86,28 @@ export function Home() {
 
         {/* Create Event Button */}
         <div className="sidebar-actions">
-          <button className="sidebar-create-btn" onClick={() => { setIsEventModalOpen(true); setSidebarOpen(false); }}>
-            <Plus size={20} />
-            <span>Crea Evento</span>
-          </button>
-          <button className="sidebar-action-btn" onClick={() => { setIsImportModalOpen(true); setSidebarOpen(false); }}>
-            <Upload size={16} />
-            <span>Importa .ics</span>
-          </button>
-          <button 
-            className="sidebar-action-btn" 
-            onClick={() => { setIsSyllabusModalOpen(true); setSidebarOpen(false); }}
-            style={{ 
-              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(99, 102, 241, 0.15))', 
-              border: '1px solid rgba(168, 85, 247, 0.35)',
-              fontWeight: 600
-            }}
+          <button
+            className="sidebar-create-btn"
+            onClick={() => setNewMenuOpen(o => !o)}
+            aria-expanded={newMenuOpen}
+            aria-haspopup="menu"
           >
-            <Sparkles size={16} style={{ color: '#a855f7' }} />
-            <span>Note AI (PDF/Excel)</span>
+            <Plus size={20} />
+            <span>Nuovo</span>
           </button>
-          <button className="sidebar-action-btn" onClick={() => { setIsCourseModalOpen(true); setSidebarOpen(false); }}>
-            <GraduationCap size={16} />
-            <span>Gestisci Corsi</span>
-          </button>
+          {newMenuOpen && (
+            <div className="new-menu" role="menu">
+              <button role="menuitem" className="new-menu-item" onClick={() => { setIsEventModalOpen(true); setNewMenuOpen(false); setSidebarOpen(false); }}>
+                <CalendarIcon size={16} /> <span>Evento<small>Lezione, esame, scadenza…</small></span>
+              </button>
+              <button role="menuitem" className="new-menu-item" onClick={() => { setIsImportModalOpen(true); setNewMenuOpen(false); setSidebarOpen(false); }}>
+                <Upload size={16} /> <span>Importa calendario<small>File .ics (es. dall'università)</small></span>
+              </button>
+              <button role="menuitem" className="new-menu-item" onClick={() => { setIsSyllabusModalOpen(true); setNewMenuOpen(false); setSidebarOpen(false); }}>
+                <Sparkles size={16} style={{ color: '#a855f7' }} /> <span>Importa programma con AI<small>PDF/Excel: argomenti e note per lezione</small></span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Nav */}
@@ -121,8 +121,11 @@ export function Home() {
           <button className={`sidebar-nav-item ${activeTab === 'statistics' ? 'active' : ''}`} onClick={() => { setActiveTab('statistics'); setSidebarOpen(false); }}>
             <TrendingUp size={20} /> Statistiche
           </button>
-          <button className={`sidebar-nav-item hide-on-mobile ${activeTab === 'anki' ? 'active' : ''}`} onClick={() => { setActiveTab('anki'); setSidebarOpen(false); }}>
+          <button className={`sidebar-nav-item ${activeTab === 'anki' ? 'active' : ''}`} onClick={() => { setActiveTab('anki'); setSidebarOpen(false); }}>
             <img src="https://upload.wikimedia.org/wikipedia/commons/3/3d/Anki-icon.svg" alt="Anki" style={{ width: 20, height: 20, filter: 'grayscale(100%) brightness(200%)' }} /> Anki
+          </button>
+          <button className="sidebar-nav-item" onClick={() => { setIsCourseModalOpen(true); setSidebarOpen(false); }}>
+            <GraduationCap size={20} /> Corsi
           </button>
         </nav>
 

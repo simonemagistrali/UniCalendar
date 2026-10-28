@@ -240,7 +240,7 @@ export class TaskManager {
         estimatedDuration: minutesPerSession,
         createdAt: new Date().toISOString(),
         deadline: event.startTime,
-        dependencies: i > 0 ? [tasks[i - 1].id] : [],
+        dependencies: [],
         postponedCount: 0,
         isProjectTask: true,
       });
@@ -295,7 +295,7 @@ export class TaskManager {
     const titleCounts = new Map<string, { name: string; count: number }>();
 
     for (const e of events) {
-      if (e.type === 'exam' || e.type === 'sport' || e.type === 'travel' || e.type === 'meal') continue;
+      if (e.type === 'exam' || e.type === 'quiz' || e.type === 'sport' || e.type === 'travel' || e.type === 'meal') continue;
       // Nome completo del corso (senza prefissi tipo "Lezione di" e info accessorie)
       const name = courseNameFromTitle(e.title);
       const key = normalizeCourseName(name);

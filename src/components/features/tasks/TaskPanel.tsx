@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Clock, BookOpen, Zap, Eye, Sparkles, Trash2, CheckSquare } from 'lucide-react';
+import { Clock, BookOpen, Zap, Eye, Sparkles, Trash2, CheckSquare, MoreHorizontal } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { PriorityEngine } from '../../../core/PriorityEngine';
 import { TaskManager } from '../../../core/TaskManager';
@@ -11,6 +11,7 @@ import { TaskQuickAdd } from './TaskQuickAdd';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { getTaskKind } from '../../../core/taskKind';
+import { AssessmentPlanner } from '../../../core/AssessmentPlanner';
 import type { TaskSortMode } from '../../../core/types';
 
 export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }) {
@@ -44,6 +45,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
   const [courseFilter, setCourseFilter] = useState<string>('ALL');
   const [sortDoneBy, setSortDoneBy] = useState<'completedAt' | 'createdAt'>('completedAt');
   const [cleanupMsg, setCleanupMsg] = useState('');
+  const [moreOpen, setMoreOpen] = useState(false);
 
   // Bulk management and delete state
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -60,6 +62,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
     NOTES: 'Sistemare appunti',
     EXERCISES: 'Esercizi',
     PROJECT: 'Progetto',
+    PREP: 'Preparazione esami/quiz',
     OTHER: 'Altro'
   };
 
@@ -74,6 +77,24 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
       addTasks(newTasks);
     }
   }, [events, courses]); // eslint-disable-line
+
+  // Preparazione esami/quiz (a ritroso), archiviazione di quella scaduta, ricalibrazione progetti
+  useEffect(() => {
+    if (events.length === 0) return;
+    const store = useAppStore.getState();
+
+    const newPrep = AssessmentPlanner.generatePrepTasks(events, courses, store.tasks, store.preferences);
+    if (newPrep.length > 0) addTasks(newPrep);
+
+    const expired = AssessmentPlanner.expiredPrepTaskIds(useAppStore.getState().tasks);
+    if (expired.length > 0) {
+      const ids = new Set(expired);
+      setTasks(useAppStore.getState().tasks.filter(t => !ids.has(t.id)));
+    }
+
+    const recalibrated = AssessmentPlanner.recalibrateProjectTasks(events, useAppStore.getState().tasks);
+    if (recalibrated) setTasks(recalibrated);
+  }, [events, courses, preferences.autoQuizPrep, preferences.examPrepDays]); // eslint-disable-line
 
   // Generate future projection for phantom tasks
   const futureProjection = useMemo(() => {
@@ -320,84 +341,51 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
               <option value="course">Ordina: per materia</option>
             </select>
 
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div className="task-more">
               <button
-                className="task-action-btn"
-                onClick={() => {
-                  if (isSelectMode) deselectAll();
-                  setIsSelectMode(!isSelectMode);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  fontSize: '0.8rem',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  background: isSelectMode ? 'var(--primary, #3b82f6)' : 'var(--bg-secondary)',
-                  color: isSelectMode ? '#ffffff' : 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-                title="Attiva la selezione multipla per eliminare attività a scelta"
+                className="task-more-btn"
+                onClick={() => setMoreOpen(o => !o)}
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                title="Altre azioni"
               >
-                <CheckSquare size={14} />
-                <span>{isSelectMode ? 'Fine selezione' : 'Seleziona'}</span>
+                <MoreHorizontal size={16} /> <span>Altro</span>
               </button>
-
-              <button
-                className="task-action-btn"
-                onClick={() => setIsDeleteModalOpen(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  fontSize: '0.8rem',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  background: 'rgba(239, 68, 68, 0.08)',
-                  color: '#ef4444',
-                  border: '1px solid rgba(239, 68, 68, 0.25)',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-                title="Elimina attività per materia, tipologia o create da AI"
-              >
-                <Trash2 size={14} />
-                <span>Elimina Task...</span>
-              </button>
-
-              <button
-                className="task-action-btn"
-                onClick={() => {
-                  const res = cleanupDuplicates();
-                  if (res.removedTasks > 0 || res.removedEvents > 0) {
-                    setCleanupMsg(`✓ Rimossi ${res.removedTasks} duplicati!`);
-                    setTimeout(() => setCleanupMsg(''), 3500);
-                  } else {
-                    setCleanupMsg('Nessun duplicato');
-                    setTimeout(() => setCleanupMsg(''), 2000);
-                  }
-                }}
-                title="Rimuove automaticamente i task o eventi duplicati per la stessa data"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  fontSize: '0.8rem',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  background: 'rgba(168, 85, 247, 0.1)',
-                  border: '1px solid rgba(168, 85, 247, 0.25)',
-                  color: '#a855f7',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                <Sparkles size={14} />
-                <span>{cleanupMsg || 'Ripulisci duplicati'}</span>
-              </button>
+              {moreOpen && (
+                <div className="task-more-menu" role="menu">
+                  <button
+                    role="menuitem"
+                    className="task-more-item"
+                    onClick={() => {
+                      if (isSelectMode) deselectAll();
+                      setIsSelectMode(!isSelectMode);
+                      setMoreOpen(false);
+                    }}
+                  >
+                    <CheckSquare size={15} /> {isSelectMode ? 'Fine selezione' : 'Seleziona piÃ¹ attivitÃ '}
+                  </button>
+                  <button
+                    role="menuitem"
+                    className="task-more-item danger"
+                    onClick={() => { setIsDeleteModalOpen(true); setMoreOpen(false); }}
+                  >
+                    <Trash2 size={15} /> Elimina in bloccoâ€¦
+                  </button>
+                  <button
+                    role="menuitem"
+                    className="task-more-item"
+                    onClick={() => {
+                      const res = cleanupDuplicates();
+                      setCleanupMsg(res.removedTasks > 0 || res.removedEvents > 0 ? `âœ“ Rimossi ${res.removedTasks} duplicati` : 'Nessun duplicato');
+                      setTimeout(() => setCleanupMsg(''), 3000);
+                      setMoreOpen(false);
+                    }}
+                  >
+                    <Sparkles size={15} /> Rimuovi duplicati
+                  </button>
+                </div>
+              )}
+              {cleanupMsg && <span style={{ marginLeft: 8, fontSize: '0.8rem' }}>{cleanupMsg}</span>}
             </div>
 
             {filter === 'done' && (

@@ -94,6 +94,7 @@ export function Calendar() {
       const course = e.courseId ? courses.find(c => c.id === e.courseId) : undefined;
       let color = course?.color || 'var(--accent-primary)';
       if (e.type === 'exam') color = '#d93025';
+      else if (e.type === 'quiz') color = '#e8710a';
       else if (e.type === 'sport') color = '#188038';
       else if (e.type === 'travel') color = '#5f6368';
       else if (e.type === 'project_deadline') color = '#a142f4';

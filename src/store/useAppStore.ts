@@ -162,6 +162,12 @@ function deduplicateTasks(tasks: Task[], events: CalendarEvent[] = []): Task[] {
   const groupMap = new Map<string, Task>();
 
   for (const t of tasks) {
+    // Sessioni di progetto e fasi di preparazione condividono evento/data/orario:
+    // non vanno fuse tra loro (ognuna è un task distinto).
+    if (t.isProjectTask || t.assessmentPrep) {
+      groupMap.set(t.id, t);
+      continue;
+    }
     // Determine category
     const titleLower = t.title.toLowerCase();
     let category = 'other';

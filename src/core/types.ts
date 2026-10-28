@@ -1,5 +1,5 @@
 /* ─── Enums ─── */
-export type EventType = 'generic' | 'lesson' | 'exam' | 'travel' | 'sport' | 'project_deadline' | 'meal';
+export type EventType = 'generic' | 'lesson' | 'exam' | 'quiz' | 'travel' | 'sport' | 'project_deadline' | 'meal';
 export type LessonType = 'theory' | 'exercise' | 'theory_exercise' | 'lab';
 export type LocationType = 'in_person' | 'remote';
 export type TaskStatus = 'todo' | 'in_progress' | 'done';
@@ -93,6 +93,8 @@ export interface Task {
   lessonDate?: string; // Date of the lesson, e.g. "15/09/2026"
   lessonTimeSlot?: string; // Time window of the lesson, e.g. "14:30 - 16:30"
   isAiEnriched?: boolean; // True if notes, chapters or topics were added by AI
+  assessmentPrep?: boolean; // True se generato dalla preparazione di un esame/quiz
+  assessmentPhase?: 'review' | 'exercises' | 'mock' | 'final'; // Fase della preparazione
 }
 
 /* ─── Study Session ─── */
@@ -125,12 +127,46 @@ export interface DayStudyHours {
   };
 }
 
+/* ─── Weekly summary prefs ─── */
+export interface WeeklySummaryPrefs {
+  email?: string;       // destinatario (se vuoto: email dell'account)
+  emailEnabled: boolean; // invio automatico via email (richiede la funzione cloud attiva)
+  day: number;          // 0=domenica ... 6=sabato (default 0)
+  hour: number;         // 0-23, ora locale (default 20)
+  timeZone?: string;    // es. Europe/Rome
+}
+
+/* ─── Semester ─── */
+export interface Semester {
+  id: string;
+  name: string;
+  startDate: string; // ISO
+  endDate?: string;  // ISO (valorizzata alla chiusura)
+  status: 'active' | 'archived';
+  /** Fotografia della chiusura: serve per ricordare cosa si è imparato */
+  archive?: SemesterArchive;
+}
+
+export interface SemesterArchive {
+  closedAt: string;
+  totalMinutes: number;
+  tasksCompleted: number;
+  courses: { id: string; name: string; minutes: number; tasksCompleted: number; topics: string[] }[];
+}
+
 /* ─── User Preferences ─── */
 export interface UserPreferences {
   // Per-day study hours (0=Sunday, 1=Monday, ... 6=Saturday)
   dailyStudyHours: Record<number, DayStudyHours>;
   daysBeforeExamToIncreasePriority: number;
   taskSortMode?: TaskSortMode; // default: 'oldest'
+  autoQuizPrep?: boolean; // Genera un ripasso leggero per ogni quiz (default true)
+  examPrepDays?: number; // Finestra di preparazione agli esami (default 21)
+  dailyTaskGoal?: number; // Obiettivo giornaliero (n. attività), persistito
+  maxStudyBlockMinutes?: number; // Durata massima di un blocco di studio (default 120)
+  minStudyBlockMinutes?: number; // Durata minima di una sessione (default 15)
+  bufferMinutes?: number; // Pausa base tra attività (default 10)
+  weeklySummary?: WeeklySummaryPrefs; // Riepilogo settimanale (in-app / email)
   defaultHomeAddress?: string; // To detect travel needs
   defaultCommuteTimeMinutes?: number; // Estimated commute time in minutes
   isCommuteProductive?: boolean; // True if commute is by train/bus and can be used for study

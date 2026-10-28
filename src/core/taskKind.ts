@@ -27,10 +27,11 @@ export function lessonTaskNeeds(
  * Tipologia di un task. Unico punto in cui il tipo viene dedotto
  * (in precedenza la stessa logica basata sul titolo era duplicata in più file).
  */
-export type TaskKind = 'PROJECT' | 'FOLLOW_LESSON' | 'NOTES' | 'EXERCISES' | 'OTHER';
+export type TaskKind = 'PROJECT' | 'PREP' | 'FOLLOW_LESSON' | 'NOTES' | 'EXERCISES' | 'OTHER';
 
-export function getTaskKind(task: Pick<Task, 'title' | 'isProjectTask'>): TaskKind {
+export function getTaskKind(task: Pick<Task, 'title' | 'isProjectTask' | 'assessmentPrep'>): TaskKind {
   if (task.isProjectTask) return 'PROJECT';
+  if (task.assessmentPrep) return 'PREP';
   const t = task.title.toLowerCase();
   if (t.startsWith('seguire/recuperare') || t.includes('recuperare:') || t.includes('seguire')) return 'FOLLOW_LESSON';
   if (t.startsWith('sistemare appunti') || t.includes('appunti:') || t.startsWith('ripasso:') || t.includes('notes')) return 'NOTES';

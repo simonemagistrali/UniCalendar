@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { EfficiencyDashboard } from './EfficiencyDashboard';
 import { CatchUpAnalysisPage } from './CatchUpAnalysisPage';
 import { BarChart2, TrendingUp } from 'lucide-react';
+import { WeeklySummaryCard } from './WeeklySummaryCard';
 
 export function StatisticsDashboard() {
   const [activeTab, setActiveTab] = useState<'efficiency' | 'catchup'>(() => {
@@ -14,6 +15,7 @@ export function StatisticsDashboard() {
 
   return (
     <div className="statistics-dashboard" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <WeeklySummaryCard />
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
         <button
           onClick={() => setActiveTab('efficiency')}
