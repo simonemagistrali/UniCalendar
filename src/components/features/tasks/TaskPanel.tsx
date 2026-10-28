@@ -10,6 +10,7 @@ import { TaskCard } from './TaskCard';
 import { TaskQuickAdd } from './TaskQuickAdd';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
+import { getTaskKind } from '../../../core/taskKind';
 
 export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }) {
   const events = useAppStore(s => s.events);
@@ -60,13 +61,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
     OTHER: 'Altro'
   };
 
-  const getTaskType = (task: typeof tasks[0]) => {
-    if (task.isProjectTask) return 'PROJECT';
-    if (task.title.startsWith('Seguire/Recuperare lezione') || task.title.includes('Recuperare:')) return 'FOLLOW_LESSON';
-    if (task.title.startsWith('Sistemare appunti') || task.title.includes('Appunti:')) return 'NOTES';
-    if (task.title.startsWith('Esercizi') || task.title.includes('Esercizi:')) return 'EXERCISES';
-    return 'OTHER';
-  };
+  const getTaskType = (task: typeof tasks[0]) => getTaskKind(task);
 
   // Auto-generate tasks from past events
   useEffect(() => {
@@ -122,24 +117,8 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
     }
   }, [sortedTasks]); // eslint-disable-line
 
-  // Visual display sorting (Urgent > Date, Non-urgent > Date)
-  const displaySortedTasks = useMemo(() => {
-    return [...sortedTasks].sort((a, b) => {
-      if (a.status === 'in_progress' && b.status !== 'in_progress') return -1;
-      if (a.status !== 'in_progress' && b.status === 'in_progress') return 1;
-
-      const aUrgent = a.priorityScore >= 100 ? 1 : 0;
-      const bUrgent = b.priorityScore >= 100 ? 1 : 0;
-
-      if (aUrgent !== bUrgent) {
-        return bUrgent - aUrgent;
-      }
-
-      const aTime = new Date(a.createdAt).getTime();
-      const bTime = new Date(b.createdAt).getTime();
-      return aTime - bTime;
-    });
-  }, [sortedTasks]);
+  // Ordine unico: identico a quello usato dallo Scheduler (PriorityEngine).
+  const displaySortedTasks = sortedTasks;
 
   const filteredTasks = useMemo(() => {
     if (dailyGoalOnly) {
