@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Clock, BookOpen, Zap, Eye, Sparkles, Trash2, CheckSquare, MoreHorizontal } from 'lucide-react';
+import {
+  Clock,
+  BookOpen,
+  Zap,
+  Eye,
+  Sparkles,
+  Trash2,
+  CheckSquare,
+  MoreHorizontal,
+  ChevronUp,
+  ChevronDown,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { PriorityEngine } from '../../../core/PriorityEngine';
 import { TaskManager } from '../../../core/TaskManager';
@@ -13,6 +25,8 @@ import { Button } from '../../ui/Button';
 import { getTaskKind } from '../../../core/taskKind';
 import { AssessmentPlanner } from '../../../core/AssessmentPlanner';
 import type { TaskSortMode } from '../../../core/types';
+
+const CONTROLS_COLLAPSED_STORAGE_KEY = 'unicalendar_task_controls_collapsed';
 
 export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }) {
   const events = useAppStore(s => s.events);
@@ -47,6 +61,27 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
   const [cleanupMsg, setCleanupMsg] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
 
+  // Stato riduci/espandi per il blocco controlli (persistito in localStorage)
+  const [isControlsCollapsed, setIsControlsCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(CONTROLS_COLLAPSED_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleControlsCollapsed = () => {
+    setIsControlsCollapsed(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem(CONTROLS_COLLAPSED_STORAGE_KEY, String(next));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  };
+
   // Bulk management and delete state
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
@@ -56,7 +91,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
   const [bulkStatus, setBulkStatus] = useState<string>('ALL');
   const [bulkOnlyAi, setBulkOnlyAi] = useState<boolean>(false);
 
-  const TASK_TYPES = {
+  const TASK_TYPES: Record<string, string> = {
     ALL: 'Tutte le tipologie',
     FOLLOW_LESSON: 'Seguire/Recuperare lezione',
     NOTES: 'Sistemare appunti',
@@ -264,27 +299,78 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
   const doneCount = tasks.filter(t => t.status === 'done').length;
   const phantomCount = phantomTasks.length;
 
+  const filterLabel =
+    filter === 'todo'
+      ? 'Da fare'
+      : filter === 'in_progress'
+      ? 'In corso'
+      : filter === 'done'
+      ? 'Completate'
+      : filter === 'forecast'
+      ? '🔮 Previste'
+      : 'Tutte';
+
+  const activeCourseName = courseFilter !== 'ALL' ? courses.find(c => c.id === courseFilter)?.name : null;
+  const activeTypeLabel = typeFilter !== 'ALL' ? TASK_TYPES[typeFilter] : null;
+  const hasCustomFilter = filter !== 'todo' || typeFilter !== 'ALL' || courseFilter !== 'ALL';
+
   return (
-    <div className="task-panel">
+    <div className={`task-panel ${isControlsCollapsed && !dailyGoalOnly ? 'task-panel-collapsed' : ''}`}>
       <div className="task-panel-header">
-        <div className="task-panel-title">
-          <BookOpen size={18} />
-          <span>{dailyGoalOnly ? 'ATTIVITÀ DI OGGI' : 'COSE DA FARE'}</span>
+        <div className="task-panel-title-wrap">
+          <div className="task-panel-title">
+            <BookOpen size={18} />
+            <span>{dailyGoalOnly ? 'ATTIVITÀ DI OGGI' : 'COSE DA FARE'}</span>
+          </div>
+
+          {!dailyGoalOnly && isControlsCollapsed && (
+            <button
+              type="button"
+              className={`task-collapsed-summary-chip ${hasCustomFilter ? 'active' : ''}`}
+              onClick={toggleControlsCollapsed}
+              title="Clicca per espandere i filtri"
+            >
+              <span>{filterLabel}</span>
+              {activeCourseName && <span>• {activeCourseName}</span>}
+              {activeTypeLabel && <span>• {activeTypeLabel}</span>}
+            </button>
+          )}
         </div>
+
         {!dailyGoalOnly && (
-          <div className="task-panel-counts">
-            <span className="task-count-badge">{todoCount} da fare</span>
-            {inProgressCount > 0 && <span className="task-count-badge" style={{ backgroundColor: '#10b981', color: 'white' }}>{inProgressCount} in corso</span>}
-            <span className="task-count-badge task-count-done">{doneCount} fatte</span>
-            {phantomCount > 0 && (
-              <span className="task-count-badge task-count-phantom">{phantomCount} previste</span>
-            )}
+          <div className="task-panel-header-right">
+            <div className="task-panel-counts">
+              <span className="task-count-badge">{todoCount} da fare</span>
+              {inProgressCount > 0 && (
+                <span className="task-count-badge" style={{ backgroundColor: '#10b981', color: 'white' }}>
+                  {inProgressCount} in corso
+                </span>
+              )}
+              <span className="task-count-badge task-count-done">{doneCount} fatte</span>
+              {phantomCount > 0 && (
+                <span className="task-count-badge task-count-phantom">{phantomCount} previste</span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className={`task-collapse-toggle-btn ${isControlsCollapsed ? 'collapsed' : ''}`}
+              onClick={toggleControlsCollapsed}
+              aria-expanded={!isControlsCollapsed}
+              title={isControlsCollapsed ? 'Espandi filtri e aggiunta rapida' : 'Riduci filtri per dare più spazio ai task'}
+            >
+              <SlidersHorizontal size={14} />
+              <span className="task-collapse-toggle-text">
+                {isControlsCollapsed ? 'Filtri' : 'Riduci'}
+              </span>
+              {isControlsCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
+            </button>
           </div>
         )}
       </div>
 
-      {!dailyGoalOnly && (
-        <>
+      {!dailyGoalOnly && !isControlsCollapsed && (
+        <div className="task-controls-collapsible">
           <div className="task-filter-bar">
             {(['todo', 'in_progress', 'done', 'all', 'forecast'] as const).map(f => (
               <button
@@ -297,7 +383,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
             ))}
           </div>
 
-          <div className="task-type-filter-bar" style={{ display: 'flex', gap: '8px' }}>
+          <div className="task-type-filter-bar">
             <select 
               className="task-type-select" 
               value={typeFilter} 
@@ -402,7 +488,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
               backgroundColor: 'var(--bg-secondary)',
               border: '1px solid var(--border-color)',
               borderRadius: '8px',
-              margin: '8px 0',
+              margin: '4px 0',
               flexWrap: 'wrap'
             }}>
               <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
@@ -451,7 +537,7 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
           )}
           
           {filter === 'todo' && <TaskQuickAdd />}
-        </>
+        </div>
       )}
 
       <div className="task-list">
