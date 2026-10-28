@@ -89,3 +89,499 @@
 .weekly-card-delta.down { color: #ef4444; }
 .weekly-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
 .weekly-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+
+/* ─── Modern Event Form Modal (Fantastical / Notion Calendar Style) ─── */
+.event-form-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.efm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.efm-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.efm-section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.efm-clear-link {
+  border: none;
+  background: transparent;
+  color: var(--accent-primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.efm-clear-link:hover {
+  text-decoration: underline;
+}
+
+/* 1. Visual Category Pills */
+.efm-type-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.efm-type-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.efm-type-pill:hover {
+  border-color: var(--text-muted);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.efm-type-pill.active {
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* 2. Course Quick-Pills */
+.efm-course-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 112px;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.efm-course-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  max-width: 100%;
+}
+
+.efm-course-chip:hover {
+  background: var(--bg-hover);
+}
+
+.efm-course-chip.active {
+  font-weight: 600;
+}
+
+.efm-course-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.efm-course-chip-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 210px;
+}
+
+/* 3. Hero Title Input */
+.efm-hero-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--accent-primary);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.efm-hero-title-wrap:focus-within {
+  background: var(--bg-primary);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-secondary);
+}
+
+.efm-hero-title-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  outline: none;
+  min-width: 0;
+  font-family: var(--font-display);
+}
+
+.efm-hero-title-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.efm-title-course-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+/* 4. Card Blocks (Date/Time & Contextual) */
+.efm-card-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.efm-date-human-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  background: var(--accent-secondary);
+  padding: 2px 9px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.efm-quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.efm-quick-chip {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.efm-quick-chip:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.efm-quick-chip.active {
+  background: var(--accent-secondary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.efm-datetime-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1fr;
+  gap: 10px;
+}
+
+.efm-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.efm-input-group label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.efm-input-group input,
+.efm-input-group select,
+.efm-input-group textarea {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.efm-input-group input:focus,
+.efm-input-group select:focus,
+.efm-input-group textarea:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-secondary);
+}
+
+.efm-duration-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.efm-duration-label {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.efm-duration-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.efm-duration-chip {
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.efm-duration-chip:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.efm-duration-chip.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* 5. Lesson Type Segmented Grid & Smart Hint */
+.efm-segmented-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.efm-segment-btn {
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+
+.efm-segment-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.efm-segment-btn.active {
+  background: var(--accent-secondary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.efm-smart-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(26, 115, 232, 0.08);
+  color: var(--accent-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.efm-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding-top: 2px;
+}
+
+/* 6. Location Toggle + Address Inline */
+.efm-location-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.efm-location-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.efm-loc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.efm-loc-btn.active {
+  background: var(--bg-primary);
+  color: var(--accent-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.efm-location-input {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.efm-location-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-secondary);
+}
+
+/* 7. Progressive Disclosure (Advanced Options) */
+.efm-advanced-wrapper {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.efm-advanced-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.efm-advanced-toggle:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.efm-advanced-toggle span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.efm-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+/* 8. Footer Actions */
+.efm-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-color);
+}
+
+@media (max-width: 640px) {
+  .efm-datetime-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .efm-datetime-grid > .efm-input-group:first-child {
+    grid-column: 1 / -1;
+  }
+  .efm-segmented-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .efm-location-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .efm-location-toggle {
+    width: 100%;
+  }
+  .efm-loc-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
