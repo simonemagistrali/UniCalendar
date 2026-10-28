@@ -696,3 +696,45 @@
 .task-panel.task-panel-collapsed .task-list {
   max-height: calc(100vh - 165px);
 }
+
+
+/* ─── Allineamento Altezza Calendario e Pannello Task nella Prima Pagina ─── */
+.task-list {
+  padding-top: 10px;
+}
+
+@media (min-width: 901px) {
+  .calendar-layout {
+    align-items: stretch !important;
+  }
+
+  .calendar-main {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .calendar-main .calendar-container {
+    flex: 1;
+  }
+
+  .calendar-sidebar {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .calendar-sidebar .task-panel {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .calendar-sidebar .task-list {
+    flex: 1 1 0;
+    max-height: none !important;
+    min-height: 360px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+}
