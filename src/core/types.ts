@@ -95,6 +95,10 @@ export interface Task {
   isAiEnriched?: boolean; // True if notes, chapters or topics were added by AI
   assessmentPrep?: boolean; // True se generato dalla preparazione di un esame/quiz
   assessmentPhase?: 'review' | 'exercises' | 'mock' | 'final'; // Fase della preparazione
+  pauseCount?: number; // Quante volte il task è stato messo in pausa (indice di frammentazione)
+  inferredStartTime?: string; // Orario di inizio ricostruito (4 livelli di confidenza)
+  timeConfidence?: number; // Peso di affidabilità oraria w in [0, 1]
+  wasScheduledSlotHit?: boolean; // True se completato nel giorno/fascia pianificati dallo scheduler
 }
 
 /* ─── Study Session ─── */
@@ -113,6 +117,10 @@ export interface PerformanceRecord {
   estimatedMinutes: number;
   actualMinutes: number;
   completedAt: string;
+  taskKind?: string;
+  inferredStartTime?: string;
+  timeConfidence?: number;
+  pauseCount?: number;
 }
 
 /* ─── Per-Day Study Hours ─── */

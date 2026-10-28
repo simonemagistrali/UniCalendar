@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { CalendarEvent, Course, Task, UserPreferences } from './types';
+import { HabitAnalysisEngine } from './HabitAnalysisEngine';
 
 /**
  * AssessmentPlanner — preparazione a ritroso (backward planning) per esami e quiz,
@@ -25,6 +26,9 @@ export class AssessmentPlanner {
       existingTasks.filter(t => t.assessmentPrep && t.relatedEventId).map(t => t.relatedEventId as string)
     );
 
+    // Calcola la ritenzione mnemonica (Curva dell'Oblio di Ebbinghaus) sui topic studiati
+    const allTopicRetentions = HabitAnalysisEngine.computeTopicRetention(courses, events, existingTasks, [], now);
+
     for (const ev of events) {
       if (ev.type !== 'exam' && ev.type !== 'quiz') continue;
       if (!ev.courseId) continue;
@@ -35,6 +39,15 @@ export class AssessmentPlanner {
 
       const course = courses.find(c => c.id === ev.courseId);
       if (!course) continue;
+
+      const courseDecayedTopics = allTopicRetentions
+        .filter(tr => tr.courseId === course.id && tr.retentionPct < 80)
+        .slice(0, 4)
+        .map(tr => `${tr.topic} (${tr.retentionPct}%)`);
+      const decayedTopicsHint =
+        courseDecayedTopics.length > 0
+          ? `\nPriorità Ebbinghaus (temi più lontani): ${courseDecayedTopics.join(', ')}.`
+          : '';
 
       const daysLeft = (startMs - now) / 86400000;
       const label = ev.title;
@@ -66,7 +79,7 @@ export class AssessmentPlanner {
       });
 
       if (ev.type === 'quiz') {
-        out.push(make(`Ripasso quiz: ${label}`, 45, 'review', 'Ripasso mirato degli argomenti del quiz (richiamo attivo, senza rileggere passivamente).'));
+        out.push(make(`Ripasso quiz: ${label}`, 45, 'review', `Ripasso mirato degli argomenti del quiz (richiamo attivo, senza rileggere passivamente).${decayedTopicsHint}`));
         if (daysLeft >= 4) {
           out.push(make(`Ripasso quiz (2): ${label}`, 30, 'final', 'Secondo passaggio leggero, a distanza di qualche giorno dal primo.'));
         }
@@ -85,7 +98,7 @@ export class AssessmentPlanner {
           `Ripasso teoria (${i}/${reviews}): ${label}`,
           90,
           'review',
-          'Richiamo attivo: chiudi gli appunti, scrivi ciò che ricordi e poi verifica.'
+          `Richiamo attivo: chiudi gli appunti, scrivi ciò che ricordi e poi verifica.${i === 1 ? decayedTopicsHint : ''}`
         ));
       }
       if (hasExercises || exerciseSessions > 0) {

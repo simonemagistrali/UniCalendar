@@ -1,5 +1,6 @@
 import type { Task, Course, CalendarEvent, UserPreferences, PerformanceRecord, FutureWorkloadProjection, TaskSortMode } from './types';
 import { isLessonRecoveryTask } from './taskKind';
+import { HabitAnalysisEngine } from './HabitAnalysisEngine';
 
 /**
  * PriorityEngine — Calculates dynamic priority scores for tasks.
@@ -15,14 +16,20 @@ export class PriorityEngine {
     originalEvent: CalendarEvent | undefined,
     prefs: UserPreferences,
     history: PerformanceRecord[],
-    _futureProjection?: FutureWorkloadProjection
+    _futureProjection?: FutureWorkloadProjection,
+    effectiveCourseDifficulty?: number
   ): number {
     let score = 0;
     const now = Date.now();
 
-    // 1. Difficulty base — peso contenuto (34-70) per non dominare scadenze e arretrato
-    const diff = course ? course.difficulty : 5;
+    // 1. Difficulty base (ibrida: difficoltà dichiarata + difficoltà comportamentale reale)
+    const diff = effectiveCourseDifficulty ?? (course ? course.difficulty : 5);
     score += 30 + diff * 4;
+
+    // 1.5 Momentum per attività già avviate e messe in pausa (evita task lasciati a metà)
+    if ((task.accumulatedTime || 0) > 0) {
+      score += 18;
+    }
 
     // 2. Delay weight — how long since creation
     const daysSinceCreation = (now - new Date(task.createdAt).getTime()) / 86400000;
@@ -150,15 +157,25 @@ export class PriorityEngine {
       }
     }
 
+    // Calcola difficoltà reale/comportamentale per ogni corso
+    const strainList = HabitAnalysisEngine.computeCourseStrain(
+      Array.from(courses.values()),
+      tasks,
+      history,
+      events
+    );
+    const effectiveDiffByCourse = new Map(strainList.map(s => [s.courseId, s.effectiveDifficulty]));
+
     // Update scores
     const scored = tasks.map(t => {
       const course = t.courseId ? courses.get(t.courseId) : undefined;
       const exam = t.courseId ? examsByCourse.get(t.courseId) : undefined;
       const lesson = t.courseId ? lessonsByCourse.get(t.courseId) : undefined;
       const originalEvent = t.relatedEventId ? events.find(e => e.id === t.relatedEventId) : undefined;
+      const effDiff = t.courseId ? effectiveDiffByCourse.get(t.courseId) : undefined;
       return {
         ...t,
-        priorityScore: this.calculatePriority(t, course, exam, lesson, originalEvent, prefs, history)
+        priorityScore: this.calculatePriority(t, course, exam, lesson, originalEvent, prefs, history, undefined, effDiff)
       };
     });
 

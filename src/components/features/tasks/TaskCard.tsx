@@ -141,7 +141,8 @@ export function TaskCard({ task, isSelectable = false, isSelected = false, onTog
     updateTask(task.id, { 
       status: 'todo', 
       accumulatedTime: getTotalAccumulated(),
-      startedAt: undefined 
+      startedAt: undefined,
+      pauseCount: (task.pauseCount || 0) + 1,
     });
   };
 

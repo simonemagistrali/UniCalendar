@@ -1,6 +1,7 @@
 import type { Task, StudySession, UserPreferences, CalendarEvent, PerformanceRecord, FutureWorkloadProjection } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { getTaskKind } from './taskKind';
+import { HabitAnalysisEngine } from './HabitAnalysisEngine';
 
 /**
  * SchedulerEngine — Generates study sessions dynamically filling empty calendar gaps.
@@ -35,28 +36,68 @@ export class SchedulerEngine {
     let iterations = 0;
     const maxIterations = daysToSchedule * 120;
 
-    const maxBlockMinutes = Math.max(20, prefs.maxStudyBlockMinutes || 120);
+    // Adattamento automatico dei blocchi e del profilo energetico
+    const procProfile = HabitAnalysisEngine.computeProcrastinationProfile(tasks, prefs);
+    const chronoProfile = HabitAnalysisEngine.computeChronotypeProfile(tasks, existingEvents, [], prefs);
+
+    const maxBlockMinutes = Math.max(20, procProfile.recommendedMaxBlockMinutes || prefs.maxStudyBlockMinutes || 120);
     const minBlockMinutes = Math.max(10, prefs.minStudyBlockMinutes || 15);
     const distributeMode = prefs.studyDistributionPreference;
 
-    // Helper to pick candidate task for current slot
-    const pickNextTask = (isWeekend: boolean): Task | undefined => {
+    let lastScheduledCourseId: string | undefined;
+    let consecutiveSameCourseBlocks = 0;
+
+    // Helper to pick candidate task for current slot (con Energy Matching + Interleaving)
+    const pickNextTask = (isWeekend: boolean, slotTime: Date): Task | undefined => {
       const candidates = todoTasks.filter(t => !isTaskDoneInSchedule(t.id));
       if (candidates.length === 0) return undefined;
 
+      let pool = candidates;
+
       if (distributeMode === 'weekdays_theory_weekend_exercises') {
         if (isWeekend) {
-          // Weekend: prefer exercises
-          const exerciseTask = candidates.find(t => getTaskKind(t) === 'EXERCISES');
-          if (exerciseTask) return exerciseTask;
+          const exercisesPool = candidates.filter(t => getTaskKind(t) === 'EXERCISES');
+          if (exercisesPool.length > 0) pool = exercisesPool;
         } else {
-          // Weekdays: prefer theory / notes / lessons
-          const theoryTask = candidates.find(t => getTaskKind(t) !== 'EXERCISES');
-          if (theoryTask) return theoryTask;
+          const theoryPool = candidates.filter(t => getTaskKind(t) !== 'EXERCISES');
+          if (theoryPool.length > 0) pool = theoryPool;
         }
       }
 
-      return candidates[0];
+      // Finestra dei top 4 candidati più urgenti tra cui ottimizzare energia e varietà
+      const topWindow = pool.slice(0, 4);
+
+      // 1. Interleaving anti-monotonia: dopo 2 blocchi consecutivi dello stesso corso,
+      // se nei top 4 c'è un altro corso urgente, alterna per evitare saturazione cognitiva
+      let filteredWindow = topWindow;
+      if (consecutiveSameCourseBlocks >= 2 && lastScheduledCourseId) {
+        const differentCourse = topWindow.filter(t => t.courseId !== lastScheduledCourseId);
+        if (differentCourse.length > 0) {
+          filteredWindow = differentCourse;
+        }
+      }
+
+      // 2. Allineamento Cronobiologico (Energy-Slot Matching)
+      if (chronoProfile.peakBand && chronoProfile.chronotypeLabel !== 'In calibrazione') {
+        const currentBand = HabitAnalysisEngine.getBandForDate(slotTime);
+        if (currentBand === chronoProfile.peakBand.id) {
+          // Fascia di massimo focus: privilegia esercizi, simulazioni d'esame o progetti
+          const highCognitive = filteredWindow.find(t => {
+            const k = getTaskKind(t);
+            return k === 'EXERCISES' || k === 'PROJECT' || (k === 'PREP' && t.assessmentPhase === 'mock');
+          });
+          if (highCognitive) return highCognitive;
+        } else if (chronoProfile.dipBand && currentBand === chronoProfile.dipBand.id) {
+          // Fascia di calo energetico: privilegia appunti o ripassi brevi
+          const lowCognitive = filteredWindow.find(t => {
+            const k = getTaskKind(t);
+            return k === 'NOTES' || t.estimatedDuration <= 45;
+          });
+          if (lowCognitive) return lowCognitive;
+        }
+      }
+
+      return filteredWindow[0] || pool[0];
     };
 
     while (currentTime < endScheduleDate && iterations < maxIterations) {
@@ -68,11 +109,12 @@ export class SchedulerEngine {
       // Skip disabled days
       if (!dayConfig || !dayConfig.enabled) {
         currentTime = this.nextDay(currentTime);
+        consecutiveSameCourseBlocks = 0;
         continue;
       }
 
       // Check if all tasks are completed
-      const task = pickNextTask(isWeekend);
+      const task = pickNextTask(isWeekend, currentTime);
       if (!task) break;
 
       let remainingTime = remainingDuration.get(task.id) || 0;
@@ -171,6 +213,13 @@ export class SchedulerEngine {
 
         remainingTime -= actualMinutes;
         remainingDuration.set(task.id, Math.max(0, remainingTime));
+
+        if (task.courseId && task.courseId === lastScheduledCourseId) {
+          consecutiveSameCourseBlocks++;
+        } else {
+          lastScheduledCourseId = task.courseId;
+          consecutiveSameCourseBlocks = 1;
+        }
       }
 
       currentTime = new Date(blockEnd);

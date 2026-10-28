@@ -6,6 +6,7 @@ import { TaskManager } from '../core/TaskManager';
 import { getTaskKind } from '../core/taskKind';
 import { PriorityEngine } from '../core/PriorityEngine';
 import { SchedulerEngine } from '../core/SchedulerEngine';
+import { HabitAnalysisEngine } from '../core/HabitAnalysisEngine';
 import { TravelManager } from '../core/TravelManager';
 import { MealManager } from '../core/MealManager';
 import { FutureProjectionEngine } from '../core/FutureProjectionEngine';
@@ -608,6 +609,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }
 
+      // Ricostruzione finestra temporale a 4 livelli di confidenza (anche senza cliccare "Inizia")
+      const timeWindow = HabitAnalysisEngine.reconstructStudyWindow(
+        task,
+        actualMinutes,
+        completionMode,
+        now,
+        s.tasks,
+        s.events,
+        s.studySessions
+      );
+
       const nextTasks = s.tasks.map(t => {
         if (t.id === id) {
           return {
@@ -618,6 +630,9 @@ export const useAppStore = create<AppState>((set, get) => ({
             completionMode,
             startedAt: undefined,
             accumulatedTime: 0,
+            inferredStartTime: timeWindow.inferredStartTime,
+            timeConfidence: timeWindow.timeConfidence,
+            wasScheduledSlotHit: timeWindow.wasScheduledSlotHit,
           };
         }
         if (skippedIds.has(t.id)) {
@@ -638,6 +653,10 @@ export const useAppStore = create<AppState>((set, get) => ({
               estimatedMinutes: task.estimatedDuration,
               actualMinutes,
               completedAt: now,
+              taskKind: getTaskKind(task),
+              inferredStartTime: timeWindow.inferredStartTime,
+              timeConfidence: timeWindow.timeConfidence,
+              pauseCount: task.pauseCount || 0,
             },
           ]
         : s.performanceHistory;

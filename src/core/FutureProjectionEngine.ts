@@ -7,6 +7,7 @@ import type {
   FutureWorkloadProjection,
 } from './types';
 import { lessonTaskNeeds } from './taskKind';
+import { HabitAnalysisEngine } from './HabitAnalysisEngine';
 
 /**
  * FutureProjectionEngine — Projects future workload by simulating what tasks
@@ -77,7 +78,15 @@ export class FutureProjectionEngine {
       // --- Phantom Task 1: Follow/Recover lesson ---
       // Only generate if student is likely to MISS the lesson
       if (!willLikelyAttend) {
-        const adjustedLessonDuration = Math.round(lessonDurationMin * multiplier * reservationFactor);
+        const adaptiveFollowMin = HabitAnalysisEngine.estimateTaskDuration(
+          lessonDurationMin,
+          course.id,
+          'FOLLOW_LESSON',
+          existingTasks,
+          history,
+          events
+        );
+        const adjustedLessonDuration = Math.round(adaptiveFollowMin * reservationFactor);
         const followPhantom: PhantomTask = {
           courseId: course.id,
           courseName: course.name,
@@ -97,7 +106,15 @@ export class FutureProjectionEngine {
       // --- Phantom Task 2: Notes revision (if required by course prefs) ---
       const wants = lessonTaskNeeds(lesson.lessonType, prefs, !!lesson.studyPreferencesOverride);
       if (wants.notes) {
-        const notesDuration = Math.round(revisionTime * reservationFactor);
+        const adaptiveNotesMin = HabitAnalysisEngine.estimateTaskDuration(
+          revisionTime,
+          course.id,
+          'NOTES',
+          existingTasks,
+          history,
+          events
+        );
+        const notesDuration = Math.round(adaptiveNotesMin * reservationFactor);
         const notesPhantom: PhantomTask = {
           courseId: course.id,
           courseName: course.name,
@@ -114,8 +131,16 @@ export class FutureProjectionEngine {
 
       // --- Phantom Task 3: Exercises (if required by course prefs) ---
       if (wants.exercises) {
+        const adaptiveExerciseMin = HabitAnalysisEngine.estimateTaskDuration(
+          Math.round(revisionTime * 1.5),
+          course.id,
+          'EXERCISES',
+          existingTasks,
+          history,
+          events
+        );
         const exerciseDuration = Math.round(
-          revisionTime * 1.5 * reservationFactor
+          adaptiveExerciseMin * reservationFactor
         );
         const exercisePhantom: PhantomTask = {
           courseId: course.id,

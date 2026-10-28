@@ -2,6 +2,7 @@ import type { CalendarEvent, Course, Task } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { courseNameFromTitle, normalizeCourseName, BOGUS_COURSE_NAMES, findCourseForTitle } from './courseNames';
 import { lessonTaskNeeds } from './taskKind';
+import { HabitAnalysisEngine } from './HabitAnalysisEngine';
 
 /**
  * TaskManager — Scans past events and generates tasks automatically.
@@ -101,26 +102,15 @@ export class TaskManager {
 
       const eventDurationMinutes = Math.max(0, Math.round((new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) / 60000)) || 120;
       
-      // Calculate historical multiplier for unbiased smart estimation
-      let lessonMultiplier = 1.0;
-      let totalNominal = 0;
-      let totalActual = 0;
-      for (const t of existingTasks) {
-        if (t.status === 'done' && t.actualDuration && t.courseId === course.id && t.title.startsWith('Seguire/Recuperare')) {
-           const ev = events.find(e => e.id === t.relatedEventId);
-           if (ev) {
-             const nominal = Math.max(0, Math.round((new Date(ev.endTime).getTime() - new Date(ev.startTime).getTime()) / 60000)) || 120;
-             totalNominal += nominal;
-             totalActual += t.actualDuration;
-           }
-        }
-      }
-      if (totalNominal > 0) {
-        lessonMultiplier = totalActual / totalNominal;
-        lessonMultiplier = Math.max(0.5, Math.min(3.0, lessonMultiplier));
-      }
-      
-      const adjustedLessonDuration = Math.round(eventDurationMinutes * lessonMultiplier);
+      // Stima adattiva Bayesiana / EWMA per Corso e Tipo Task
+      const adjustedLessonDuration = HabitAnalysisEngine.estimateTaskDuration(
+        eventDurationMinutes,
+        course.id,
+        'FOLLOW_LESSON',
+        existingTasks,
+        [],
+        events
+      );
 
       let followTaskId: string | null = null;
       let notesTaskId: string | null = null;
@@ -150,6 +140,22 @@ export class TaskManager {
       }
 
       const revisionTime = course.defaultStudyPreferences.estimatedRevisionTimePerLesson || 45;
+      const adaptiveNotesMinutes = HabitAnalysisEngine.estimateTaskDuration(
+        revisionTime,
+        course.id,
+        'NOTES',
+        existingTasks,
+        [],
+        events
+      );
+      const adaptiveExerciseMinutes = HabitAnalysisEngine.estimateTaskDuration(
+        Math.round(revisionTime * 1.5),
+        course.id,
+        'EXERCISES',
+        existingTasks,
+        [],
+        events
+      );
 
       // Notes revision task
       if (needsNotes) {
@@ -163,7 +169,7 @@ export class TaskManager {
           lessonTimeSlot: timeSlot,
           status: 'todo',
           priorityScore: 0,
-          estimatedDuration: revisionTime,
+          estimatedDuration: adaptiveNotesMinutes,
           createdAt: now,
           dependencies: followTaskId ? [followTaskId] : [],
           postponedCount: 0,
@@ -192,7 +198,7 @@ export class TaskManager {
           lessonTimeSlot: timeSlot,
           status: 'todo',
           priorityScore: 0,
-          estimatedDuration: Math.round(revisionTime * 1.5),
+          estimatedDuration: adaptiveExerciseMinutes,
           createdAt: now,
           dependencies,
           postponedCount: 0,
