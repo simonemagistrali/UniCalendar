@@ -59,6 +59,12 @@ export function CourseCalendarTab({ course }: { course: Course }) {
     return keyA.localeCompare(keyB);
   });
 
+  // Trova le lezioni a calendario generale per questa materia che non sono ancora state dettagliate nel piano
+  const existingCourseEvents = events.filter(e => 
+    e.courseId === course.id || 
+    (!e.courseId && e.title && course.name && e.title.toLowerCase().includes(course.name.toLowerCase()))
+  ).filter(e => e.type === 'lesson');
+
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
@@ -288,7 +294,18 @@ export function CourseCalendarTab({ course }: { course: Course }) {
 
       {plan.length === 0 && !formOpen && (
         <div className="cp-empty">
-          Nessuna lezione memorizzata per questo corso. Importa il PDF/Excel dell'orario con l'AI oppure inseriscile manualmente.
+          {existingCourseEvents.length > 0 ? (
+            <div>
+              <p style={{ margin: '0 0 8px 0', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Ci sono {existingCourseEvents.length} lezioni nel calendario generale per questo corso.
+              </p>
+              <p style={{ margin: 0, fontSize: '0.8rem' }}>
+                Clicca in alto su <strong>"Importa con AI"</strong> per caricare il syllabus/tabella lezioni: l'AI collegherà automaticamente ogni data al rispettivo argomento, capitolo ed esercitazione!
+              </p>
+            </div>
+          ) : (
+            'Nessuna lezione memorizzata per questo corso. Importa il PDF/Excel dell\'orario con l\'AI oppure inseriscile manualmente.'
+          )}
         </div>
       )}
 

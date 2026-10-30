@@ -10,6 +10,7 @@ interface Props {
 
 export function CourseOverviewTab({ course, onAnalyze }: Props) {
   const patch = useInfoPatch(course);
+  const events = useAppStore(s => s.events);
   const info = course.info ?? {};
 
   const [overview, setOverview] = useState(info.overview ?? '');
@@ -23,13 +24,20 @@ export function CourseOverviewTab({ course, onAnalyze }: Props) {
   const topics = info.topics ?? [];
   const studied = topics.filter(t => t.studied).length;
   const assessments = info.assessments ?? [];
-  const lessons = info.lessonPlan ?? [];
+  const planLessons = info.lessonPlan ?? [];
+  const calendarEvents = events.filter(e => e.courseId === course.id && (e.type === 'lesson' || (!e.courseId && e.title.toLowerCase().includes(course.name.toLowerCase()))));
+  const totalLessonsCount = Math.max(planLessons.length, calendarEvents.length);
   const docs = info.documents ?? [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="cp-stats">
-        <div className="cp-stat"><div className="cp-stat-value">{lessons.length}</div><div className="cp-stat-label">lezioni nel calendario del corso</div></div>
+        <div className="cp-stat">
+          <div className="cp-stat-value">{totalLessonsCount}</div>
+          <div className="cp-stat-label">
+            {planLessons.length > 0 ? 'lezioni con dettagli' : calendarEvents.length > 0 ? 'lezioni nel calendario (in attesa di syllabus)' : 'lezioni nel calendario'}
+          </div>
+        </div>
         <div className="cp-stat"><div className="cp-stat-value">{studied}/{topics.length}</div><div className="cp-stat-label">argomenti studiati</div></div>
         <div className="cp-stat"><div className="cp-stat-value">{assessments.filter(a => a.done).length}/{assessments.length}</div><div className="cp-stat-label">prove e scadenze completate</div></div>
       </div>
