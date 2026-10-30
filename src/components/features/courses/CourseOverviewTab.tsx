@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Sparkles, FileText } from 'lucide-react';
+import { useAppStore } from '../../../store/useAppStore';
 import type { Course } from '../../../core/types';
 import { useInfoPatch } from './courseHooks';
 
