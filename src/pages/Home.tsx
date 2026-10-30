@@ -10,6 +10,7 @@ import { ImportCalendarModal } from '../components/features/events/ImportCalenda
 import { ImportSyllabusModal } from '../components/features/events/ImportSyllabusModal';
 import { TaskPanel } from '../components/features/tasks/TaskPanel';
 import { CourseManager } from '../components/features/courses/CourseManager';
+import { CoursesPage } from '../components/features/courses/CoursesPage';
 import { CatchUpMini } from '../components/features/dashboard/CatchUpIndicator';
 import { StatisticsDashboard } from '../components/features/dashboard/StatisticsDashboard';
 import { AnkiDashboard } from '../pages/AnkiDashboard';
@@ -33,7 +34,7 @@ export function Home() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isSyllabusModalOpen, setIsSyllabusModalOpen] = useState(false);
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'calendar' | 'tasks' | 'statistics' | 'anki'>(() => {
+  const [activeTab, setActiveTab] = useState<'calendar' | 'tasks' | 'statistics' | 'anki' | 'courses'>(() => {
     return (localStorage.getItem('unicalendar_activeTab') as any) || 'calendar';
   });
 
@@ -124,7 +125,7 @@ export function Home() {
           <button className={`sidebar-nav-item ${activeTab === 'anki' ? 'active' : ''}`} onClick={() => { setActiveTab('anki'); setSidebarOpen(false); }}>
             <img src="https://upload.wikimedia.org/wikipedia/commons/3/3d/Anki-icon.svg" alt="Anki" style={{ width: 20, height: 20, filter: 'grayscale(100%) brightness(200%)' }} /> Anki
           </button>
-          <button className="sidebar-nav-item" onClick={() => { setIsCourseModalOpen(true); setSidebarOpen(false); }}>
+          <button className={`sidebar-nav-item ${activeTab === 'courses' ? 'active' : ''}`} onClick={() => { setActiveTab('courses'); setSidebarOpen(false); }}>
             <GraduationCap size={20} /> Corsi
           </button>
         </nav>
@@ -156,7 +157,7 @@ export function Home() {
       <main className="main-content">
         <header className="main-header" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <h1 className="main-title" style={{ margin: 0 }}>
-            {activeTab === 'calendar' ? 'Calendario' : activeTab === 'tasks' ? 'Attività' : activeTab === 'statistics' ? 'Statistiche' : 'Studio Anki'}
+            {activeTab === 'calendar' ? 'Calendario' : activeTab === 'tasks' ? 'Attività' : activeTab === 'statistics' ? 'Statistiche' : activeTab === 'courses' ? 'Gestione Corsi' : 'Studio Anki'}
           </h1>
         </header>
 
@@ -188,6 +189,12 @@ export function Home() {
           {activeTab === 'anki' && (
             <div className="anki-page-wrapper">
               <AnkiDashboard />
+            </div>
+          )}
+
+          {activeTab === 'courses' && (
+            <div className="courses-page-wrapper">
+              <CoursesPage />
             </div>
           )}
         </div>
@@ -222,6 +229,13 @@ export function Home() {
         >
           <span className="mobile-nav-icon"><Brain size={22} /></span>
           <span>Anki</span>
+        </button>
+        <button
+          className={`mobile-nav-item ${activeTab === 'courses' ? 'active' : ''}`}
+          onClick={() => setActiveTab('courses')}
+        >
+          <span className="mobile-nav-icon"><GraduationCap size={22} /></span>
+          <span>Corsi</span>
         </button>
         <button
           className="mobile-nav-item"

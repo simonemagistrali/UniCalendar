@@ -99,3 +99,4 @@ ok('decryptField compatibile con il formato AES dell\'app');
 
 await client.close();
 console.log(`\n${passed} gruppi di test superati.`);
+

@@ -8,6 +8,7 @@ import type {
 } from './types';
 import { lessonTaskNeeds } from './taskKind';
 import { HabitAnalysisEngine } from './HabitAnalysisEngine';
+import { lessonLabel, lessonDetailsText } from './lessonLink';
 
 /**
  * FutureProjectionEngine — Projects future workload by simulating what tasks
@@ -68,6 +69,8 @@ export class FutureProjectionEngine {
       const reservationFactor = this.getAdaptiveReservationFactor(history, course.id);
 
       const eventDate = new Date(lesson.startTime).toLocaleDateString('it-IT');
+      // Con l'argomento noto (es. da AI) il task previsto mostra gia' di cosa si tratta
+      const label = lessonLabel(lesson, course);
 
       // --- Behavioral Prediction: Attendance Rate ---
       // If the student usually attends this course (≥70%), don't generate
@@ -94,7 +97,7 @@ export class FutureProjectionEngine {
           expectedAvailableAfter: lesson.endTime,
           estimatedDuration: adjustedLessonDuration,
           type: 'follow_recover',
-          title: `[Previsto] Recuperare: ${lesson.title} (${eventDate})`,
+          title: `[Previsto] Recuperare: ${label} (${eventDate})`,
         };
         phantomTasks.push(followPhantom);
         this.addToProjection(projectionByDay, dayKey, adjustedLessonDuration);
@@ -122,7 +125,7 @@ export class FutureProjectionEngine {
           expectedAvailableAfter: lesson.endTime,
           estimatedDuration: notesDuration,
           type: 'notes',
-          title: `[Previsto] Appunti: ${lesson.title} (${eventDate})`,
+          title: `[Previsto] Appunti: ${label} (${eventDate})`,
         };
         phantomTasks.push(notesPhantom);
         this.addToProjection(projectionByDay, dayKey, notesDuration);
@@ -149,7 +152,7 @@ export class FutureProjectionEngine {
           expectedAvailableAfter: lesson.endTime,
           estimatedDuration: exerciseDuration,
           type: 'exercises',
-          title: `[Previsto] Esercizi: ${lesson.title} (${eventDate})`,
+          title: `[Previsto] Esercizi: ${label} (${eventDate})`,
         };
         phantomTasks.push(exercisePhantom);
         this.addToProjection(projectionByDay, dayKey, exerciseDuration);
@@ -188,7 +191,7 @@ export class FutureProjectionEngine {
       return {
         id: `phantom-${pt.sourceEventId}-${pt.type}`,
         title: pt.title,
-        description: `Previsto dopo la lezione di ${lessonDateStr}`,
+        description: [`Previsto dopo la lezione di ${lessonDateStr}`, sourceEvent ? lessonDetailsText(sourceEvent) : ''].filter(Boolean).join('\n'),
         courseId: pt.courseId,
         relatedEventId: pt.sourceEventId,
         status: 'todo' as const,

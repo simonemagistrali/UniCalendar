@@ -4,6 +4,7 @@ import { SemesterManager, type CloseSemesterOptions, type CloseSemesterResult } 
 import { saveState, loadState } from '../core/persistence';
 import { TaskManager } from '../core/TaskManager';
 import { getTaskKind } from '../core/taskKind';
+import { refreshLessonTasks } from '../core/lessonLink';
 import { PriorityEngine } from '../core/PriorityEngine';
 import { SchedulerEngine } from '../core/SchedulerEngine';
 import { HabitAnalysisEngine } from '../core/HabitAnalysisEngine';
@@ -42,7 +43,6 @@ const defaultPreferences: UserPreferences = {
   defaultCommuteTimeMinutes: 45,
   isCommuteProductive: false,
   ankiAverageTimeSeconds: 15,
-  geminiApiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || '',
 };
 
 /**
@@ -78,7 +78,6 @@ function mergePreferences(saved: unknown): UserPreferences {
     defaultCommuteTimeMinutes: p.defaultCommuteTimeMinutes ?? 45,
     isCommuteProductive: p.isCommuteProductive ?? false,
     ankiAverageTimeSeconds: p.ankiAverageTimeSeconds ?? 15,
-    geminiApiKey: p.geminiApiKey || defaultPreferences.geminiApiKey,
   };
 }
 
@@ -126,6 +125,8 @@ interface AppState {
   addCourse: (course: Course) => void;
   updateCourse: (id: string, updates: Partial<Course>) => void;
   removeCourse: (id: string) => void;
+  /** Salva in un'unica operazione atomica corso + eventi + task (usato dall'import AI dei documenti). */
+  commitCourseImport: (data: { course: Course; events: CalendarEvent[]; tasks: Task[] }) => void;
   repairCourses: () => { changed: boolean; count: number };
   
   // Sessions
@@ -740,6 +741,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
+  commitCourseImport: ({ course, events, tasks }) => {
+    get().saveSnapshot();
+    set((s) => {
+      const exists = s.courses.some(c => c.id === course.id);
+      const next = {
+        ...s,
+        courses: exists ? s.courses.map(c => (c.id === course.id ? course : c)) : [...s.courses, course],
+        events,
+        tasks: deduplicateTasks(tasks, events),
+      };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
   repairCourses: () => {
     const s = get();
     const result = repairCourseNames({
@@ -823,7 +839,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     // 1. Generate tasks from past events
     const { updatedEvents, newTasks } = TaskManager.generateTasksFromPastEvents(state.events, state.courses, state.tasks);
-    const allTasks = [...state.tasks, ...newTasks];
+    // Riallinea titolo/descrizione dei task di lezione agli argomenti correnti degli eventi (es. importati da AI)
+    const refreshed = refreshLessonTasks([...state.tasks, ...newTasks], updatedEvents, state.courses);
+    const allTasks = refreshed.tasks;
 
     // 1.5 Future Workload Projection — predict tasks from upcoming lessons
     const futureProjection = FutureProjectionEngine.project(

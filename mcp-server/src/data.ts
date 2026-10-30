@@ -5,7 +5,8 @@
  *  1. UNICALENDAR_DEMO=1            → dati di esempio (per provare il server)
  *  2. UNICALENDAR_DATA_FILE=<path>  → file JSON esportato dall'app (stato locale)
  *  3. UNICALENDAR_UID=<uid>         → lettura da Firestore con Firebase Admin
- *                                      (richiede GOOGLE_APPLICATION_CREDENTIALS)
+ *                                      (richiede GOOGLE_APPLICATION_CREDENTIALS, oppure
+ *                                      FIREBASE_SERVICE_ACCOUNT con il JSON della chiave)
  *
  * IMPORTANTE: in un server MCP stdio NIENTE deve andare su stdout (è il canale del
  * protocollo). Tutti i log usano console.error.
@@ -74,11 +75,13 @@ async function loadFromFile(path: string): Promise<UserData> {
 
 async function loadFromFirestore(uid: string): Promise<UserData> {
   // Import dinamico: chi usa solo demo/file non deve avere le credenziali.
-  const { initializeApp, applicationDefault, getApps } = await import('firebase-admin/app');
+  const { initializeApp, applicationDefault, cert, getApps } = await import('firebase-admin/app');
   const { getFirestore } = await import('firebase-admin/firestore');
 
   if (getApps().length === 0) {
-    initializeApp({ credential: applicationDefault() });
+    // Su hosting serverless (Vercel) non ci sono file: la chiave arriva come JSON in una variabile.
+    const inline = process.env.FIREBASE_SERVICE_ACCOUNT;
+    initializeApp({ credential: inline ? cert(JSON.parse(inline)) : applicationDefault() });
   }
   const db = getFirestore();
 
@@ -126,3 +129,4 @@ export async function getUserData(): Promise<UserData> {
 export function clearDataCache(): void {
   cache = null;
 }
+

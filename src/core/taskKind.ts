@@ -33,6 +33,12 @@ export function getTaskKind(task: Pick<Task, 'title' | 'isProjectTask' | 'assess
   if (task.isProjectTask) return 'PROJECT';
   if (task.assessmentPrep) return 'PREP';
   const t = task.title.toLowerCase();
+  // Il prefisso del titolo è la fonte più affidabile: l'argomento della lezione (che può contenere
+  // parole come "notes" o "esercizi") non deve cambiare il tipo del task.
+  const stripped = t.replace(/^\[previsto\]\s*/, '');
+  if (stripped.startsWith('seguire/recuperare') || stripped.startsWith('recuperare:')) return 'FOLLOW_LESSON';
+  if (stripped.startsWith('sistemare appunti') || stripped.startsWith('appunti:') || stripped.startsWith('ripasso:')) return 'NOTES';
+  if (stripped.startsWith('esercizi')) return 'EXERCISES';
   if (t.startsWith('seguire/recuperare') || t.includes('recuperare:') || t.includes('seguire')) return 'FOLLOW_LESSON';
   if (t.startsWith('sistemare appunti') || t.includes('appunti:') || t.startsWith('ripasso:') || t.includes('notes')) return 'NOTES';
   if (t.startsWith('esercizi') || t.includes('esercizi:') || t.includes('eserciz')) return 'EXERCISES';

@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { courseNameFromTitle, normalizeCourseName, BOGUS_COURSE_NAMES, findCourseForTitle } from './courseNames';
 import { lessonTaskNeeds } from './taskKind';
 import { HabitAnalysisEngine } from './HabitAnalysisEngine';
+import { eventSlot, lessonLabel, lessonDetailsText, taskBelongsToEvent } from './lessonLink';
 
 /**
  * TaskManager — Scans past events and generates tasks automatically.
@@ -58,33 +59,23 @@ export class TaskManager {
 
       const prefs = event.studyPreferencesOverride || course.defaultStudyPreferences;
       
-      const eventDateIt = new Date(event.startTime).toLocaleDateString('it-IT');
-      const eventDateIso = event.startTime.split('T')[0];
-      const startHM = new Date(event.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-      const endHM = new Date(event.endTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-      const timeSlot = `${startHM} - ${endHM}`;
+      const { dateIt: eventDateIt, timeSlot } = eventSlot(event);
 
-      const followTitle = `Seguire/Recuperare lezione: ${event.title} (${eventDateIt} ${timeSlot})`;
-      const notesTitle = `Sistemare appunti: ${event.title} (${eventDateIt} ${timeSlot})`;
-      const exerciseTitle = `Esercizi: ${event.title} (${eventDateIt} ${timeSlot})`;
+      // Se la lezione ha già un argomento (es. da AI/syllabus) i task nascono già con argomento e dettagli
+      const label = lessonLabel(event, course);
+      const details = lessonDetailsText(event);
+      const enriched = !!details;
+
+      const followTitle = `Seguire/Recuperare lezione: ${label} (${eventDateIt} ${timeSlot})`;
+      const notesTitle = `Sistemare appunti: ${label} (${eventDateIt} ${timeSlot})`;
+      const exerciseTitle = `Esercizi: ${label} (${eventDateIt} ${timeSlot})`;
 
       const followKey = `${course.id}-${followTitle}`;
       const notesKey = `${course.id}-${notesTitle}`;
       const exerciseKey = `${course.id}-${exerciseTitle}`;
 
-      // Helper to check if task matches this event slot in ANY date format
-      const matchesEventSlot = (t: Task) => {
-        if (t.relatedEventId === event.id) return true;
-        if (t.courseId !== course.id) return false;
-        const d = t.lessonDate || '';
-        const dateMatches = d === eventDateIt || d === eventDateIso || 
-                            t.title.includes(eventDateIt) || t.title.includes(eventDateIso);
-        if (!dateMatches) return false;
-        if (t.lessonTimeSlot && timeSlot) {
-          return t.lessonTimeSlot === timeSlot;
-        }
-        return true;
-      };
+      // Il task appartiene a questa lezione (per id evento oppure corso + data + fascia oraria)
+      const matchesEventSlot = (t: Task) => taskBelongsToEvent(t, event);
 
       const hasFollowForSlot = existingTasks.some(t => isFollowTask(t) && matchesEventSlot(t));
       const hasNotesForSlot = existingTasks.some(t => isNotesTask(t) && matchesEventSlot(t));
@@ -120,11 +111,12 @@ export class TaskManager {
         const followTask: Task = {
           id: uuidv4(),
           title: followTitle,
-          description: `Segna come completato se hai seguito la lezione, altrimenti l'app pianificherà il recupero.`,
+          description: enriched ? `Segna come completato se hai seguito la lezione, altrimenti l'app pianificherà il recupero.\n${details}` : `Segna come completato se hai seguito la lezione, altrimenti l'app pianificherà il recupero.`,
           courseId: course.id,
           relatedEventId: event.id,
           lessonDate: eventDateIt,
           lessonTimeSlot: timeSlot,
+          isAiEnriched: enriched || undefined,
           status: 'todo',
           priorityScore: 50,
           estimatedDuration: adjustedLessonDuration,
@@ -162,11 +154,12 @@ export class TaskManager {
         const notesTask: Task = {
           id: uuidv4(),
           title: notesTitle,
-          description: `Revisione appunti della lezione`,
+          description: enriched ? details : `Revisione appunti della lezione`,
           courseId: course.id,
           relatedEventId: event.id,
           lessonDate: eventDateIt,
           lessonTimeSlot: timeSlot,
+          isAiEnriched: enriched || undefined,
           status: 'todo',
           priorityScore: 0,
           estimatedDuration: adaptiveNotesMinutes,
@@ -191,11 +184,12 @@ export class TaskManager {
         const exerciseTask: Task = {
           id: uuidv4(),
           title: exerciseTitle,
-          description: `Esercitazione post-lezione`,
+          description: enriched ? details : `Esercitazione post-lezione`,
           courseId: course.id,
           relatedEventId: event.id,
           lessonDate: eventDateIt,
           lessonTimeSlot: timeSlot,
+          isAiEnriched: enriched || undefined,
           status: 'todo',
           priorityScore: 0,
           estimatedDuration: adaptiveExerciseMinutes,

@@ -20,6 +20,69 @@ export interface Course {
   defaultStudyPreferences: StudyPreferences;
   isCustomName?: boolean; // Se true, il nome è stato modificato o creato a mano ed è predefinito (protetto da riparazioni automatiche)
   originalName?: string;   // Nome originario rilevato dal calendario prima della modifica a mano
+  /** Scheda della materia (inserita a mano o estratta dall'AI) */
+  info?: CourseInfo;
+}
+
+/* ─── Scheda del corso ─── */
+export type AssessmentType = 'quiz' | 'lab' | 'exam' | 'oral' | 'project' | 'deadline' | 'other';
+
+export interface CourseAssessment {
+  id: string;
+  type: AssessmentType;
+  title: string;
+  weightPercent?: number; // peso sul voto finale
+  date?: string; // YYYY-MM-DD (data della prova o scadenza)
+  time?: string; // HH:mm
+  notes?: string;
+  done?: boolean; // spuntata (svolta / consegnata)
+  grade?: string; // voto ottenuto
+  linkedEventId?: string; // evento nel calendario collegato
+  source?: 'manual' | 'ai';
+}
+
+export interface CourseTopic {
+  id: string;
+  title: string;
+  part?: string; // macro-argomento / modulo
+  details?: string;
+  studied?: boolean;
+  source?: 'manual' | 'ai';
+}
+
+/** Lezione pianificata nel calendario della singola materia */
+export interface CoursePlanLesson {
+  id: string;
+  date: string; // YYYY-MM-DD
+  startTime?: string;
+  endTime?: string;
+  topic: string;
+  lessonType: LessonType;
+  room?: string;
+  lecturer?: string;
+  chapters?: string;
+  links?: string[];
+  coursePart?: string;
+  cancelled?: boolean;
+  eventId?: string; // evento collegato nel calendario generale
+}
+
+export interface CourseDocumentLog {
+  name: string;
+  kind: string;
+  at: string; // ISO
+  summary?: string;
+}
+
+export interface CourseInfo {
+  overview?: string; // riassunto generale della materia
+  gradingSummary?: string; // composizione della valutazione in parole (es. "2 quiz + lab + esame")
+  studyPlan?: string; // pianificazione dello studio suggerita
+  assessments?: CourseAssessment[];
+  topics?: CourseTopic[];
+  lessonPlan?: CoursePlanLesson[];
+  documents?: CourseDocumentLog[];
+  updatedAt?: string;
 }
 
 export interface StudyPreferences {
@@ -190,7 +253,6 @@ export interface UserPreferences {
   defaultCommuteTimeMinutes?: number; // Estimated commute time in minutes
   isCommuteProductive?: boolean; // True if commute is by train/bus and can be used for study
   ankiAverageTimeSeconds?: number; // Average time to review a single Anki card
-  geminiApiKey?: string; // Google Gemini API Key for smart syllabus/notes analysis
 }
 
 /* ─── Syllabus / Calendar Import via AI ─── */
@@ -211,9 +273,34 @@ export interface ParsedLessonNote {
   matchedEventId?: string; // Existing CalendarEvent id if matched
 }
 
+export type DocumentKind = 'lesson_calendar' | 'syllabus' | 'exam_info' | 'study_plan' | 'deadlines' | 'other';
+
+export interface ParsedAssessment {
+  type: AssessmentType;
+  title: string;
+  weightPercent?: number;
+  date?: string; // YYYY-MM-DD
+  time?: string; // HH:mm
+  notes?: string;
+}
+
+export interface ParsedTopic {
+  title: string;
+  part?: string;
+  details?: string;
+}
+
+/** Risultato completo dell'analisi AI di un documento di un corso */
 export interface SyllabusExtractionResult {
   courseName?: string;
+  documentKind: DocumentKind;
+  documentSummary?: string;
   lessons: ParsedLessonNote[];
+  assessments: ParsedAssessment[];
+  topics: ParsedTopic[];
+  overview?: string;
+  gradingSummary?: string;
+  studyPlan?: string;
   totalExtracted: number;
   tokensUsed?: number;
   modelUsed?: string;

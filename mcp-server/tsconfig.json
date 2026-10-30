@@ -13,3 +13,4 @@
   },
   "include": ["src", "test", "../src/core/CatchUpEngine.ts", "../src/core/WeeklySummaryEngine.ts", "../src/core/types.ts"]
 }
+

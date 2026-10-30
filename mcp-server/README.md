@@ -173,3 +173,4 @@ mcp-server/
   src/demo.ts     dati di esempio
   test/smoke.ts   test end-to-end con un client MCP in memoria
 ```
+
