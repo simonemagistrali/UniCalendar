@@ -12,6 +12,7 @@ import { TaskPanel } from '../components/features/tasks/TaskPanel';
 import { CourseManager } from '../components/features/courses/CourseManager';
 import { CoursesPage } from '../components/features/courses/CoursesPage';
 import { CatchUpMini } from '../components/features/dashboard/CatchUpIndicator';
+import { DeadlinesWidget } from '../components/features/dashboard/DeadlinesWidget';
 import { StatisticsDashboard } from '../components/features/dashboard/StatisticsDashboard';
 import { AnkiDashboard } from '../pages/AnkiDashboard';
 import { authService } from '../core/mockBackend';
@@ -169,7 +170,7 @@ export function Home() {
               </div>
               <div className="calendar-sidebar">
                 <CatchUpMini />
-                <TaskPanel dailyGoalOnly={true} />
+                <DeadlinesWidget />
               </div>
             </div>
           )}

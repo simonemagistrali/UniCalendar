@@ -1,0 +1,205 @@
+.deadlines-widget {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  gap: 12px;
+  max-height: 480px;
+  overflow: hidden;
+}
+
+.deadlines-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.deadlines-widget-title {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.deadlines-total-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+.deadlines-overdue-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(217, 48, 37, 0.12);
+  color: var(--accent-danger);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(217, 48, 37, 0.25);
+}
+
+.deadlines-widget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.deadlines-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  border: 1px dashed var(--border-color);
+  border-radius: 10px;
+}
+
+.deadline-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.deadline-card:hover {
+  background: var(--bg-hover);
+  border-color: rgba(26, 115, 232, 0.4);
+}
+
+.deadline-card.overdue {
+  border-color: rgba(217, 48, 37, 0.4);
+  background: rgba(217, 48, 37, 0.03);
+}
+
+.deadline-toggle-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 2px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.deadline-toggle-btn:hover {
+  color: var(--accent-success);
+}
+
+.deadline-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.deadline-main-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.deadline-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.deadline-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.deadline-course-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deadline-course-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.deadline-type-tag {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.deadline-weight-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(242, 153, 0, 0.12);
+  color: #b06d00;
+}
+
+.deadline-overdue-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(217, 48, 37, 0.15);
+  color: #d93025;
+}
+
+.deadline-date-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.deadline-date-text {
+  font-weight: 500;
+}
+
+.deadline-card.overdue .deadline-date-text {
+  color: var(--accent-danger);
+  font-weight: 600;
+}
+
+.deadline-notes {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.8;
+  max-width: 160px;
+}
