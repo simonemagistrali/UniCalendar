@@ -1,16 +1,36 @@
 import { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, CalendarPlus, Link2Off, CalendarCheck } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, CalendarPlus, Link2Off, CalendarCheck, Bell } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '../../../store/useAppStore';
-import type { AssessmentType, Course, CourseAssessment } from '../../../core/types';
+import type { AssessmentType, Course, CourseAssessment, AssessmentNotification } from '../../../core/types';
 import { ASSESSMENT_LABELS, createAssessmentEvent, sortAssessments } from '../../../core/CourseKnowledge';
 import { useInfoPatch, fmtDate } from './courseHooks';
+import { NotificationEditor } from './NotificationEditor';
 
 const TYPES = Object.keys(ASSESSMENT_LABELS) as AssessmentType[];
 const BADGE: Record<AssessmentType, string> = { quiz: 'orange', lab: 'purple', exam: 'red', oral: 'red', project: 'blue', deadline: 'red', other: 'gray' };
 
-interface Draft { type: AssessmentType; title: string; date: string; time: string; weight: string; notes: string; linkedEventId: string }
-const emptyDraft: Draft = { type: 'quiz', title: '', date: '', time: '', weight: '', notes: '', linkedEventId: '' };
+interface Draft {
+  type: AssessmentType;
+  title: string;
+  date: string;
+  time: string;
+  weight: string;
+  notes: string;
+  linkedEventId: string;
+  notifications: AssessmentNotification[];
+}
+
+const emptyDraft: Draft = {
+  type: 'quiz',
+  title: '',
+  date: '',
+  time: '',
+  weight: '',
+  notes: '',
+  linkedEventId: '',
+  notifications: [],
+};
 
 export function CourseAssessmentsTab({ course }: { course: Course }) {
   const patch = useInfoPatch(course);
@@ -30,7 +50,16 @@ export function CourseAssessmentsTab({ course }: { course: Course }) {
 
   const openNew = () => { setDraft(emptyDraft); setEditingId(null); setFormOpen(true); };
   const openEdit = (a: CourseAssessment) => {
-    setDraft({ type: a.type, title: a.title, date: a.date ?? '', time: a.time ?? '', weight: a.weightPercent?.toString() ?? '', notes: a.notes ?? '', linkedEventId: a.linkedEventId ?? '' });
+    setDraft({
+      type: a.type,
+      title: a.title,
+      date: a.date ?? '',
+      time: a.time ?? '',
+      weight: a.weightPercent?.toString() ?? '',
+      notes: a.notes ?? '',
+      linkedEventId: a.linkedEventId ?? '',
+      notifications: a.notifications ? [...a.notifications] : [],
+    });
     setEditingId(a.id);
     setFormOpen(true);
   };
@@ -47,6 +76,7 @@ export function CourseAssessmentsTab({ course }: { course: Course }) {
       weightPercent: Number.isFinite(weight) && weight > 0 ? weight : undefined,
       notes: draft.notes.trim() || undefined,
       linkedEventId: draft.linkedEventId || undefined,
+      notifications: draft.notifications.length > 0 ? draft.notifications : undefined,
     };
     if (editingId) save(list.map(a => (a.id === editingId ? { ...a, ...base } : a)));
     else save([...list, { id: uuidv4(), done: false, source: 'manual', ...base }]);
@@ -103,6 +133,13 @@ export function CourseAssessmentsTab({ course }: { course: Course }) {
             </select>
           </div>
           <div className="cp-field"><label>Note</label><input className="cp-input" value={draft.notes} onChange={e => setDraft({ ...draft, notes: e.target.value })} placeholder="Argomenti, materiale consentito, modalità..." /></div>
+
+          <NotificationEditor
+            notifications={draft.notifications}
+            onChange={n => setDraft({ ...draft, notifications: n })}
+            hasDate={!!draft.date}
+          />
+
           <div className="cp-toolbar">
             <button className="btn btn-primary" onClick={submit} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Check size={15} /> {editingId ? 'Aggiorna' : 'Aggiungi'}</button>
             <button className="btn btn-ghost" onClick={closeForm} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><X size={15} /> Annulla</button>
@@ -127,6 +164,11 @@ export function CourseAssessmentsTab({ course }: { course: Course }) {
                 {a.date ? <span>{fmtDate(a.date)}{a.time ? ` · ${a.time}` : ''}</span> : <span>data da definire</span>}
                 {a.weightPercent != null && <span>peso {a.weightPercent}%</span>}
                 {overdue && <span className="cp-badge red">scaduta</span>}
+                {a.notifications && a.notifications.length > 0 && (
+                  <span className="cp-badge purple" title={`${a.notifications.length} notifiche email configurate`}>
+                    <Bell size={11} /> {a.notifications.length} notifiche
+                  </span>
+                )}
                 {a.source === 'ai' && <span className="cp-badge purple">AI</span>}
                 {linked && <span className="cp-badge green"><CalendarCheck size={11} /> In calendario</span>}
               </span>

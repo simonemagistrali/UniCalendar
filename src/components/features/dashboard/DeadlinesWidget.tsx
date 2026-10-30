@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
-import { ClipboardList, CheckSquare, Square, Calendar, AlertCircle } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { ClipboardList, CheckSquare, Square, Calendar, AlertCircle, Bell } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { CourseAssessment, Course } from '../../../core/types';
 import { ASSESSMENT_LABELS } from '../../../core/CourseKnowledge';
 import { GlassPanel } from '../../ui/GlassPanel';
+import { NotificationEditor } from '../courses/NotificationEditor';
 import './DeadlinesWidget.css';
 
 interface DeadlineItem {
@@ -16,6 +17,7 @@ interface DeadlineItem {
 export function DeadlinesWidget() {
   const courses = useAppStore(s => s.courses);
   const updateCourse = useAppStore(s => s.updateCourse);
+  const [editingNotifKey, setEditingNotifKey] = useState<string | null>(null);
 
   const pendingDeadlines = useMemo(() => {
     const list: DeadlineItem[] = [];
@@ -52,6 +54,24 @@ export function DeadlinesWidget() {
     const currentAssessments = currentCourse.info?.assessments ?? [];
     const updated = currentAssessments.map(a =>
       a.id === item.assessment.id ? { ...a, done: !a.done } : a
+    );
+
+    updateCourse(currentCourse.id, {
+      info: {
+        ...(currentCourse.info ?? {}),
+        assessments: updated,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  };
+
+  const handleUpdateNotifications = (item: DeadlineItem, notifs: typeof item.assessment.notifications) => {
+    const currentCourse = courses.find(c => c.id === item.course.id);
+    if (!currentCourse) return;
+
+    const currentAssessments = currentCourse.info?.assessments ?? [];
+    const updated = currentAssessments.map(a =>
+      a.id === item.assessment.id ? { ...a, notifications: notifs } : a
     );
 
     updateCourse(currentCourse.id, {
@@ -114,7 +134,29 @@ export function DeadlinesWidget() {
                 <div className="deadline-body">
                   <div className="deadline-main-line">
                     <span className="deadline-title">{assessment.title}</span>
+                    <button
+                      type="button"
+                      className={`cp-icon-btn ${assessment.notifications && assessment.notifications.length > 0 ? 'active' : ''}`}
+                      style={{ color: assessment.notifications && assessment.notifications.length > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                      title="Gestisci notifiche email per questa scadenza"
+                      onClick={() => setEditingNotifKey(editingNotifKey === `${course.id}-${assessment.id}` ? null : `${course.id}-${assessment.id}`)}
+                    >
+                      <Bell size={14} />
+                      {assessment.notifications && assessment.notifications.length > 0 && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, marginLeft: 2 }}>{assessment.notifications.length}</span>
+                      )}
+                    </button>
                   </div>
+
+                  {editingNotifKey === `${course.id}-${assessment.id}` && (
+                    <div style={{ marginTop: 6, marginBottom: 6, padding: 8, background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                      <NotificationEditor
+                        notifications={assessment.notifications ?? []}
+                        onChange={notifs => handleUpdateNotifications({ assessment, course, isOverdue, sortKey: '' }, notifs)}
+                        hasDate={!!assessment.date}
+                      />
+                    </div>
+                  )}
 
                   <div className="deadline-meta-row">
                     <span

@@ -27,6 +27,13 @@ export interface Course {
 /* ─── Scheda del corso ─── */
 export type AssessmentType = 'quiz' | 'lab' | 'exam' | 'oral' | 'project' | 'deadline' | 'other';
 
+export interface AssessmentNotification {
+  id: string;
+  daysBefore: number; // quanti giorni prima (es: 7 = una settimana prima, 1 = giorno prima, 0 = stesso giorno)
+  time?: string; // orario di invio "HH:mm" (default 09:00)
+  sentAt?: string; // ISO data invio se già notificata
+}
+
 export interface CourseAssessment {
   id: string;
   type: AssessmentType;
@@ -39,6 +46,7 @@ export interface CourseAssessment {
   grade?: string; // voto ottenuto
   linkedEventId?: string; // evento nel calendario collegato
   source?: 'manual' | 'ai';
+  notifications?: AssessmentNotification[]; // notifiche email configurate per questa specifica scadenza
 }
 
 export interface CourseTopic {

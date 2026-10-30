@@ -318,3 +318,100 @@ exports.sendWeeklySummaryTest = onCall(async (request) => {
 
   return { success: true, email: targetEmail };
 });
+
+/**
+ * Scheduled Cloud Function: Runs hourly to deliver deadline reminder notifications.
+ * Each deadline can specify multiple reminders (e.g. 7 days before, 1 day before, same day).
+ */
+exports.sendDeadlineReminders = onSchedule(
+  { schedule: "15 * * * *", timeZone: "UTC" },
+  async (_event) => {
+    logger.info("Starting deadline reminder notifications check...");
+    const usersSnap = await db.collection("users").get();
+    const now = new Date();
+
+    for (const doc of usersSnap.docs) {
+      try {
+        const userId = doc.id;
+        const rawUserData = doc.data();
+
+        const keySnap = await db.collection("user_keys").doc(userId).get();
+        const userKey = keySnap.exists ? keySnap.data().key : null;
+
+        const preferences = decryptPayload(rawUserData.preferences, userKey);
+        const targetEmail = preferences?.weeklySummary?.email || rawUserData.email || null;
+        if (!targetEmail) continue;
+
+        const courses = decryptPayload(rawUserData.courses, userKey) || [];
+        const userTz = preferences?.weeklySummary?.timeZone || "Europe/Rome";
+        const localNowStr = now.toLocaleString("en-US", { timeZone: userTz });
+        const localNow = new Date(localNowStr);
+        const todayStr = localNow.toISOString().substring(0, 10);
+        const currentHour = localNow.getHours();
+
+        let updatedAny = false;
+
+        for (const course of courses) {
+          const assessments = course.info?.assessments ?? [];
+          for (const a of assessments) {
+            if (a.done || !a.date || !Array.isArray(a.notifications) || a.notifications.length === 0) {
+              continue;
+            }
+
+            const targetDate = new Date(`${a.date}T00:00:00`);
+            const diffDays = Math.round((targetDate.getTime() - new Date(`${todayStr}T00:00:00`).getTime()) / 86400000);
+
+            for (const notif of a.notifications) {
+              if (notif.sentAt) continue;
+
+              const scheduledHour = notif.time ? parseInt(notif.time.split(":")[0]) || 9 : 9;
+
+              if (diffDays === notif.daysBefore && currentHour >= scheduledHour) {
+                const dayText = notif.daysBefore === 0
+                  ? "oggi!"
+                  : notif.daysBefore === 1
+                  ? "domani!"
+                  : `tra ${notif.daysBefore} giorni (${a.date})`;
+
+                const emailHtml = `
+<!DOCTYPE html>
+<html>
+<body style="font-family: -apple-system, sans-serif; background: #0b0f19; color: #f1f5f9; padding: 24px;">
+  <div style="background: #161e2e; border: 1px solid #2d3748; border-radius: 12px; padding: 24px; max-width: 500px; margin: 0 auto;">
+    <h2 style="color: #f59e0b; margin-top: 0;">⏰ Promemoria Scadenza: ${a.title}</h2>
+    <p style="font-size: 15px; color: #e2e8f0; line-height: 1.5;">
+      La scadenza/prova di <strong>${course.name}</strong> è prevista per <strong>${dayText}</strong>${a.time ? ` alle ${a.time}` : ""}.
+    </p>
+    ${a.notes ? `<p style="font-size: 13px; color: #94a3b8; background: rgba(255,255,255,0.04); padding: 10px; border-radius: 6px;">Note: ${a.notes}</p>` : ""}
+    <p style="font-size: 12px; color: #64748b; margin-top: 24px; border-top: 1px solid #2d3748; padding-top: 12px;">
+      Notifica automatica configurata su UniCalendar per questa specifica scadenza.
+    </p>
+  </div>
+</body>
+</html>
+`;
+                await deliverEmail(
+                  targetEmail,
+                  `⏰ [UniCalendar] Promemoria: ${a.title} (${course.name})`,
+                  emailHtml
+                );
+
+                notif.sentAt = new Date().toISOString();
+                updatedAny = true;
+                logger.info(`Notification sent for assessment ${a.id} to ${targetEmail}`);
+              }
+            }
+          }
+        }
+
+        // Se sono state inviate notifiche, aggiorniamo il record nel documento con sentAt
+        if (updatedAny && userKey) {
+          const encryptedCourses = CryptoJS.AES.encrypt(JSON.stringify(courses), userKey).toString();
+          await db.collection("users").doc(userId).set({ courses: encryptedCourses }, { merge: true });
+        }
+      } catch (err) {
+        logger.error(`Error processing reminders for user ${doc.id}:`, err);
+      }
+    }
+  }
+);
