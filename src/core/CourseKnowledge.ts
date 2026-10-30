@@ -25,7 +25,33 @@ export const ASSESSMENT_LABELS: Record<AssessmentType, string> = {
   other: 'Altro',
 };
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9àèéìòù]+/g, ' ').trim();
+/** Unisce due stringhe di testo informativo senza duplicazioni o sovrascritture distruttive. */
+function mergeText(existing?: string, incoming?: string): string | undefined {
+  if (!existing && !incoming) return undefined;
+  if (!existing) return incoming?.trim() || undefined;
+  if (!incoming) return existing?.trim() || undefined;
+
+  const exClean = existing.trim();
+  const inClean = incoming.trim();
+  if (exClean === inClean) return exClean;
+
+  const exLow = exClean.toLowerCase();
+  const inLow = inClean.toLowerCase();
+  // Se uno contiene già interamente l'altro, teniamo la versione più ricca e completa
+  if (exLow.includes(inLow)) return exClean;
+  if (inLow.includes(exLow)) return inClean;
+
+  // Altrimenti uniamo le due informazioni in modo equilibrato
+  return `${exClean}\n\n[Integrazione]:\n${inClean}`;
+}
+
+/** Unisce array di link o stringhe eliminando duplicati */
+function mergeLists(a?: string[], b?: string[]): string[] | undefined {
+  const set = new Set<string>();
+  for (const item of a ?? []) if (item?.trim()) set.add(item.trim());
+  for (const item of b ?? []) if (item?.trim()) set.add(item.trim());
+  return set.size > 0 ? Array.from(set) : undefined;
+}
 
 /** Tipo di evento del calendario corrispondente a una prova/scadenza. */
 export function assessmentEventType(type: AssessmentType): EventType {
@@ -138,20 +164,21 @@ export function applyExtractionToCourse(input: {
       if (!l.parsedDate) continue;
       const eventId = (l.id && applied.eventIdByLessonId[l.id]) || item.matchedEvent?.id;
       const idx = plan.findIndex(p => p.date === l.parsedDate && (p.startTime && l.startTime ? p.startTime === l.startTime : true));
+      const existing = idx >= 0 ? plan[idx] : undefined;
       const entry: CoursePlanLesson = {
-        id: idx >= 0 ? plan[idx].id : uuidv4(),
+        id: existing ? existing.id : uuidv4(),
         date: l.parsedDate,
-        startTime: l.startTime ?? (idx >= 0 ? plan[idx].startTime : undefined),
-        endTime: l.endTime ?? (idx >= 0 ? plan[idx].endTime : undefined),
-        topic: l.topic || (idx >= 0 ? plan[idx].topic : ''),
-        lessonType: l.lessonType,
-        room: l.room ?? (idx >= 0 ? plan[idx].room : undefined),
-        lecturer: l.lecturer ?? (idx >= 0 ? plan[idx].lecturer : undefined),
-        chapters: l.sectionsOrChapters ?? (idx >= 0 ? plan[idx].chapters : undefined),
-        links: l.readingsOrLinks && l.readingsOrLinks.length ? l.readingsOrLinks : (idx >= 0 ? plan[idx].links : undefined),
-        coursePart: l.coursePart ?? (idx >= 0 ? plan[idx].coursePart : undefined),
-        cancelled: l.isCancelled || undefined,
-        eventId: eventId ?? (idx >= 0 ? plan[idx].eventId : undefined),
+        startTime: l.startTime ?? existing?.startTime,
+        endTime: l.endTime ?? existing?.endTime,
+        topic: mergeText(existing?.topic, l.topic) || '',
+        lessonType: l.lessonType || existing?.lessonType || 'theory',
+        room: l.room ?? existing?.room,
+        lecturer: l.lecturer ?? existing?.lecturer,
+        chapters: mergeText(existing?.chapters, l.sectionsOrChapters),
+        links: mergeLists(existing?.links, l.readingsOrLinks),
+        coursePart: l.coursePart ?? existing?.coursePart,
+        cancelled: l.isCancelled !== undefined ? l.isCancelled : existing?.cancelled,
+        eventId: eventId ?? existing?.eventId,
       };
       if (idx >= 0) plan[idx] = entry;
       else plan.push(entry);
@@ -162,13 +189,18 @@ export function applyExtractionToCourse(input: {
   // ── Indice degli argomenti ──
   if (options.applyTopics && result.topics.length > 0) {
     const topics: CourseTopic[] = [...(info.topics ?? [])];
-    const known = new Set(topics.map(t => norm(t.title)));
     for (const t of result.topics) {
       const key = norm(t.title);
-      if (!key || known.has(key)) continue;
-      known.add(key);
-      topics.push({ id: uuidv4(), title: t.title, part: t.part, details: t.details, source: 'ai' });
-      stats.topicsAdded++;
+      if (!key) continue;
+      const existing = topics.find(ex => norm(ex.title) === key);
+      if (existing) {
+        // Merge bilanciato dei dettagli e del modulo
+        existing.part = existing.part || t.part;
+        existing.details = mergeText(existing.details, t.details);
+      } else {
+        topics.push({ id: uuidv4(), title: t.title, part: t.part, details: t.details, source: 'ai' });
+        stats.topicsAdded++;
+      }
     }
     info.topics = topics;
   }
@@ -185,7 +217,11 @@ export function applyExtractionToCourse(input: {
         if (!target.date && p.date) { target.date = p.date; changed = true; }
         if (!target.time && p.time) { target.time = p.time; changed = true; }
         if (target.weightPercent == null && p.weightPercent != null) { target.weightPercent = p.weightPercent; changed = true; }
-        if (!target.notes && p.notes) { target.notes = p.notes; changed = true; }
+        const mergedNotes = mergeText(target.notes, p.notes);
+        if (mergedNotes !== target.notes) {
+          target.notes = mergedNotes;
+          changed = true;
+        }
         if (changed) stats.assessmentsUpdated++;
       } else {
         target = {
@@ -222,11 +258,11 @@ export function applyExtractionToCourse(input: {
     info.assessments = list.sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
   }
 
-  // ── Testi: riempie solo i campi vuoti (non sovrascrive ciò che l'utente ha già scritto) ──
+  // ── Testi generali: merge armonico senza sovrascritture distruttive ──
   if (options.applyTexts) {
-    if (result.overview && !info.overview) info.overview = result.overview;
-    if (result.gradingSummary && !info.gradingSummary) info.gradingSummary = result.gradingSummary;
-    if (result.studyPlan && !info.studyPlan) info.studyPlan = result.studyPlan;
+    info.overview = mergeText(info.overview, result.overview);
+    info.gradingSummary = mergeText(info.gradingSummary, result.gradingSummary);
+    info.studyPlan = mergeText(info.studyPlan, result.studyPlan);
   }
 
   info.documents = [

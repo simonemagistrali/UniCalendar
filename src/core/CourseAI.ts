@@ -97,8 +97,12 @@ Oggi è ${today}. Anno di riferimento per le date senza anno: ${defaultYear} (un
 ${courseContext}
 ═══════════════════════════════════════════════════════════════
 
-COMPITO: capisci da solo che tipo di documento è e estrai SOLO le informazioni che contiene davvero, senza inventare nulla.
-Non ripetere ciò che è già nel resoconto, a meno che il documento lo corregga o aggiunga dettagli (in quel caso restituiscilo con i dati aggiornati, mantenendo lo stesso titolo).
+COMPITO: capisci da solo che tipo di documento è ed estrai con accuratezza le informazioni presenti.
+Esegui un MERGE BILANCIATO tra le informazioni che possiedi già nel resoconto e quelle del nuovo documento:
+- Non dare più importanza a nessuna delle due fonti: integrane le informazioni in modo complementare.
+- Se il nuovo documento contiene dettagli aggiuntivi, date più precise, capitoli o spiegazioni non presenti nel resoconto, includili.
+- Se il documento conferma ciò che è già noto senza aggiungere nulla di nuovo, ometti la voce o restituiscine i dati consolidati.
+- Se il documento tratta nuovi argomenti, lezioni o scadenze non ancora presenti, estraili per intero.
 Il documento può contenere una o più di queste informazioni:
  a) calendario/programma delle lezioni con date → "lessons"
  b) indice, programma o elenco degli argomenti del corso → "topics"
