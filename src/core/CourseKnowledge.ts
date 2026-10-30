@@ -25,6 +25,8 @@ export const ASSESSMENT_LABELS: Record<AssessmentType, string> = {
   other: 'Altro',
 };
 
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9àèéìòù]+/g, ' ').trim();
+
 /** Unisce due stringhe di testo informativo senza duplicazioni o sovrascritture distruttive. */
 function mergeText(existing?: string, incoming?: string): string | undefined {
   if (!existing && !incoming) return undefined;
