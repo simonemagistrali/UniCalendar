@@ -1,11 +1,17 @@
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth, googleProvider } from './firebase';
+import { auth } from './firebase';
 import type { CalendarEvent } from './types';
 
 export async function fetchGoogleCalendarEvents(): Promise<CalendarEvent[]> {
   try {
-    // Force a popup to ensure we get a fresh OAuth credential with the Calendar scope
-    const result = await signInWithPopup(auth, googleProvider);
+    // Provider dedicato con lo scope del calendario richiesto solo on-demand
+    const calendarProvider = new GoogleAuthProvider();
+    calendarProvider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+    calendarProvider.setCustomParameters({
+      prompt: 'consent'
+    });
+
+    const result = await signInWithPopup(auth, calendarProvider);
     
     const credential = GoogleAuthProvider.credentialFromResult(result);
     const token = credential?.accessToken;
