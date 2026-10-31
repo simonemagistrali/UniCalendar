@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, GraduationCap, Archive, Download, Upload, Sparkles } from 'lucide-react';
+import { ArrowLeft, Save, GraduationCap, Archive, Download, Upload, Sparkles, Mail } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { Button } from '../components/ui/Button';
 import { GlassPanel } from '../components/ui/GlassPanel';
@@ -26,9 +26,19 @@ export function Settings() {
   const semesters = useAppStore(s => s.semesters);
   const user = useAppStore(s => s.user);
 
-  const [dailyHours, setDailyHours] = useState<Record<number, DayStudyHours>>(
-    () => ({ ...preferences.dailyStudyHours })
-  );
+  const [dailyHours, setDailyHours] = useState<Record<number, DayStudyHours>>(() => {
+    const current = preferences?.dailyStudyHours || {};
+    const fallback: Record<number, DayStudyHours> = {};
+    for (let d = 0; d < 7; d++) {
+      fallback[d] = current[d] || {
+        enabled: d !== 0,
+        start: '08:00',
+        end: '18:00',
+        lunchBreak: { enabled: true, start: '13:00', end: '14:00' },
+      };
+    }
+    return fallback;
+  });
   const [daysBeforeExam, setDaysBeforeExam] = useState((preferences.daysBeforeExamToIncreasePriority ?? 14).toString());
   const [examPrepDays, setExamPrepDays] = useState((preferences.examPrepDays ?? 21).toString());
   const [autoQuizPrep, setAutoQuizPrep] = useState<boolean>(preferences.autoQuizPrep ?? true);
@@ -219,7 +229,12 @@ export function Settings() {
 
             <div className="settings-days-grid">
               {DAYS_OF_WEEK.map(day => {
-                const config = dailyHours[day.id];
+                const config = dailyHours[day.id] || {
+                  enabled: day.id !== 0,
+                  start: '08:00',
+                  end: '18:00',
+                  lunchBreak: { enabled: true, start: '13:00', end: '14:00' },
+                };
                 return (
                   <div key={day.id} className={`settings-day-row ${!config.enabled ? 'disabled' : ''}`}>
                     <button
