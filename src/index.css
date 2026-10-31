@@ -663,6 +663,26 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
     grid-template-columns: 1fr !important;
     gap: 12px !important;
   }
+  .catchup-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  .catchup-header-left {
+    width: 100%;
+  }
+  .catchup-view-toggle {
+    width: 100%;
+    display: flex;
+  }
+  .catchup-view-toggle .catchup-view-btn {
+    flex: 1;
+    justify-content: center;
+  }
+  .catchup-global {
+    width: 100%;
+    align-items: center;
+  }
   .insights-action-box {
     padding-left: 0 !important;
     border-left: none !important;
