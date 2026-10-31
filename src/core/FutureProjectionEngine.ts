@@ -79,8 +79,9 @@ export class FutureProjectionEngine {
       const willLikelyAttend = attendanceRate >= 0.70;
 
       // --- Phantom Task 1: Follow/Recover lesson ---
-      // Only generate if student is likely to MISS the lesson
-      if (!willLikelyAttend) {
+      // Only generate if explicitly enabled for the course and student is likely to MISS the lesson
+      const wantsFollow = !!course.defaultStudyPreferences.requiresFollowLesson;
+      if (wantsFollow && !willLikelyAttend) {
         const adaptiveFollowMin = HabitAnalysisEngine.estimateTaskDuration(
           lessonDurationMin,
           course.id,

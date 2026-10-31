@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
-import { Target, Calendar, TrendingUp, CheckCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Target, Calendar, TrendingUp, CheckCircle, BookOpen, Wrench, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { GlassPanel } from '../../ui/GlassPanel';
 import { useAppStore } from '../../../store/useAppStore';
 import { CatchUpEngine } from '../../../core/CatchUpEngine';
 import type { CourseCatchUpStatus } from '../../../core/CatchUpEngine';
+import { LessonProgressEngine, type CoursePaceStatus } from '../../../core/LessonProgressEngine';
 
 function getStatusColor(percentage: number): string {
   if (percentage >= 80) return 'var(--accent-success)';
@@ -189,12 +190,23 @@ export function CatchUpMini() {
   const tasks = useAppStore(s => s.tasks);
   const courses = useAppStore(s => s.courses);
   const studySessions = useAppStore(s => s.studySessions);
+  const setLessonTrackDone = useAppStore(s => s.setLessonTrackDone);
+  const [expandedCourseId, setExpandedCourseId] = useState<string | null>(null);
 
   const summary = useMemo(() => {
     return CatchUpEngine.calculate(events, courses, tasks, studySessions);
   }, [events, courses, tasks, studySessions]);
 
-  const globalColor = getStatusColor(summary.globalPercentage);
+  const paceSummary = useMemo(() => {
+    return LessonProgressEngine.calculateAll(courses, events, tasks);
+  }, [courses, events, tasks]);
+
+  const paceByCourse = useMemo(
+    () => new Map<string, CoursePaceStatus>(paceSummary.courses.map(p => [p.courseId, p])),
+    [paceSummary]
+  );
+
+  const globalColor = getStatusColor(paceSummary.globalPercentage);
   const coursesWithLessons = summary.courses.filter(c => c.totalLessonsPast > 0);
 
   if (coursesWithLessons.length === 0) return null;
@@ -203,34 +215,106 @@ export function CatchUpMini() {
     <div className="catchup-mini">
       <div className="catchup-mini-header">
         <Target size={14} />
-        <span>A pari</span>
-        <CircularProgress percentage={summary.globalPercentage} color={globalColor} size={36} />
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          <span>Passo Lezioni</span>
+          <span style={{ fontSize: '0.68rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+            {paceSummary.totalGap === 0
+              ? 'In pari con tutti i corsi ✨'
+              : `${paceSummary.totalTheoryGap} appunti · ${paceSummary.totalExerciseGap} esercizi indietro`}
+          </span>
+        </div>
+        <CircularProgress percentage={paceSummary.globalPercentage} color={globalColor} size={36} />
       </div>
       <div className="catchup-mini-list">
-        {coursesWithLessons.map(cs => (
-          <div key={cs.courseId} className="catchup-mini-item">
-            <div className="catchup-mini-item-header">
-              <span className="task-course-dot" style={{ backgroundColor: cs.courseColor }} />
-              <span className="catchup-mini-name" title={cs.courseName}>
-                {cs.courseName.replace(/^Lezione:\s*/i, '')}
-              </span>
-              <span className="catchup-mini-pct" style={{ color: getStatusColor(cs.catchUpPercentage) }}>
-                {cs.catchUpPercentage}%
-              </span>
-            </div>
-            <div className="catchup-mini-bar-container">
+        {coursesWithLessons.map(cs => {
+          const pace = paceByCourse.get(cs.courseId);
+          const pct = pace ? pace.overallPercentage : cs.catchUpPercentage;
+          const isExpanded = expandedCourseId === cs.courseId;
+          const hasGap = (pace?.totalGap || 0) > 0;
+
+          return (
+            <div key={cs.courseId} className="catchup-mini-item" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div
-                className="catchup-mini-bar"
-                style={{
-                  width: `${Math.min(100, cs.catchUpPercentage)}%`,
-                  backgroundColor: getStatusColor(cs.catchUpPercentage),
-                }}
-              />
+                className="catchup-mini-item-header"
+                style={{ cursor: hasGap ? 'pointer' : 'default' }}
+                onClick={() => hasGap && setExpandedCourseId(isExpanded ? null : cs.courseId)}
+              >
+                <span className="task-course-dot" style={{ backgroundColor: cs.courseColor }} />
+                <span className="catchup-mini-name" title={cs.courseName}>
+                  {cs.courseName.replace(/^Lezione:\s*/i, '')}
+                </span>
+                <span className="catchup-mini-pct" style={{ color: getStatusColor(pct), display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                  {pct}%
+                  {hasGap && (isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                </span>
+              </div>
+
+              {pace && (
+                <div style={{ display: 'flex', gap: 8, fontSize: '0.7rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                  {pace.theory.profCurrentIndex > 0 && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: pace.theory.gapCount > 0 ? '#b06d00' : 'var(--accent-success)' }}>
+                      <BookOpen size={10} />
+                      Teoria: {pace.theory.studentDoneCount}/{pace.theory.profCurrentIndex}
+                      {pace.theory.gapCount > 0 && ` (-${pace.theory.gapCount})`}
+                    </span>
+                  )}
+                  {pace.exercise.profCurrentIndex > 0 && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: pace.exercise.gapCount > 0 ? '#b06d00' : 'var(--accent-success)' }}>
+                      <Wrench size={10} />
+                      Esercizi: {pace.exercise.studentDoneCount}/{pace.exercise.profCurrentIndex}
+                      {pace.exercise.gapCount > 0 && ` (-${pace.exercise.gapCount})`}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="catchup-mini-bar-container">
+                <div
+                  className="catchup-mini-bar"
+                  style={{
+                    width: `${Math.min(100, pct)}%`,
+                    backgroundColor: getStatusColor(pct),
+                  }}
+                />
+              </div>
+
+              {isExpanded && pace && hasGap && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+                  {pace.theory.missingLessons.slice(0, 3).map(m => (
+                    <div key={`t-${m.eventId}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, fontSize: '0.72rem' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={`Teoria #${m.index}: ${m.topic}`}>
+                        📖 <strong>#{m.index}</strong> ({m.dateIt}) {m.topic}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setLessonTrackDone(m.eventId, 'theory', true)}
+                        style={{ border: '1px solid rgba(24,128,56,0.35)', background: 'rgba(24,128,56,0.12)', color: '#188038', borderRadius: 4, padding: '1px 6px', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 2 }}
+                      >
+                        <Check size={10} /> Fatto
+                      </button>
+                    </div>
+                  ))}
+                  {pace.exercise.missingLessons.slice(0, 3).map(m => (
+                    <div key={`e-${m.eventId}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, fontSize: '0.72rem' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={`Esercizi #${m.index}: ${m.topic}`}>
+                        🔧 <strong>#{m.index}</strong> ({m.dateIt}) {m.topic}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setLessonTrackDone(m.eventId, 'exercise', true)}
+                        style={{ border: '1px solid rgba(24,128,56,0.35)', background: 'rgba(24,128,56,0.12)', color: '#188038', borderRadius: 4, padding: '1px 6px', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 2 }}
+                      >
+                        <Check size={10} /> Fatto
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
-      {summary.globalCatchUpDate && summary.globalPercentage < 100 && (
+      {summary.globalCatchUpDate && paceSummary.globalPercentage < 100 && (
         <div className="catchup-mini-footer" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Calendar size={12} />

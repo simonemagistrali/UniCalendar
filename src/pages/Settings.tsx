@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, GraduationCap, Archive, Download, Upload, Mail } from 'lucide-react';
+import { ArrowLeft, Save, GraduationCap, Archive, Download, Upload, Sparkles } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { Button } from '../components/ui/Button';
 import { GlassPanel } from '../components/ui/GlassPanel';
@@ -608,11 +608,30 @@ export function Settings() {
 
           {/* Backup e Privacy */}
           <GlassPanel>
-            <h2 className="settings-section-title">Backup Dati e Privacy</h2>
+            <h2 className="settings-section-title">Pulizia Sicura Dati, Backup e Privacy</h2>
             <p className="settings-section-desc">
-              Esporta o importa un backup completo in formato JSON, oppure consulta l'informativa sulla privacy.
+              Rimuovi i task ridondanti o orfani (es. i vecchi task "Seguire/Recuperare lezione" o i doppioni generati in passato) mantenendo intatto il calendario e tutte le analisi delle prestazioni.
             </p>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '1rem' }}>
+              <Button
+                variant="primary"
+                icon={<Sparkles size={16} />}
+                onClick={() => {
+                  const res = useAppStore.getState().cleanupNoisyTasks({
+                    removeFollowLessonTasks: true,
+                    removeOrphanLessonTasks: true,
+                    deduplicate: true,
+                  });
+                  setBackupMsg(
+                    res.removedTasks > 0 || res.removedEvents > 0
+                      ? `✓ Pulizia completata: rimossi ${res.removedTasks} task superflui e ${res.removedEvents} eventi duplicati (puoi annullare con Undo).`
+                      : '✓ I tuoi dati sono già puliti!'
+                  );
+                  setTimeout(() => setBackupMsg(null), 5000);
+                }}
+              >
+                Pulisci Task Superflui & Doppioni
+              </Button>
               <Button variant="secondary" onClick={handleExportBackup} icon={<Download size={16} />}>
                 Esporta Backup JSON
               </Button>

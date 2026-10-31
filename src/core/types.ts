@@ -96,6 +96,7 @@ export interface CourseInfo {
 export interface StudyPreferences {
   requiresNotesRevision: boolean;
   requiresExercises: boolean;
+  requiresFollowLesson?: boolean; // Opzionale (default false): crea anche il task "Seguire/Recuperare lezione"
   estimatedRevisionTimePerLesson: number; // minutes
 }
 
@@ -136,6 +137,9 @@ export interface CalendarEvent {
   notes?: string;
   readings?: string[];
   lecturer?: string;
+  // Avanzamento per lezione (Teoria vs Esercitazioni)
+  theoryDone?: boolean;
+  exerciseDone?: boolean;
 }
 
 /* ─── Task ─── */

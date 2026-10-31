@@ -4,7 +4,8 @@ import { SemesterManager, type CloseSemesterOptions, type CloseSemesterResult } 
 import { saveState, loadState } from '../core/persistence';
 import { TaskManager } from '../core/TaskManager';
 import { getTaskKind } from '../core/taskKind';
-import { refreshLessonTasks } from '../core/lessonLink';
+import { refreshLessonTasks, taskBelongsToEvent, localDateKey } from '../core/lessonLink';
+import { getLessonTracks } from '../core/LessonProgressEngine';
 import { PriorityEngine } from '../core/PriorityEngine';
 import { SchedulerEngine } from '../core/SchedulerEngine';
 import { HabitAnalysisEngine } from '../core/HabitAnalysisEngine';
@@ -148,8 +149,11 @@ interface AppState {
   // Sync
   syncAndSchedule: () => void;
 
-  // Cleanup
+  // Cleanup & Lesson Progress
   cleanupDuplicates: () => { removedTasks: number; removedEvents: number };
+  setLessonTrackDone: (eventId: string, track: 'theory' | 'exercise', done: boolean) => void;
+  setCourseCheckpoint: (courseId: string, track: 'theory' | 'exercise', upToEventId: string | null) => { markedLessons: number; removedTasks: number };
+  cleanupNoisyTasks: (opts?: { removeFollowLessonTasks?: boolean; removeOrphanLessonTasks?: boolean; deduplicate?: boolean }) => { removedTasks: number; removedEvents: number };
 
   // Semesters
   semesters: Semester[];
@@ -676,6 +680,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       const next = {
         ...s,
+        events: s.events.map(ev => {
+          if (task.relatedEventId && ev.id === task.relatedEventId) {
+            const k = getTaskKind(task);
+            if (k === 'NOTES') return { ...ev, theoryDone: true };
+            if (k === 'EXERCISES') return { ...ev, exerciseDone: true };
+          }
+          return ev;
+        }),
         tasks: nextTasks,
         performanceHistory: nextPerformanceHistory,
       };
@@ -925,6 +937,185 @@ export const useAppStore = create<AppState>((set, get) => ({
         return next;
       });
     }
+    return { removedTasks, removedEvents };
+  },
+
+  setLessonTrackDone: (eventId, track, done) => {
+    get().saveSnapshot();
+    set((s) => {
+      const targetEvent = s.events.find(e => e.id === eventId);
+      if (!targetEvent) return s;
+
+      const wantedKind = track === 'theory' ? 'NOTES' : 'EXERCISES';
+      const nowIso = new Date().toISOString();
+
+      const nextEvents = s.events.map(e => {
+        if (e.id !== eventId) return e;
+        return track === 'theory'
+          ? { ...e, theoryDone: done, isDone: done ? true : e.isDone }
+          : { ...e, exerciseDone: done, isDone: done ? true : e.isDone };
+      });
+
+      // Aggiorna o rimuove i task pendenti associati a questa lezione senza inquinare performanceHistory
+      const removedTaskIds = new Set<string>();
+      const nextTasks = s.tasks
+        .filter(t => {
+          if (done && track === 'theory' && getTaskKind(t) === 'FOLLOW_LESSON' && t.status !== 'done' && taskBelongsToEvent(t, targetEvent)) {
+            removedTaskIds.add(t.id);
+            return false;
+          }
+          return true;
+        })
+        .map(t => {
+          if (getTaskKind(t) === wantedKind && taskBelongsToEvent(t, targetEvent)) {
+            if (done && t.status !== 'done') {
+              return { ...t, status: 'done' as const, completedAt: nowIso, completionMode: 'normal' as const };
+            }
+            if (!done && t.status === 'done') {
+              return { ...t, status: 'todo' as const, completedAt: undefined };
+            }
+          }
+          return t;
+        });
+
+      const next = {
+        ...s,
+        events: nextEvents,
+        tasks: nextTasks,
+        studySessions: s.studySessions.filter(ss => !removedTaskIds.has(ss.taskId)),
+      };
+      persist(next as AppState);
+      return next;
+    });
+  },
+
+  setCourseCheckpoint: (courseId, track, upToEventId) => {
+    get().saveSnapshot();
+    let markedLessons = 0;
+    let removedTasks = 0;
+
+    set((s) => {
+      const course = s.courses.find(c => c.id === courseId);
+      if (!course) return s;
+
+      const courseEvents = s.events
+        .filter(e =>
+          e.type === 'lesson' &&
+          (e.courseId === course.id || (!e.courseId && e.title?.toLowerCase().includes(course.name.toLowerCase())))
+        )
+        .filter(e => {
+          const tracks = getLessonTracks(e, course);
+          return track === 'theory' ? tracks.hasTheory : tracks.hasExercise;
+        })
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+      const targetIdx = upToEventId ? courseEvents.findIndex(e => e.id === upToEventId) : -1;
+      const doneEventIds = new Set<string>(
+        targetIdx >= 0 ? courseEvents.slice(0, targetIdx + 1).map(e => e.id) : []
+      );
+      const trackEventIds = new Set<string>(courseEvents.map(e => e.id));
+
+      markedLessons = doneEventIds.size;
+
+      const nextEvents = s.events.map(e => {
+        if (!trackEventIds.has(e.id)) return e;
+        const isCovered = doneEventIds.has(e.id);
+        return track === 'theory'
+          ? { ...e, courseId: e.courseId || course.id, theoryDone: isCovered, isDone: isCovered ? true : e.isDone }
+          : { ...e, courseId: e.courseId || course.id, exerciseDone: isCovered, isDone: isCovered ? true : e.isDone };
+      });
+
+      const wantedKind = track === 'theory' ? 'NOTES' : 'EXERCISES';
+      const coveredEvents = courseEvents.filter(e => doneEventIds.has(e.id));
+
+      const removedTaskIds = new Set<string>();
+      const nextTasks = s.tasks.filter(t => {
+        if (t.status === 'done' || t.courseId !== course.id) return true;
+        const k = getTaskKind(t);
+        const matchesCovered = coveredEvents.some(ev => taskBelongsToEvent(t, ev));
+        if (!matchesCovered) return true;
+
+        if (k === wantedKind || (track === 'theory' && k === 'FOLLOW_LESSON')) {
+          removedTaskIds.add(t.id);
+          removedTasks++;
+          return false;
+        }
+        return true;
+      });
+
+      const next = {
+        ...s,
+        events: nextEvents,
+        tasks: nextTasks,
+        studySessions: s.studySessions.filter(ss => !removedTaskIds.has(ss.taskId)),
+      };
+      persist(next as AppState);
+      return next;
+    });
+
+    return { markedLessons, removedTasks };
+  },
+
+  cleanupNoisyTasks: (opts) => {
+    get().saveSnapshot();
+    const removeFollow = opts?.removeFollowLessonTasks ?? true;
+    const removeOrphan = opts?.removeOrphanLessonTasks ?? true;
+    const doDedup = opts?.deduplicate ?? true;
+
+    const state = get();
+    const cleanedEvents = doDedup ? deduplicateEventsList(state.events) : state.events;
+    const eventById = new Map(cleanedEvents.map(e => [e.id, e]));
+    const courseIds = new Set(state.courses.map(c => c.id));
+
+    let workingTasks = doDedup ? deduplicateTasks(state.tasks, cleanedEvents) : [...state.tasks];
+
+    workingTasks = workingTasks.filter(t => {
+      if (t.status === 'done') return true; // Non toccare mai i task già completati
+
+      const kind = getTaskKind(t);
+      if (removeFollow && kind === 'FOLLOW_LESSON') {
+        return false;
+      }
+
+      if (removeOrphan && (kind === 'FOLLOW_LESSON' || kind === 'NOTES' || kind === 'EXERCISES')) {
+        if (t.courseId && !courseIds.has(t.courseId)) return false;
+        if (t.relatedEventId && !eventById.has(t.relatedEventId)) {
+          // Verifica se esiste un evento lezione nello stesso giorno per quel corso
+          const hasMatchingDay = cleanedEvents.some(
+            e => e.type === 'lesson' && e.courseId === t.courseId && taskBelongsToEvent(t, e)
+          );
+          if (!hasMatchingDay) return false;
+        }
+        // Se la lezione collegata è già segnata come completata su quel binario, rimuovi il task pendente ridondante
+        const ev = t.relatedEventId
+          ? eventById.get(t.relatedEventId)
+          : cleanedEvents.find(e => e.type === 'lesson' && e.courseId === t.courseId && taskBelongsToEvent(t, e));
+        if (ev) {
+          if (kind === 'NOTES' && ev.theoryDone) return false;
+          if (kind === 'EXERCISES' && ev.exerciseDone) return false;
+        }
+      }
+
+      return true;
+    });
+
+    const removedTasks = state.tasks.length - workingTasks.length;
+    const removedEvents = state.events.length - cleanedEvents.length;
+
+    if (removedTasks > 0 || removedEvents > 0) {
+      const remainingIds = new Set(workingTasks.map(t => t.id));
+      set((s) => {
+        const next = {
+          ...s,
+          events: cleanedEvents,
+          tasks: workingTasks,
+          studySessions: s.studySessions.filter(ss => remainingIds.has(ss.taskId)),
+        };
+        persist(next as AppState);
+        return next;
+      });
+    }
+
     return { removedTasks, removedEvents };
   },
   // ── Semesters ──

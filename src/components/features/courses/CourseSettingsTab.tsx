@@ -20,6 +20,7 @@ export function CourseSettingsTab({ course, onDeleted }: Props) {
   const [color, setColor] = useState(course.color);
   const [notesRevision, setNotesRevision] = useState(course.defaultStudyPreferences.requiresNotesRevision);
   const [exercises, setExercises] = useState(course.defaultStudyPreferences.requiresExercises);
+  const [followLesson, setFollowLesson] = useState(course.defaultStudyPreferences.requiresFollowLesson ?? false);
   const [revisionTime, setRevisionTime] = useState(course.defaultStudyPreferences.estimatedRevisionTimePerLesson.toString());
   const [isCustomName, setIsCustomName] = useState(course.isCustomName ?? true);
 
@@ -32,6 +33,7 @@ export function CourseSettingsTab({ course, onDeleted }: Props) {
     setColor(course.color);
     setNotesRevision(course.defaultStudyPreferences.requiresNotesRevision);
     setExercises(course.defaultStudyPreferences.requiresExercises);
+    setFollowLesson(course.defaultStudyPreferences.requiresFollowLesson ?? false);
     setRevisionTime(course.defaultStudyPreferences.estimatedRevisionTimePerLesson.toString());
     setIsCustomName(course.isCustomName ?? true);
     setSavedMsg(false);
@@ -47,6 +49,7 @@ export function CourseSettingsTab({ course, onDeleted }: Props) {
       defaultStudyPreferences: {
         requiresNotesRevision: notesRevision,
         requiresExercises: exercises,
+        requiresFollowLesson: followLesson,
         estimatedRevisionTimePerLesson: parseInt(revisionTime) || 45,
       },
       isCustomName,
@@ -157,6 +160,14 @@ export function CourseSettingsTab({ course, onDeleted }: Props) {
               onChange={e => setExercises(e.target.checked)}
             />
             <span>Genera task di esercizi dopo ogni lezione</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={followLesson}
+              onChange={e => setFollowLesson(e.target.checked)}
+            />
+            <span>Genera anche il task "Seguire/Recuperare lezione" (disattivato di default per passare direttamente agli appunti)</span>
           </label>
         </div>
       </div>

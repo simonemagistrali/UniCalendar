@@ -4,6 +4,7 @@ import type {
   Task,
   StudySession,
 } from './types';
+import { getLessonTracks, isLessonTrackDone } from './LessonProgressEngine';
 
 /**
  * Per-course catch-up status.
@@ -83,15 +84,23 @@ export class CatchUpEngine {
         continue;
       }
 
-      // For each past lesson, check if ALL its tasks are completed
+      // For each past lesson, check if its tracks/tasks are completed
       let fullyDone = 0;
       let totalPendingTasks = 0;
       let totalPendingMinutes = 0;
+      const courseTasks = tasks.filter(t => t.courseId === course.id && !t.isPhantom);
 
       for (const lesson of pastLessons) {
-        const lessonTasks = tasks.filter(
-          t => t.relatedEventId === lesson.id && !t.isPhantom
-        );
+        const tracks = getLessonTracks(lesson, course);
+        const theoryDone = !tracks.hasTheory || isLessonTrackDone(lesson, 'theory', courseTasks).done;
+        const exDone = !tracks.hasExercise || isLessonTrackDone(lesson, 'exercise', courseTasks).done;
+
+        const lessonTasks = courseTasks.filter(t => t.relatedEventId === lesson.id);
+
+        if (theoryDone && exDone) {
+          fullyDone++;
+          continue;
+        }
 
         if (lessonTasks.length === 0) {
           // No tasks generated yet (edge case) — not caught up

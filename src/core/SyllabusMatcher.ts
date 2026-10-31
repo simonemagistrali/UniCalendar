@@ -211,12 +211,18 @@ export function applySyllabusMatches(
       if (syllabusLesson.isCancelled) continue;
 
       if (!target.courseId) target.courseId = course.id;
-      if (syllabusLesson.topic) target.topic = syllabusLesson.topic;
-      if (syllabusLesson.lessonType) target.lessonType = syllabusLesson.lessonType;
-      if (syllabusLesson.lecturer) target.lecturer = syllabusLesson.lecturer;
-      if (syllabusLesson.sectionsOrChapters) target.notes = syllabusLesson.sectionsOrChapters;
+      if (syllabusLesson.topic && !target.topic?.trim()) target.topic = syllabusLesson.topic;
+      if (syllabusLesson.lessonType && !target.lessonType) target.lessonType = syllabusLesson.lessonType;
+      if (syllabusLesson.lecturer && !target.lecturer?.trim()) target.lecturer = syllabusLesson.lecturer;
+      if (syllabusLesson.sectionsOrChapters) {
+        if (!target.notes?.trim()) target.notes = syllabusLesson.sectionsOrChapters;
+        else if (!target.notes.toLowerCase().includes(syllabusLesson.sectionsOrChapters.toLowerCase())) {
+          target.notes = `${target.notes}\n${syllabusLesson.sectionsOrChapters}`;
+        }
+      }
       if (syllabusLesson.readingsOrLinks && syllabusLesson.readingsOrLinks.length > 0) {
-        target.readings = syllabusLesson.readingsOrLinks;
+        const mergedLinks = Array.from(new Set([...(target.readings ?? []), ...syllabusLesson.readingsOrLinks]));
+        target.readings = mergedLinks;
       }
       if (syllabusLesson.room && !target.location?.address) {
         target.location = { type: 'in_person', address: `Aula ${syllabusLesson.room}` };

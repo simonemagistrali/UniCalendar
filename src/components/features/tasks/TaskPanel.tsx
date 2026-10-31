@@ -453,13 +453,17 @@ export function TaskPanel({ dailyGoalOnly = false }: { dailyGoalOnly?: boolean }
                     role="menuitem"
                     className="task-more-item"
                     onClick={() => {
-                      const res = cleanupDuplicates();
-                      setCleanupMsg(res.removedTasks > 0 || res.removedEvents > 0 ? `✓ Rimossi ${res.removedTasks} duplicati` : 'Nessun duplicato');
-                      setTimeout(() => setCleanupMsg(''), 3000);
+                      const res = useAppStore.getState().cleanupNoisyTasks({
+                        removeFollowLessonTasks: true,
+                        removeOrphanLessonTasks: true,
+                        deduplicate: true,
+                      });
+                      setCleanupMsg(res.removedTasks > 0 || res.removedEvents > 0 ? `✓ Rimossi ${res.removedTasks} task superflui` : '✓ Tutto pulito');
+                      setTimeout(() => setCleanupMsg(''), 3500);
                       setMoreOpen(false);
                     }}
                   >
-                    <Sparkles size={15} /> Rimuovi duplicati
+                    <Sparkles size={15} /> Pulisci task superflui e duplicati
                   </button>
                 </div>
               )}

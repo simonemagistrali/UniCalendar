@@ -50,10 +50,10 @@ export function ImportSyllabusModal({ isOpen, onClose, initialCourseId }: Import
   const [analyzedCourseId, setAnalyzedCourseId] = useState('');
   const [options, setOptions] = useState<ApplyOptions>({
     applyLessons: true,
-    createMissingLessonEvents: true,
+    createMissingLessonEvents: false,
     applyTopics: true,
     applyAssessments: true,
-    createAssessmentEvents: true,
+    createAssessmentEvents: false,
     applyTexts: true,
   });
   const [stats, setStats] = useState<ApplyStats | null>(null);
@@ -124,11 +124,18 @@ export function ImportSyllabusModal({ isOpen, onClose, initialCourseId }: Import
       setAnalyzedCourseId(freshCourse.id);
       const matches = matchSyllabusWithCalendar(aiResult.lessons, state.events, freshCourse, state.tasks);
       setMatchResults(matches);
+      const hasExistingCourseEvents = state.events.some(
+        e => e.type === 'lesson' && (e.courseId === freshCourse.id || (!e.courseId && e.title?.toLowerCase().includes(freshCourse.name.toLowerCase())))
+      );
       setOptions(o => ({
         ...o,
         applyLessons: aiResult.lessons.length > 0,
+        // Il calendario è sacro: non crea nuovi eventi lezione a meno che il corso non abbia ancora alcun evento nel calendario
+        createMissingLessonEvents: !hasExistingCourseEvents && aiResult.lessons.length > 0,
         applyTopics: aiResult.topics.length > 0,
         applyAssessments: aiResult.assessments.length > 0,
+        // Le scadenze rilevate vengono proposte in scheda corso senza alterare automaticamente gli eventi calendario se non confermato
+        createAssessmentEvents: false,
         applyTexts: !!(aiResult.overview || aiResult.gradingSummary || aiResult.studyPlan),
       }));
       setStep('review');
@@ -304,8 +311,8 @@ export function ImportSyllabusModal({ isOpen, onClose, initialCourseId }: Import
                     <span style={chip('rgba(34,197,94,0.15)', '#22c55e')}>{matchResults.filter(m => m.matchedEvent).length} abbinate</span>
                     <span style={chip('rgba(59,130,246,0.15)', '#3b82f6')}>{matchResults.filter(m => m.isNewEventNeeded).length} nuove</span>
                   </div>
-                  {checkbox('applyLessons', 'Aggiorna calendario del corso, lezioni e task', 'Argomento, capitoli, docente e materiali vengono scritti nelle lezioni e nei task di studio (anche futuri).')}
-                  {options.applyLessons && checkbox('createMissingLessonEvents', 'Crea nel calendario le lezioni delle date mancanti', 'Le lezioni future genereranno i task di studio a lezione finita.')}
+                  {checkbox('applyLessons', 'Arricchisci le lezioni esistenti e il piano del corso', 'Il calendario esistente resta intatto: argomento, capitoli, docente e materiali vengono collegati alle lezioni già a calendario.')}
+                  {options.applyLessons && matchResults.some(m => m.isNewEventNeeded) && checkbox('createMissingLessonEvents', 'Aggiungi al calendario anche le date non presenti nel tuo orario (opzionale)', 'Di default disattivato per non alterare il tuo calendario.')}
                   <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {matchResults.map((item, idx) => {
                       const l = item.syllabusLesson;

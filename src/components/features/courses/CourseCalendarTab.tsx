@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, CalendarCheck, CalendarPlus, BookOpen, ExternalLink } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, Trash2, Edit2, Check, X, CalendarCheck, CalendarPlus, BookOpen, ExternalLink, CheckCircle2, Circle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '../../../store/useAppStore';
-import type { Course, CoursePlanLesson, LessonType } from '../../../core/types';
+import type { Course, CoursePlanLesson, LessonType, CalendarEvent } from '../../../core/types';
 import { createEventFromPlanLesson } from '../../../core/CourseKnowledge';
+import { localDateKey, localTime } from '../../../core/lessonLink';
+import { getLessonTracks, isLessonTrackDone } from '../../../core/LessonProgressEngine';
 import { useInfoPatch, fmtDate } from './courseHooks';
 
 interface Draft {
@@ -51,7 +53,9 @@ const TYPE_BADGE: Record<LessonType, string> = {
 export function CourseCalendarTab({ course }: { course: Course }) {
   const patch = useInfoPatch(course);
   const events = useAppStore(s => s.events);
+  const tasks = useAppStore(s => s.tasks);
   const addEvent = useAppStore(s => s.addEvent);
+  const setLessonTrackDone = useAppStore(s => s.setLessonTrackDone);
 
   const plan = [...(course.info?.lessonPlan ?? [])].sort((a, b) => {
     const keyA = `${a.date} ${a.startTime || '00:00'}`;
@@ -59,11 +63,22 @@ export function CourseCalendarTab({ course }: { course: Course }) {
     return keyA.localeCompare(keyB);
   });
 
-  // Trova le lezioni a calendario generale per questa materia che non sono ancora state dettagliate nel piano
-  const existingCourseEvents = events.filter(e => 
-    e.courseId === course.id || 
-    (!e.courseId && e.title && course.name && e.title.toLowerCase().includes(course.name.toLowerCase()))
-  ).filter(e => e.type === 'lesson');
+  // Trova le lezioni a calendario generale per questa materia
+  const existingCourseEvents = useMemo(() => {
+    return events
+      .filter(
+        e =>
+          e.type === 'lesson' &&
+          (e.courseId === course.id ||
+            (!e.courseId && e.title && course.name && e.title.toLowerCase().includes(course.name.toLowerCase())))
+      )
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  }, [events, course.id, course.name]);
+
+  const courseTasks = useMemo(
+    () => tasks.filter(t => t.courseId === course.id && !t.isPhantom),
+    [tasks, course.id]
+  );
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -292,25 +307,120 @@ export function CourseCalendarTab({ course }: { course: Course }) {
         </div>
       )}
 
-      {plan.length === 0 && !formOpen && (
+      {plan.length === 0 && existingCourseEvents.length === 0 && !formOpen && (
         <div className="cp-empty">
-          {existingCourseEvents.length > 0 ? (
-            <div>
-              <p style={{ margin: '0 0 8px 0', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Ci sono {existingCourseEvents.length} lezioni nel calendario generale per questo corso.
-              </p>
-              <p style={{ margin: 0, fontSize: '0.8rem' }}>
-                Clicca in alto su <strong>"Importa con AI"</strong> per caricare il syllabus/tabella lezioni: l'AI collegherà automaticamente ogni data al rispettivo argomento, capitolo ed esercitazione!
-              </p>
-            </div>
-          ) : (
-            'Nessuna lezione memorizzata per questo corso. Importa il PDF/Excel dell\'orario con l\'AI oppure inseriscile manualmente.'
-          )}
+          Nessuna lezione memorizzata per questo corso. Importa il calendario (.ics) o carica il programma con l'AI, oppure inseriscile manualmente.
         </div>
       )}
 
+      {plan.length === 0 && existingCourseEvents.length > 0 && !formOpen && (
+        <div className="cp-card" style={{ background: 'rgba(59, 130, 246, 0.06)', borderColor: 'rgba(59, 130, 246, 0.25)' }}>
+          <div className="cp-card-body" style={{ fontSize: '0.82rem' }}>
+            <strong>Stai vedendo le {existingCourseEvents.length} lezioni dal tuo calendario generale.</strong>{' '}
+            Puoi spuntare direttamente qui sotto <em>Appunti</em> ed <em>Esercizi</em> man mano che avanzi, oppure cliccare in alto su <strong>"Importa con AI"</strong> per abbinare argomenti e capitoli a queste date senza alterare il calendario.
+          </div>
+        </div>
+      )}
+
+      {/* Se non c'è un lessonPlan separato ma ci sono eventi nel calendario, mostriamo direttamente gli eventi con 1-tap toggle */}
+      {plan.length === 0 && existingCourseEvents.map((ev, idx) => {
+        const tracks = getLessonTracks(ev, course);
+        const theoryDone = tracks.hasTheory ? isLessonTrackDone(ev, 'theory', courseTasks).done : false;
+        const exDone = tracks.hasExercise ? isLessonTrackDone(ev, 'exercise', courseTasks).done : false;
+        const isPast = new Date(ev.endTime).getTime() <= Date.now();
+        const lt: LessonType = ev.lessonType || (tracks.hasExercise && !tracks.hasTheory ? 'exercise' : 'theory');
+
+        return (
+          <div key={ev.id} className="cp-card" style={{ opacity: !isPast ? 0.85 : 1 }}>
+            <div className="cp-card-body">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-secondary)' }}>#{idx + 1}</span>
+                <span className="cp-card-title">{fmtDate(localDateKey(ev.startTime))}</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  {localTime(ev.startTime)} - {localTime(ev.endTime)}
+                </span>
+                <span className={`cp-badge ${TYPE_BADGE[lt]}`}>
+                  {TYPE_LABELS[lt]}
+                </span>
+                {ev.location?.address && <span className="cp-badge gray">{ev.location.address}</span>}
+                {!isPast && <span className="cp-badge gray">Futura</span>}
+              </div>
+
+              <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)', marginTop: 2 }}>
+                {ev.topic || ev.title}
+              </div>
+
+              {ev.notes && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  <BookOpen size={13} style={{ color: '#a855f7' }} />
+                  <span>{ev.notes}</span>
+                </div>
+              )}
+
+              {/* 1-Tap Toggles per Teoria / Esercizi */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                {tracks.hasTheory && (
+                  <button
+                    type="button"
+                    onClick={() => setLessonTrackDone(ev.id, 'theory', !theoryDone)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      padding: '4px 10px',
+                      borderRadius: 999,
+                      fontSize: '0.76rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: theoryDone ? '1px solid rgba(24,128,56,0.4)' : '1px solid var(--border-color)',
+                      background: theoryDone ? 'rgba(24,128,56,0.14)' : 'var(--bg-secondary)',
+                      color: theoryDone ? '#188038' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {theoryDone ? <CheckCircle2 size={13} /> : <Circle size={13} />}
+                    {theoryDone ? 'Appunti sistemati' : 'Segna appunti fatti'}
+                  </button>
+                )}
+                {tracks.hasExercise && (
+                  <button
+                    type="button"
+                    onClick={() => setLessonTrackDone(ev.id, 'exercise', !exDone)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      padding: '4px 10px',
+                      borderRadius: 999,
+                      fontSize: '0.76rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: exDone ? '1px solid rgba(24,128,56,0.4)' : '1px solid var(--border-color)',
+                      background: exDone ? 'rgba(24,128,56,0.14)' : 'var(--bg-secondary)',
+                      color: exDone ? '#188038' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {exDone ? <CheckCircle2 size={13} /> : <Circle size={13} />}
+                    {exDone ? 'Esercitazione fatta' : 'Segna esercizi fatti'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
       {plan.map(l => {
-        const inCalendar = l.eventId && eventById.has(l.eventId);
+        const linkedEvent: CalendarEvent | undefined =
+          (l.eventId ? eventById.get(l.eventId) : undefined) ||
+          existingCourseEvents.find(e => localDateKey(e.startTime) === l.date);
+        const inCalendar = !!linkedEvent;
+        const tracks = linkedEvent ? getLessonTracks(linkedEvent, course) : {
+          hasTheory: l.lessonType !== 'exercise' && l.lessonType !== 'lab',
+          hasExercise: l.lessonType === 'exercise' || l.lessonType === 'lab' || l.lessonType === 'theory_exercise',
+        };
+        const theoryDone = linkedEvent && tracks.hasTheory ? isLessonTrackDone(linkedEvent, 'theory', courseTasks).done : false;
+        const exDone = linkedEvent && tracks.hasExercise ? isLessonTrackDone(linkedEvent, 'exercise', courseTasks).done : false;
+
         return (
           <div key={l.id} className={`cp-card ${l.cancelled ? 'cancelled' : ''}`}>
             <div className="cp-card-body">
@@ -364,6 +474,55 @@ export function CourseCalendarTab({ course }: { course: Course }) {
                       <ExternalLink size={12} /> Materiale
                     </a>
                   ))}
+                </div>
+              )}
+
+              {linkedEvent && !l.cancelled && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                  {tracks.hasTheory && (
+                    <button
+                      type="button"
+                      onClick={() => setLessonTrackDone(linkedEvent.id, 'theory', !theoryDone)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '4px 10px',
+                        borderRadius: 999,
+                        fontSize: '0.76rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        border: theoryDone ? '1px solid rgba(24,128,56,0.4)' : '1px solid var(--border-color)',
+                        background: theoryDone ? 'rgba(24,128,56,0.14)' : 'var(--bg-secondary)',
+                        color: theoryDone ? '#188038' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {theoryDone ? <CheckCircle2 size={13} /> : <Circle size={13} />}
+                      {theoryDone ? 'Appunti sistemati' : 'Segna appunti fatti'}
+                    </button>
+                  )}
+                  {tracks.hasExercise && (
+                    <button
+                      type="button"
+                      onClick={() => setLessonTrackDone(linkedEvent.id, 'exercise', !exDone)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '4px 10px',
+                        borderRadius: 999,
+                        fontSize: '0.76rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        border: exDone ? '1px solid rgba(24,128,56,0.4)' : '1px solid var(--border-color)',
+                        background: exDone ? 'rgba(24,128,56,0.14)' : 'var(--bg-secondary)',
+                        color: exDone ? '#188038' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {exDone ? <CheckCircle2 size={13} /> : <Circle size={13} />}
+                      {exDone ? 'Esercitazione fatta' : 'Segna esercizi fatti'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

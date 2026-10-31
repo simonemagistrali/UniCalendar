@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Plus, Sparkles, BookOpen, Calendar, ClipboardCheck, Settings, GraduationCap, Check } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { Course } from '../../../core/types';
+import { LessonProgressEngine } from '../../../core/LessonProgressEngine';
 import { GlassPanel } from '../../ui/GlassPanel';
 import { CourseOverviewTab } from './CourseOverviewTab';
 import { CourseAssessmentsTab } from './CourseAssessmentsTab';
@@ -15,8 +16,15 @@ type Tab = 'overview' | 'calendar' | 'assessments' | 'topics' | 'settings';
 
 export function CoursesPage() {
   const courses = useAppStore(s => s.courses);
+  const events = useAppStore(s => s.events);
+  const tasks = useAppStore(s => s.tasks);
   const addCourse = useAppStore(s => s.addCourse);
   const repairCourses = useAppStore(s => s.repairCourses);
+
+  const paceMap = useMemo(() => {
+    const all = LessonProgressEngine.calculateAll(courses, events, tasks);
+    return new Map(all.courses.map(p => [p.courseId, p]));
+  }, [courses, events, tasks]);
 
   const [activeCourseId, setActiveCourseId] = useState<string>(() => courses[0]?.id || '');
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -87,8 +95,9 @@ export function CoursesPage() {
 
           {courses.map(c => {
             const isActive = activeCourse?.id === c.id;
-            const lessonCount = c.info?.lessonPlan?.length || 0;
-            const topicCount = c.info?.topics?.length || 0;
+            const pace = paceMap.get(c.id);
+            const totalLessons = Math.max(c.info?.lessonPlan?.length || 0, (pace?.theory.totalScheduled || 0) + (pace?.exercise.totalScheduled || 0));
+            const gap = pace?.totalGap || 0;
             return (
               <button
                 key={c.id}
@@ -105,8 +114,12 @@ export function CoursesPage() {
                     {c.name}
                   </div>
                   <div className="cp-item-sub">
-                    {lessonCount > 0 ? `${lessonCount} lezioni` : 'Nessuna lezione'}
-                    {topicCount > 0 ? ` • ${topicCount} argomenti` : ''}
+                    {totalLessons > 0 ? `${totalLessons} lezioni` : 'Nessuna lezione'}
+                    {totalLessons > 0 && (
+                      gap === 0
+                        ? ' • 🟢 In pari'
+                        : ` • 🔴 -${gap} da fare`
+                    )}
                   </div>
                 </div>
               </button>

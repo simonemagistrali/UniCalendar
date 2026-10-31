@@ -82,9 +82,10 @@ export class TaskManager {
       const hasExerciseForSlot = existingTasks.some(t => isExerciseTask(t) && matchesEventSlot(t));
 
       const wants = lessonTaskNeeds(event.lessonType, prefs, !!event.studyPreferencesOverride);
-      const needsFollow = !existingFollowTasks.has(event.id) && !existingFollowTaskTitles.has(followKey) && !hasFollowForSlot;
-      const needsNotes = wants.notes && !existingNotesTasks.has(event.id) && !existingNotesTaskTitles.has(notesKey) && !hasNotesForSlot;
-      const needsExercises = wants.exercises && !existingExerciseTasks.has(event.id) && !existingExerciseTaskTitles.has(exerciseKey) && !hasExerciseForSlot;
+      const wantsFollow = !!course.defaultStudyPreferences.requiresFollowLesson;
+      const needsFollow = wantsFollow && !event.theoryDone && !existingFollowTasks.has(event.id) && !existingFollowTaskTitles.has(followKey) && !hasFollowForSlot;
+      const needsNotes = wants.notes && !event.theoryDone && !existingNotesTasks.has(event.id) && !existingNotesTaskTitles.has(notesKey) && !hasNotesForSlot;
+      const needsExercises = wants.exercises && !event.exerciseDone && !existingExerciseTasks.has(event.id) && !existingExerciseTaskTitles.has(exerciseKey) && !hasExerciseForSlot;
 
       if (!needsFollow && !needsNotes && !needsExercises) {
         if (!event.isDone) updatedEvents[i] = { ...event, isDone: true };
