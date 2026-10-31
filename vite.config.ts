@@ -20,15 +20,27 @@ function geminiDevProxy(env: Record<string, string>): Plugin {
         }
         const chunks: Buffer[] = []
         req.on('data', (c: Buffer) => chunks.push(c))
+        req.on('error', (err) => {
+          console.error('[vite dev proxy] Errore stream richiesta:', err)
+          res.statusCode = 500
+          res.end(JSON.stringify({ error: 'Errore durante la ricezione della richiesta AI.' }))
+        })
         req.on('end', async () => {
-          let body: unknown = {}
-          try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch { /* corpo vuoto */ }
-          const result = await handleGeminiRequest(req.headers.authorization, body, {
-            GEMINI_API_KEY: env.GEMINI_API_KEY,
-            FIREBASE_API_KEY: env.FIREBASE_API_KEY || env.VITE_FIREBASE_API_KEY,
-          })
-          res.statusCode = result.status
-          res.end(JSON.stringify(result.body))
+          try {
+            let body: unknown = {}
+            try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch { /* corpo vuoto */ }
+            const result = await handleGeminiRequest(req.headers.authorization, body, {
+              GEMINI_API_KEY: env.GEMINI_API_KEY,
+              FIREBASE_API_KEY: env.FIREBASE_API_KEY || env.VITE_FIREBASE_API_KEY,
+            })
+            res.statusCode = result.status
+            res.end(JSON.stringify(result.body))
+          } catch (err: unknown) {
+            console.error('[vite dev proxy] Errore proxy AI:', err)
+            res.statusCode = 500
+            const message = (err as Error)?.message || 'Errore interno nel proxy di sviluppo'
+            res.end(JSON.stringify({ error: `Errore proxy AI: ${message}` }))
+          }
         })
       })
     },

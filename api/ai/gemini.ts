@@ -22,6 +22,8 @@ async function readBody(req: Req): Promise<unknown> {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return {}; }
 }
 
+export const maxDuration = 60;
+
 export default async function handler(req: Req, res: ServerResponse): Promise<void> {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Cache-Control', 'no-store');
@@ -33,11 +35,19 @@ export default async function handler(req: Req, res: ServerResponse): Promise<vo
     return;
   }
 
-  const result = await handleGeminiRequest(req.headers.authorization, await readBody(req), {
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-    FIREBASE_API_KEY: process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY,
-  });
-  res.statusCode = result.status;
-  res.end(JSON.stringify(result.body));
+  try {
+    const body = await readBody(req);
+    const result = await handleGeminiRequest(req.headers.authorization, body, {
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+      FIREBASE_API_KEY: process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY,
+    });
+    res.statusCode = result.status;
+    res.end(JSON.stringify(result.body));
+  } catch (err: unknown) {
+    console.error('[api/ai/gemini] Errore imprevisto nel proxy:', err);
+    res.statusCode = 500;
+    const message = (err as Error)?.message || 'Errore interno del server durante la chiamata AI.';
+    res.end(JSON.stringify({ error: `Errore elaborazione AI: ${message}` }));
+  }
 }
 
