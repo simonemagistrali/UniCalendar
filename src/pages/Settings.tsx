@@ -247,7 +247,7 @@ export function Settings() {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
-                            <input 
+                            <input
                               type="checkbox"
                               checked={config.lunchBreak?.enabled ?? true}
                               onChange={() => handleToggleLunch(day.id)}
@@ -551,10 +551,10 @@ export function Settings() {
                 <span className="settings-field-label">minuti</span>
               </div>
             </div>
-            
+
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 checked={isCommuteProductive}
                 onChange={e => setIsCommuteProductive(e.target.checked)}
                 style={{ width: '18px', height: '18px' }}
@@ -590,10 +590,10 @@ export function Settings() {
           <GlassPanel>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
               <h2 className="settings-section-title" style={{ margin: 0 }}>Assistente AI (Google Gemini)</h2>
-              <span style={{ 
-                fontSize: '0.75rem', 
-                padding: '2px 8px', 
-                borderRadius: '12px', 
+              <span style={{
+                fontSize: '0.75rem',
+                padding: '2px 8px',
+                borderRadius: '12px',
                 background: 'rgba(34, 197, 94, 0.15)',
                 color: '#22c55e',
                 fontWeight: 600
@@ -640,8 +640,8 @@ export function Settings() {
                 <span>Importa Backup JSON</span>
                 <input type="file" accept=".json" onChange={handleImportBackup} style={{ display: 'none' }} />
               </label>
-              <Button 
-                variant="secondary" 
+              <Button
+                variant="secondary"
                 onClick={() => navigate('/privacy')}
               >
                 Leggi la Privacy Policy
