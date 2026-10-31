@@ -1,3 +1,4 @@
+import { taskLessonDateIso } from './lessonLink';
 import type { Task, Course, CalendarEvent, UserPreferences, PerformanceRecord, FutureWorkloadProjection, TaskSortMode } from './types';
 import { isLessonRecoveryTask } from './taskKind';
 import { HabitAnalysisEngine } from './HabitAnalysisEngine';
@@ -183,6 +184,22 @@ export class PriorityEngine {
     // "In corso" è sempre in cima; poi vale la modalità scelta dall'utente.
     const mode: TaskSortMode = prefs.taskSortMode || 'oldest';
     const created = (t: Task) => new Date(t.createdAt).getTime();
+
+    // Data di riferimento per l'anzianità della lezione / attività
+    const getTaskAgeTime = (t: Task): number => {
+      const lessonDate = taskLessonDateIso(t);
+      if (lessonDate) {
+        let timePart = '00:00';
+        const slot = t.lessonTimeSlot || t.title.match(/(\d{1,2}:\d{2})\s*-\s*\d{1,2}:\d{2}/)?.[1];
+        if (slot) {
+          const match = slot.match(/(\d{1,2}:\d{2})/);
+          if (match) timePart = match[1].padStart(5, '0');
+        }
+        const parsed = new Date(`${lessonDate}T${timePart}:00`).getTime();
+        if (!isNaN(parsed)) return parsed;
+      }
+      return created(t);
+    };
     const dueTime = (t: Task): number => {
       const candidates: number[] = [];
       if (t.deadline) candidates.push(new Date(t.deadline).getTime());
@@ -220,7 +237,7 @@ export class PriorityEngine {
         }
         case 'oldest':
         default:
-          return created(a) - created(b) || b.priorityScore - a.priorityScore;
+          return getTaskAgeTime(a) - getTaskAgeTime(b) || created(a) - created(b) || b.priorityScore - a.priorityScore;
       }
     });
 
