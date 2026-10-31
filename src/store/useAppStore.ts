@@ -23,8 +23,8 @@ function defaultDailyHours(): Record<number, DayStudyHours> {
     h[d] = d === 0
       ? { enabled: true, start: '09:00', end: '14:00', lunchBreak: { enabled: true, start: '13:00', end: '14:00' } } // Sunday: shorter hours
       : d === 6
-      ? { enabled: true, start: '09:00', end: '17:00', lunchBreak: { enabled: true, start: '13:00', end: '14:00' } } // Saturday: slightly shorter
-      : { enabled: true, start: '08:00', end: '18:00', lunchBreak: { enabled: true, start: '13:00', end: '14:00' } }; // Weekdays
+        ? { enabled: true, start: '09:00', end: '17:00', lunchBreak: { enabled: true, start: '13:00', end: '14:00' } } // Saturday: slightly shorter
+        : { enabled: true, start: '08:00', end: '18:00', lunchBreak: { enabled: true, start: '13:00', end: '14:00' } }; // Weekdays
   }
   return h;
 }
@@ -95,19 +95,19 @@ interface AppState {
   ankiHistory: AnkiDaySnapshot[];
   setUser: (user: AppUser | null) => void;
   initializeUser: (user: AppUser) => Promise<void>;
-  
+
   // Daily Goal
   selectedDailyGoalType: 'PACE' | '7DAYS' | 'END' | null;
   selectedDailyGoalValue: number | null;
   setDailyGoal: (type: 'PACE' | '7DAYS' | 'END' | null, value: number | null) => void;
-  
-  
+
+
   // Events
   addEvent: (event: CalendarEvent) => void;
   addEvents: (events: CalendarEvent[]) => void;
   updateEvent: (id: string, updates: Partial<CalendarEvent>) => void;
   removeEvent: (id: string) => void;
-  
+
   // Tasks
   addTask: (task: Task) => void;
   addTasks: (tasks: Task[]) => void;
@@ -121,7 +121,7 @@ interface AppState {
     completionMode?: 'attended' | 'recovered' | 'normal',
     opts?: { durationConfidence?: number; wasDistracted?: boolean; isMultiDay?: boolean }
   ) => void;
-  
+
   // Courses
   addCourse: (course: Course) => void;
   updateCourse: (id: string, updates: Partial<Course>) => void;
@@ -129,23 +129,23 @@ interface AppState {
   /** Salva in un'unica operazione atomica corso + eventi + task (usato dall'import AI dei documenti). */
   commitCourseImport: (data: { course: Course; events: CalendarEvent[]; tasks: Task[] }) => void;
   repairCourses: () => { changed: boolean; count: number };
-  
+
   // Sessions
   setStudySessions: (sessions: StudySession[]) => void;
-  
+
   // Performance
   addPerformanceRecord: (record: PerformanceRecord) => void;
-  
+
   // Preferences
   updatePreferences: (prefs: Partial<UserPreferences>) => void;
 
   // Anki
   recordAnkiSync: (today: AnkiDaySnapshot, reviewsByDay: Record<string, number>) => void;
-  
+
   // Bulk
   setEvents: (events: CalendarEvent[]) => void;
   setTasks: (tasks: Task[]) => void;
-  
+
   // Sync
   syncAndSchedule: () => void;
 
@@ -154,6 +154,7 @@ interface AppState {
   setLessonTrackDone: (eventId: string, track: 'theory' | 'exercise', done: boolean) => void;
   setCourseCheckpoint: (courseId: string, track: 'theory' | 'exercise', upToEventId: string | null) => { markedLessons: number; removedTasks: number };
   cleanupNoisyTasks: (opts?: { removeFollowLessonTasks?: boolean; removeOrphanLessonTasks?: boolean; deduplicate?: boolean }) => { removedTasks: number; removedEvents: number };
+  resetAllData: (opts?: { keepCourses?: boolean; keepHistory?: boolean }) => void;
 
   // Semesters
   semesters: Semester[];
@@ -268,19 +269,19 @@ function isEventDuplicate(newEvent: CalendarEvent, existingEvents: CalendarEvent
   if (existingEvents.some(e => e.id === newEvent.id)) {
     return true;
   }
-  
+
   const nStart = new Date(newEvent.startTime).getTime();
   const nEnd = new Date(newEvent.endTime).getTime();
   const nTitle = newEvent.title.toLowerCase();
-  
+
   return existingEvents.some(e => {
     const eStart = new Date(e.startTime).getTime();
     const eEnd = new Date(e.endTime).getTime();
     const eTitle = e.title.toLowerCase();
-    
+
     const sameTime = nStart === eStart && nEnd === eEnd;
     const sameTitle = nTitle === eTitle || nTitle.includes(eTitle) || eTitle.includes(nTitle);
-    
+
     return sameTime && sameTitle;
   });
 }
@@ -335,12 +336,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   initializeUser: async (user) => {
     set({ user });
-    
+
     try {
       console.log("[Sync] Tentativo di caricamento dati per:", user.id);
       const cloudData = await loadFromCloud(user.id);
       console.log("[Sync] Dati ricevuti dal cloud:", cloudData);
-      
+
       const updateFromCloud = (data: any) => {
         let needsCloudWrite = false;
         set((s) => {
@@ -362,7 +363,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           // Riscrivi sul cloud solo se abbiamo riparato i corsi o se il locale
           // aveva giorni Anki che il cloud non conosceva ancora
           needsCloudWrite = repaired.changed || ankiHistory.length !== (data.ankiHistory || []).length;
-          
+
           // Salva solo in cache locale: NON ri-caricare sul cloud, altrimenti si
           // cancellerebbe un eventuale salvataggio locale in attesa (debounce).
           saveState({
@@ -383,12 +384,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (cloudData) {
         updateFromCloud(cloudData);
       }
-      
+
       // Iscriviti ai cambiamenti in tempo reale per supportare il multi-device
       subscribeToCloud(user.id, (realtimeData) => {
         updateFromCloud(realtimeData);
       });
-      
+
     } catch (error) {
       console.error("Failed to hydrate from cloud", error);
     }
@@ -498,8 +499,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   removeTask: (id) => {
     get().saveSnapshot();
     set((s) => {
-      const next = { 
-        ...s, 
+      const next = {
+        ...s,
         tasks: s.tasks.filter(t => t.id !== id),
         studySessions: s.studySessions.filter(ss => ss.taskId !== id)
       };
@@ -512,8 +513,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().saveSnapshot();
     const idSet = new Set(ids);
     set((s) => {
-      const next = { 
-        ...s, 
+      const next = {
+        ...s,
         tasks: s.tasks.filter(t => !idSet.has(t.id)),
         studySessions: s.studySessions.filter(ss => !idSet.has(ss.taskId))
       };
@@ -529,7 +530,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const remainingTasks = s.tasks.filter(t => {
         // Course filter
         if (filter.courseId && filter.courseId !== 'ALL' && t.courseId !== filter.courseId) return true;
-        
+
         // Status filter
         if (filter.status && filter.status !== 'ALL') {
           if (filter.status === 'todo' && t.status === 'done') return true;
@@ -538,9 +539,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         // AI enriched filter
         if (filter.onlyAiEnriched) {
-          const isAi = t.isAiEnriched || 
-                       t.description?.includes('Argomento:') || 
-                       t.description?.includes('Capitoli/Libro:');
+          const isAi = t.isAiEnriched ||
+            t.description?.includes('Argomento:') ||
+            t.description?.includes('Capitoli/Libro:');
           if (!isAi) return true;
         }
 
@@ -660,22 +661,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       const nextPerformanceHistory = task.courseId
         ? [
-            ...s.performanceHistory,
-            {
-              courseId: task.courseId,
-              taskId: id,
-              estimatedMinutes: task.estimatedDuration,
-              actualMinutes,
-              completedAt: now,
-              taskKind: getTaskKind(task),
-              inferredStartTime: timeWindow.inferredStartTime,
-              timeConfidence: timeWindow.timeConfidence,
-              durationConfidence: timeWindow.durationConfidence,
-              wasDistracted: opts?.wasDistracted || false,
-              isMultiDay: timeWindow.isMultiDay,
-              pauseCount: task.pauseCount || 0,
-            },
-          ]
+          ...s.performanceHistory,
+          {
+            courseId: task.courseId,
+            taskId: id,
+            estimatedMinutes: task.estimatedDuration,
+            actualMinutes,
+            completedAt: now,
+            taskKind: getTaskKind(task),
+            inferredStartTime: timeWindow.inferredStartTime,
+            timeConfidence: timeWindow.timeConfidence,
+            durationConfidence: timeWindow.durationConfidence,
+            wasDistracted: opts?.wasDistracted || false,
+            isMultiDay: timeWindow.isMultiDay,
+            pauseCount: task.pauseCount || 0,
+          },
+        ]
         : s.performanceHistory;
 
       const next = {
@@ -848,7 +849,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   syncAndSchedule: () => {
     get().saveSnapshot();
     const state = get();
-    
+
     // 1. Generate tasks from past events
     const { updatedEvents, newTasks } = TaskManager.generateTasksFromPastEvents(state.events, state.courses, state.tasks);
     // Riallinea titolo/descrizione dei task di lezione agli argomenti correnti degli eventi (es. importati da AI)
@@ -887,21 +888,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     const allEventsForScheduling = [...updatedEvents, ...travelEvents, ...mealEvents];
 
     const sessions = SchedulerEngine.generateSchedule(
-      sortedActiveTasks, 
-      allEventsForScheduling, 
-      state.preferences, 
-      new Date(), 
+      sortedActiveTasks,
+      allEventsForScheduling,
+      state.preferences,
+      new Date(),
       14, // Schedule for next 14 days
       state.performanceHistory,
       futureProjection
     );
 
     set((s) => {
-      const next = { 
-        ...s, 
-        events: updatedEvents, 
+      const next = {
+        ...s,
+        events: updatedEvents,
         tasks: finalTasks,
-        studySessions: sessions 
+        studySessions: sessions
       };
       persist(next as AppState);
       return next;
@@ -1117,6 +1118,40 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     return { removedTasks, removedEvents };
+  },
+
+  resetAllData: (opts) => {
+    get().saveSnapshot();
+    const state = get();
+    const nextCourses = opts?.keepCourses ? state.courses : [];
+    const nextHistory = opts?.keepHistory ? state.performanceHistory : [];
+    const nextAnki = opts?.keepHistory ? state.ankiHistory : [];
+
+    const next: Partial<AppState> = {
+      events: [],
+      tasks: [],
+      courses: nextCourses,
+      studySessions: [],
+      performanceHistory: nextHistory,
+      ankiHistory: nextAnki,
+      semesters: [],
+    };
+
+    set((s) => {
+      const updated = { ...s, ...next };
+      saveState({
+        events: updated.events,
+        tasks: updated.tasks,
+        courses: updated.courses,
+        preferences: updated.preferences,
+        performanceHistory: updated.performanceHistory,
+        studySessions: updated.studySessions,
+        ankiHistory: updated.ankiHistory,
+        semesters: updated.semesters,
+      });
+      persist(updated as AppState);
+      return updated;
+    });
   },
   // ── Semesters ──
   addSemester: (name) => {

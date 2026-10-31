@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, GraduationCap, Archive, Download, Upload, Sparkles, Mail } from 'lucide-react';
+import { ArrowLeft, Save, GraduationCap, Archive, Download, Upload, Sparkles, Mail, Trash2, AlertTriangle, RotateCcw } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { Button } from '../components/ui/Button';
 import { GlassPanel } from '../components/ui/GlassPanel';
@@ -68,6 +68,11 @@ export function Settings() {
 
   // Backup Notice
   const [backupMsg, setBackupMsg] = useState<string | null>(null);
+
+  // Reset Completo state
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [resetKeepCourses, setResetKeepCourses] = useState(false);
+  const [resetKeepHistory, setResetKeepHistory] = useState(false);
 
   const activeSemester = SemesterManager.getActive(semesters);
 
@@ -206,6 +211,19 @@ export function Settings() {
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  const handleFullReset = () => {
+    // 1. Salva un backup di emergenza automatico nei Download prima di resettare
+    handleExportBackup();
+    // 2. Resetta i dati (locale + Firebase)
+    useAppStore.getState().resetAllData({
+      keepCourses: resetKeepCourses,
+      keepHistory: resetKeepHistory,
+    });
+    setIsResetConfirmOpen(false);
+    setBackupMsg('✓ Reset completato: tutti i dati sono stati cancellati e un backup di sicurezza è stato scaricato nei Download.');
+    setTimeout(() => setBackupMsg(null), 6000);
   };
 
   return (
@@ -665,6 +683,86 @@ export function Settings() {
             {backupMsg && (
               <div style={{ marginTop: '8px', fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>
                 {backupMsg}
+              </div>
+            )}
+          </GlassPanel>
+
+          {/* Zona Pericolo: Reset Completo */}
+          <GlassPanel style={{ borderColor: 'rgba(217, 48, 37, 0.35)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem' }}>
+              <AlertTriangle size={20} style={{ color: 'var(--accent-danger)' }} />
+              <h2 className="settings-section-title" style={{ margin: 0, color: 'var(--accent-danger)' }}>
+                Zona Pericolo: Reset Dati & Ripartenza da Zero
+              </h2>
+            </div>
+            <p className="settings-section-desc">
+              Cancella definitivamente gli eventi del calendario, le attività, le sessioni e i semestri salvati sia in locale che sul cloud Firebase per ripartire con un'agenda pulita.
+            </p>
+
+            {!isResetConfirmOpen ? (
+              <div style={{ marginTop: '1rem' }}>
+                <Button
+                  variant="danger"
+                  icon={<Trash2 size={16} />}
+                  onClick={() => setIsResetConfirmOpen(true)}
+                >
+                  Cancella Tutti i Dati per Ripartire da Zero…
+                </Button>
+              </div>
+            ) : (
+              <div style={{
+                marginTop: '1rem',
+                padding: '14px',
+                borderRadius: '10px',
+                background: 'rgba(217, 48, 37, 0.08)',
+                border: '1px solid rgba(217, 48, 37, 0.3)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ fontWeight: 700, color: '#d93025', fontSize: '0.92rem' }}>
+                  ⚠️ Conferma di cancellazione totale
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                  Questa operazione svuoterà l'intero database locale e su cloud Firebase. Prima del reset verrà scaricato <strong>automaticamente un file di backup JSON</strong> sul tuo computer per sicurezza.
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={resetKeepCourses}
+                      onChange={e => setResetKeepCourses(e.target.checked)}
+                      style={{ accentColor: '#d93025' }}
+                    />
+                    <span>Mantieni i corsi universitari configurati (svuota solo lezioni e task)</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={resetKeepHistory}
+                      onChange={e => setResetKeepHistory(e.target.checked)}
+                      style={{ accentColor: '#d93025' }}
+                    />
+                    <span>Mantieni lo storico delle prestazioni passate per i modelli di stima</span>
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  <Button
+                    variant="danger"
+                    icon={<Trash2 size={16} />}
+                    onClick={handleFullReset}
+                  >
+                    Confermo: Scarica Backup e Cancella Tutto
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setIsResetConfirmOpen(false)}
+                  >
+                    Annulla
+                  </Button>
+                </div>
               </div>
             )}
           </GlassPanel>

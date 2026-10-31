@@ -183,10 +183,10 @@ export class FutureProjectionEngine {
       const sourceEvent = events.find(e => e.id === pt.sourceEventId);
       const lessonDateStr = sourceEvent
         ? new Date(sourceEvent.startTime).toLocaleDateString('it-IT', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-          })
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+        })
         : '';
 
       return {
